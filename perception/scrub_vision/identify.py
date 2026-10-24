@@ -21,7 +21,7 @@ TOL_MM = 1.5            # silhouette match tolerance (thin tines are ~2 mm wide)
 LENGTH_WEIGHT = 2.0     # score penalty per unit relative length error (Castroviejo 140 vs micro scissors 150)
 
 
-@dataclass
+@dataclass(eq=False)   # identity equality: masks are arrays
 class Detection:
     mask: np.ndarray
     coarse: str | None
