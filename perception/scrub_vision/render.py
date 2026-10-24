@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import trimesh
 
-from .templates import Instrument, mesh_for
+from .templates import Instrument, fill_tris, mesh_for
 
 PLA_GREEN_RGB = (0, 174, 66)
 
@@ -91,18 +91,19 @@ def render_scene(items: list[tuple[trimesh.Trimesh, np.ndarray]], cam: CamSpec, 
         nn = np.linalg.norm(n, axis=1)
         keep = (n[:, 2] > 0) & (nn > 1e-9)       # facing the camera
         uv = cam.project(v)
-        polys = np.round(uv[mesh.faces[keep]]).astype(np.int32)
+        polys = uv[mesh.faces[keep]]
         shade = 0.45 + 0.55 * np.clip((n[keep] / nn[keep, None]) @ light, 0, 1)
         # soft drop shadow on what's below
         sil = np.zeros((cam.h, cam.w), np.uint8)
-        cv2.fillPoly(sil, list(polys + np.round(shadow_off * cam.fx / cam.height_mm).astype(np.int32)), 255)
+        fill_tris(sil, polys + shadow_off * cam.fx / cam.height_mm, 255)
         sh = cv2.GaussianBlur(sil.astype(np.float32) / 255, (0, 0), 3) * rng.uniform(0.15, 0.35)
         img *= (1 - sh)[..., None]
-        levels = np.minimum((shade * 12).astype(int), 11)
-        for lv in np.unique(levels):
-            col = tuple(float(c) for c in np.clip(base * (lv + 0.5) / 12 * 1.1, 0, 255))
-            cv2.fillPoly(img, list(polys[levels == lv]), col)
-        cv2.fillPoly(ids, list(polys), k + 1)
+        # draw faces lowest-first so an instrument's raised parts cover its own lower parts
+        zf = v[mesh.faces[keep]][:, :, 2].mean(1)
+        for i in np.argsort(zf):
+            col = tuple(float(c) for c in np.clip(base * shade[i] * 1.1, 0, 255))
+            cv2.fillConvexPoly(img, np.round(polys[i]).astype(np.int32), col)
+        fill_tris(ids, polys, k + 1)
     masks = [ids == k + 1 for k in range(len(items))]
     return np.clip(img, 0, 255).astype(np.uint8), masks
 

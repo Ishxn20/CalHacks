@@ -99,9 +99,15 @@ def mesh_for(inst: Instrument) -> trimesh.Trimesh:
     return m
 
 
+def fill_tris(img: np.ndarray, tris: np.ndarray, color) -> None:
+    """Union-fill triangles. (cv2.fillPoly with many polygons uses even-odd: overlaps would cancel.)"""
+    for t in np.round(tris).astype(np.int32):
+        cv2.fillConvexPoly(img, t, color)
+
+
 def rasterize_xy(vertices_xy: np.ndarray, faces: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     img = np.zeros(shape, np.uint8)
-    cv2.fillPoly(img, list(np.round(vertices_xy[faces]).astype(np.int32)), 255)
+    fill_tris(img, vertices_xy[faces], 255)
     return img
 
 

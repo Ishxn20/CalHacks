@@ -50,3 +50,19 @@ def test_gripper_hides_instrument_pixels():
     out, gm = add_gripper(img, rng)
     assert gm[-1].any() and not gm[: int(540 * 0.7)].any()
     assert (out[gm] < 60).all()
+
+
+def test_rasterize_overlapping_triangles_is_union():
+    from scrub_vision.templates import rasterize_xy
+    v = np.array([[0, 0], [40, 0], [0, 40], [10, 10], [50, 10], [10, 50]], float)
+    m = rasterize_xy(v, np.array([[0, 1, 2], [3, 4, 5]]), (60, 60))
+    assert m[15, 15] == 255      # inside both triangles: must stay filled
+
+
+def test_template_mask_is_solid():
+    from scrub_vision.templates import build_templates, load_instruments
+    t = next(t for t in build_templates(load_instruments(), 0.5) if t.fine_id == "forceps_resano")
+    import cv2
+    _, hier = cv2.findContours((t.mask > 0).astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    holes = sum(h[3] != -1 for h in hier[0])
+    assert holes <= 1            # only the gap between the tines

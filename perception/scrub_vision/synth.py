@@ -13,7 +13,7 @@ import numpy as np
 import yaml
 
 from .render import CamSpec, add_gripper, pose, render_scene, scene_mesh
-from .templates import Instrument, classes, load_instruments
+from .templates import Instrument, classes, fill_tris, load_instruments
 
 PILE_CENTER_MM = (0.0, -40.0)     # above the gripper, which occupies the bottom of the frame
 PILE_HALF_MM = (120.0, 80.0)
@@ -27,7 +27,7 @@ def _footprint(mesh, T, shape, origin) -> np.ndarray:
     v = mesh.vertices @ T[:3, :3].T + T[:3, 3]
     xy = (v[:, :2] - origin) / HM_RES
     fp = np.zeros(shape, np.uint8)
-    cv2.fillPoly(fp, list(np.round(xy[mesh.faces]).astype(np.int32)), 1)
+    fill_tris(fp, xy[mesh.faces], 1)
     return fp.astype(bool)
 
 
