@@ -16,4 +16,3 @@ sim/declutter_eval*.json
 sim/*.log
 perception/*.log
 sim/policy/checkpoints/*/replay_buffer.pkl
-sim/train_reach*.log
