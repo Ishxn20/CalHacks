@@ -8,3 +8,10 @@ last_command.json
 
 #coding agents
 .cursor.superpowers/
+.DS_Store
+*.pt
+perception/*_data.yaml
+sim/*.mp4
+sim/declutter_eval*.json
+sim/*.log
+perception/*.log
