@@ -52,11 +52,13 @@ class TaskFailed(RuntimeError):
 
 
 class ScrubAssistant:
-    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier) -> None:
+    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier, kin=None) -> None:
         self.driver = driver
         self.catalog = catalog
         self.verifier = verifier
         self.cfg = driver.cfg
+        self.kin = kin                      # Kinematics, only in pick.mode == "ik"
+        self._picked_from: tuple | None = None   # (x_mm, y_mm, yaw_deg, thickness_mm) of the last ik pick
 
         self.phase = Phase.IDLE
         self.holding: Resolved | None = None
@@ -261,6 +263,70 @@ class ScrubAssistant:
         d.gripper_open()
         self.holding = None
         d.move_path(list(reversed(slot.approach[:-1])), speed=slow)
+
+    # ── ik picking (pick.mode == "ik") ────────────────────────────────────
+
+    def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float) -> np.ndarray:
+        """Joint vector for a top-down grasp pose, or TaskFailed if the arm can't reach it."""
+        assert self.kin is not None, "pick.mode is not 'ik'"
+        q = self.kin.ik_topdown(x_mm / 1000.0, y_mm / 1000.0, z_m, math.radians(yaw_deg),
+                                self.driver.q_command(), (self.cfg.lower, self.cfg.upper))
+        if q is None:
+            raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm")
+        return q
+
+    def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float) -> float:
+        """Step the open gripper straight down from hover until the pile pushes back or z_floor is reached.
+
+        Contact = any pick.contact_joints lagging its setpoint by more than pick.contact_deviation beyond
+        the lag measured at hover (gravity sag). Returns the z (m) the gripper stopped at.
+        """
+        pk, d = self.cfg.pick, self.driver
+        idx = [self.cfg.joint_index(n) for n in pk.contact_joints]
+        slow = self.cfg.motion.approach_speed_scale
+        z_hover = pk.table_z + pk.hover
+        d.move_to(self._solve(x_mm, y_mm, z_hover, yaw_deg))
+        baseline = np.nanmean([d.tracking_deviation()[idx] for _ in range(5)], axis=0)
+        z_prev, z = z_hover, z_hover
+        while z > z_floor + 1e-9:
+            z_prev, z = z, max(z - pk.descend_step, z_floor)
+            d.move_to(self._solve(x_mm, y_mm, z, yaw_deg), speed=slow)
+            d.sleep(0.02)   # let feedback catch up before judging contact
+            dev = np.nanmax(np.abs(d.tracking_deviation()[idx] - baseline), initial=0.0)
+            if dev > pk.contact_deviation:
+                d.move_to(self._solve(x_mm, y_mm, z_prev, yaw_deg), speed=slow)
+                return z_prev
+        return z
+
+    def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float) -> None:
+        """hover -> open -> contact descent -> grasp -> lift. TaskFailed on a miss (caller decides on retry)."""
+        pk, d = self.cfg.pick, self.driver
+        z_hover = pk.table_z + pk.hover
+        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg)   # fail before moving if unreachable
+        self.phase = Phase.PICKING
+        d.move_to(q_hover)
+        d.gripper_open()
+        z_floor = pk.table_z + thickness_mm / 2000.0 - 0.002
+        self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor)
+        got_it = d.gripper_grasp()
+        d.move_to(q_hover, speed=self.cfg.motion.approach_speed_scale)
+        if not got_it:
+            d.gripper_open()
+            raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
+        self._picked_from = (x_mm, y_mm, yaw_deg, thickness_mm)
+
+    def _place_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float) -> None:
+        """hover -> descend to just above the table -> open -> hover. No contact sensing (staging zone is flat)."""
+        pk, d = self.cfg.pick, self.driver
+        slow = self.cfg.motion.approach_speed_scale
+        q_hover = self._solve(x_mm, y_mm, pk.table_z + pk.hover, yaw_deg)
+        q_down = self._solve(x_mm, y_mm, pk.table_z + thickness_mm / 2000.0 + 0.005, yaw_deg)
+        self.phase = Phase.RETURNING
+        d.move_to(q_hover)
+        d.move_to(q_down, speed=slow)
+        d.gripper_open()
+        self.holding = None
+        d.move_to(q_hover, speed=slow)
 
     def _oriented(self, pose: str, orientation: str | None) -> np.ndarray:
         """Pose with the wrist (joint6) rotated for forehand/backhand, wrapped into joint limits."""

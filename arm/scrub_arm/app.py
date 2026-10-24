@@ -36,7 +36,12 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
         bus = RobstrideBus(cfg)
     driver = ArmDriver(cfg, bus, poses, sim=sim)
     catalog = Catalog(tray, default_orientation=cfg.handoff.default_orientation, require_slot=cfg.pick.mode == "slots")
-    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify))
+    kin = None
+    if cfg.pick.mode == "ik":
+        from .kinematics import Kinematics   # needs the `kinematics` extra (pinocchio)
+
+        kin = Kinematics()
+    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify), kin=kin)
     return App(cfg, tray, poses, driver, catalog, assistant)
 
 

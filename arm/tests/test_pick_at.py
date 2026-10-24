@@ -1,0 +1,88 @@
+import math
+import re
+
+import numpy as np
+import pytest
+
+from scrub_arm.app import build
+from scrub_arm.handoff import TaskFailed
+
+
+@pytest.fixture
+def ik_app(config_dir):
+    p = config_dir / "arm.yaml"
+    p.write_text(re.sub(r"^(\s*mode:\s*)slots", r"\g<1>ik", p.read_text(), flags=re.M))
+    a = build(sim=True, config_dir=config_dir)
+    m = a.cfg.motion
+    m.speed_scale, m.approach_speed_scale, m.min_move_s, m.settle_timeout_s = 20.0, 1.0, 0.02, 0.1
+    a.cfg.gripper.settle_s = 0.05
+    a.cfg.control_rate_hz = 500
+    a.driver.start()
+    a.driver.enable()
+    yield a
+    a.driver.shutdown()
+
+
+def test_ik_mode_builds_kinematics(ik_app):
+    assert ik_app.assistant.kin is not None
+
+
+def test_pick_at_sets_picked_from(ik_app):
+    ik_app.assistant._pick_at(300, 0, 0, 4.0)
+    assert ik_app.assistant._picked_from == (300, 0, 0, 4.0)
+
+
+def test_pick_at_miss_raises(ik_app):
+    ik_app.driver.bus.object_in_jaws = False
+    with pytest.raises(TaskFailed):
+        ik_app.assistant._pick_at(300, 0, 0, 4.0)
+
+
+def test_unreachable_does_not_move(ik_app):
+    q0 = ik_app.driver.q_command()
+    with pytest.raises(TaskFailed):
+        ik_app.assistant._pick_at(1500, 0, 0, 4.0)
+    assert np.allclose(ik_app.driver.q_command(), q0)
+
+
+def _contact_after(ik_app, n_moves):
+    """Shove joint2 off its setpoint after the n-th move_to call (simulates fingertips landing on the pile)."""
+    real = ik_app.driver.move_to
+    calls = {"n": 0}
+
+    def move_to(q, speed=1.0, wait=True):
+        real(q, speed, wait)
+        calls["n"] += 1
+        if calls["n"] == n_moves:
+            ik_app.driver.bus.external_offset[1] = math.radians(3.0)
+
+    ik_app.driver.move_to = move_to
+
+
+def test_descend_stops_on_contact(ik_app):
+    a, pk = ik_app.assistant, ik_app.cfg.pick
+    z_floor = pk.table_z
+    _contact_after(ik_app, 3)   # hover move + 2 steps, contact on the 3rd call (2nd descent step)
+    z = a._descend_until_contact(300, 0, 0, z_floor)
+    assert z > z_floor + 2 * pk.descend_step
+    assert z < pk.table_z + pk.hover
+
+
+def test_contact_on_first_step_returns_to_hover(ik_app):
+    a, pk = ik_app.assistant, ik_app.cfg.pick
+    _contact_after(ik_app, 2)   # hover move, then contact on the first descent step
+    z = a._descend_until_contact(300, 0, 0, pk.table_z)
+    assert z == pytest.approx(pk.table_z + pk.hover)
+
+
+def test_no_contact_reaches_floor(ik_app):
+    a, pk = ik_app.assistant, ik_app.cfg.pick
+    z = a._descend_until_contact(300, 0, 0, 0.010)
+    assert z == pytest.approx(0.010, abs=1e-9)
+
+
+def test_place_at_opens_gripper(ik_app):
+    a = ik_app.assistant
+    a._pick_at(300, 0, 0, 4.0)
+    a._place_at(250, -200, 0, 4.0)
+    assert abs(ik_app.driver.gripper_measured() - ik_app.cfg.gripper.open) < math.radians(2)
