@@ -20,12 +20,12 @@ DEFAULT = Path(__file__).resolve().parent / "policy" / "reach_policy.zip"
 class ReachPolicy:
     def __init__(self, path=DEFAULT, max_steps: int = 150) -> None:
         """path: a saved SAC .zip, or a live SAC model (evaluation during training)."""
+        self.env = ReachEnv(max_steps=max_steps)
         if isinstance(path, (str, Path)):
             from stable_baselines3 import SAC
 
-            path = SAC.load(str(path), device="cpu")
+            path = SAC.load(str(path), env=self.env, device="cpu")   # HER models need the env to load
         self.model = path
-        self.env = ReachEnv(max_steps=max_steps)
 
     def rollout(self, x: float, y: float, z: float, yaw: float, q_seed) -> tuple[np.ndarray | None, int, dict]:
         """(q at first success or None, steps taken, last step info)."""

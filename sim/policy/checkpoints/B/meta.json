@@ -1,0 +1,13 @@
+{
+ "name": "B",
+ "her": true,
+ "gamma": 0.98,
+ "seed": 7,
+ "target_steps": 300000,
+ "eval_every": 50000,
+ "eval_n": 200,
+ "eval_seed": 777,
+ "learning_starts": 5000,
+ "num_timesteps": 150000,
+ "note": "paused from a run started before checkpointing existed: model only, replay buffer lost (buffer_size was 1M); resume refills 5000 steps first"
+}
