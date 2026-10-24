@@ -2,7 +2,8 @@
 
     python -m sim.eval_reach [--policy sim/policy/reach_policy.zip] [--n 500]
 
-Targets and start poses come from ReachEnv's sampler with seed 12345 (training used seeds 1-3), so every target
+Targets and start poses come from ReachEnv's sampler with seed 12345 (training: seeds 1-9, model selection:
+seed 777), so every target
 is one ik_topdown can reach. Both solvers get the same start (= IK seed); allow_flip=False for both.
 Errors are measured with pinocchio FK. "Steps": policy actions until within 3 mm / 3 deg; for IK, damped
 least-squares iterations (Jacobian evaluations) over all its seeds and yaw candidates.
@@ -16,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from sim.reach_env import POS_TOL, ROT_TOL_DEG, ReachEnv
+from sim.reach_env import POS_TOL, ROT_TOL_DEG, SCAN, ReachEnv
 from sim.reach_policy import DEFAULT, ReachPolicy
 
 
@@ -41,13 +42,36 @@ def errors(kin, q, target) -> tuple[float, float]:
             float(np.degrees(np.arccos(np.clip((np.trace(Rt.T @ R) - 1) / 2, -1, 1)))))
 
 
+def held_out(env: ReachEnv, n: int, seed: int) -> list[tuple]:
+    """n (target, start q) pairs: start at the scan pose half the time, else at another target's IK solution."""
+    rng, cases = np.random.default_rng(seed), []
+    for _ in range(n):
+        q0 = env.sample_target(rng)[1] if rng.random() >= 0.5 else SCAN
+        cases.append((env.sample_target(rng)[0], q0))
+    return cases
+
+
+def rl_rows(pol: ReachPolicy, kin, cases) -> list[dict]:
+    """Deterministic rollouts; errors by pinocchio FK at the first in-tolerance step, else the last step."""
+    rows = []
+    for target, q0 in cases:
+        t = time.perf_counter()
+        q, steps, _ = pol.rollout(*target, q0)
+        ms = (time.perf_counter() - t) * 1000
+        pe, ro = errors(kin, q if q is not None else pol.env.q, target)
+        rows.append({"pos_mm": pe, "rot_deg": ro, "ok": q is not None and pe <= POS_TOL * 1000
+                     and ro <= ROT_TOL_DEG, "steps": steps, "ms": ms})
+    return rows
+
+
 def summary(rows: list[dict]) -> dict:
     pe = np.array([r["pos_mm"] for r in rows])
     re_ = np.array([r["rot_deg"] for r in rows])
     ok = np.array([r["ok"] for r in rows])
     st = np.array([r["steps"] for r in rows])
     return {"n": len(rows), "success": float(ok.mean()), "pos_mm_mean": float(pe.mean()),
-            "pos_mm_p95": float(np.percentile(pe, 95)), "rot_deg_mean": float(re_.mean()),
+            "pos_mm_median": float(np.median(pe)), "pos_mm_p95": float(np.percentile(pe, 95)),
+            "rot_deg_mean": float(re_.mean()), "rot_deg_median": float(np.median(re_)),
             "steps_median_success": float(np.median(st[ok])) if ok.any() else None,
             "steps_mean_success": float(st[ok].mean()) if ok.any() else None,
             "ms_per_solve": float(np.mean([r["ms"] for r in rows]))}
@@ -61,11 +85,7 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
     env, pol = ReachEnv(), ReachPolicy(args.policy)
     kin = env.kin
-    rng = np.random.default_rng(12345)
-    cases = []
-    for _ in range(args.n):
-        q0 = env.sample_target(rng)[1] if rng.random() >= 0.5 else np.radians([0, 45, 70, 0, 65, 0])
-        cases.append((env.sample_target(rng)[0], q0))
+    cases = held_out(env, args.n, 12345)
     counter = _Counting(kin.pin)
     kin.pin = counter
     res = {"ik": [], "rl": []}
@@ -76,12 +96,7 @@ def main(argv=None) -> None:
         pe, ro = errors(kin, q, target) if q is not None else (np.inf, np.inf)
         res["ik"].append({"pos_mm": pe, "rot_deg": ro, "ok": pe <= POS_TOL * 1000 and ro <= ROT_TOL_DEG,
                           "steps": counter.n, "ms": ms})
-        t = time.perf_counter()
-        q, steps, _ = pol.rollout(*target, q0)
-        ms = (time.perf_counter() - t) * 1000
-        pe, ro = errors(kin, q if q is not None else pol.env.q, target)
-        res["rl"].append({"pos_mm": pe, "rot_deg": ro, "ok": q is not None and pe <= POS_TOL * 1000
-                          and ro <= ROT_TOL_DEG, "steps": steps, "ms": ms})
+    res["rl"] = rl_rows(pol, kin, cases)
     out = {k: summary(v) for k, v in res.items()}
     Path(args.out).write_text(json.dumps({"summary": out, "policy": args.policy, "targets": [
         list(t) for t, _ in cases], **res}, indent=1))

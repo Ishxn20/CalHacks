@@ -18,10 +18,13 @@ DEFAULT = Path(__file__).resolve().parent / "policy" / "reach_policy.zip"
 
 
 class ReachPolicy:
-    def __init__(self, path: Path | str = DEFAULT, max_steps: int = 150) -> None:
-        from stable_baselines3 import SAC
+    def __init__(self, path=DEFAULT, max_steps: int = 150) -> None:
+        """path: a saved SAC .zip, or a live SAC model (evaluation during training)."""
+        if isinstance(path, (str, Path)):
+            from stable_baselines3 import SAC
 
-        self.model = SAC.load(str(path), device="cpu")
+            path = SAC.load(str(path), device="cpu")
+        self.model = path
         self.env = ReachEnv(max_steps=max_steps)
 
     def rollout(self, x: float, y: float, z: float, yaw: float, q_seed) -> tuple[np.ndarray | None, int, dict]:
@@ -30,9 +33,9 @@ class ReachPolicy:
         info, self.path = {}, []                     # joint trajectory of the last rollout (for the video)
         for _ in range(self.env.max_steps):
             a, _ = self.model.predict(obs, deterministic=True)
-            obs, _, done, truncated, info = self.env.step(a)
+            obs, _, _, truncated, info = self.env.step(a)
             self.path.append(self.env.q.copy())
-            if done:
+            if info["success"]:
                 return self.env.q.copy(), info["steps"], info
             if truncated:
                 break
