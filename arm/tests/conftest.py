@@ -8,12 +8,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scrub_arm.app import build  # noqa: E402
+from scrub_arm.config import DEFAULT_TRAY_PATH  # noqa: E402
 
 
 @pytest.fixture
 def config_dir(tmp_path):
     d = tmp_path / "config"
     shutil.copytree(ROOT / "config", d)
+    shutil.copy(DEFAULT_TRAY_PATH, d)
     return d
 
 

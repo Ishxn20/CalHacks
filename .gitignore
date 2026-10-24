@@ -4,3 +4,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+last_command.json
+
+#coding agents
+.cursor
