@@ -94,3 +94,8 @@ def test_resolve_with_slot_still_rejects_unloaded(tray):
 def test_resolve_without_slot_keeps_orientation(tray):
     r = Catalog(tray, require_slot=False).resolve("castro", orientation="backhand")
     assert r.orientation == "backhand"
+
+
+def test_category_request_in_ik_mode_asks_which(tray):
+    with pytest.raises(ResolveError, match="which"):
+        Catalog(tray, require_slot=False).resolve("scissors")

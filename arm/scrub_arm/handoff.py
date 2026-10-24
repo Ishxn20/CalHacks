@@ -237,22 +237,31 @@ class ScrubAssistant:
         for _ in range(pk.max_declutter_moves):
             self.phase = Phase.MOVING
             d.move_pose("scan")
+            d.sleep(0.3)               # wrist camera: let a frame from the settled scan pose arrive
             plan = client.plan(r.instrument.id)
             if plan["action"] == "fail":
                 raise TaskFailed(plan.get("say") or f"I can't find the {r.instrument.name}")
             t = plan["target"]
             self._log(f"plan: {plan['action']} {t.get('id')} at ({t['x_mm']:.0f}, {t['y_mm']:.0f})")
+            grasping = plan["action"] == "grasp_target"
+            if not grasping:          # check the drop-off is reachable before lifting anything
+                p = plan["place"]
+                self._solve(p["x_mm"], p["y_mm"], pk.table_z + pk.hover, p["yaw_deg"])
+                self._solve(p["x_mm"], p["y_mm"], pk.table_z + t["thickness_mm"] / 2000.0 + 0.005, p["yaw_deg"])
             try:
-                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"])
+                # The requested instrument keeps its tip on a fixed side of the gripper so the taught
+                # handoff pose presents it handle-first; movers can be pinched either way round.
+                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], allow_flip=not grasping)
             except TaskFailed:
                 if missed:
                     raise
                 missed = True        # the pile may have shifted: look again once
                 continue
-            if plan["action"] == "grasp_target":
+            if grasping:
                 self.holding = r
                 return
-            p = plan["place"]
+            self.holding = Resolved(slot=None, instrument=self._instrument(t.get("id")), orientation=None)
+            self._log(f"carrying {self.holding.instrument.name} to staging")
             self._place_at(p["x_mm"], p["y_mm"], p["yaw_deg"], t["thickness_mm"])
         raise TaskFailed(f"couldn't uncover the {r.instrument.name} in {pk.max_declutter_moves} moves")
 
@@ -289,8 +298,8 @@ class ScrubAssistant:
 
     def _return_held(self) -> None:
         assert self.holding is not None
-        if self.holding.slot is None:      # ik pick: put it back where it came from
-            self._place_at(*self._picked_from)
+        if self.holding.slot is None:      # ik pick: put it back where it came from, onto whatever is there now
+            self._place_at(*self._picked_from, sense_contact=True)
             return
         d, slot = self.driver, self.holding.slot
         slow = self.cfg.motion.approach_speed_scale
@@ -303,48 +312,61 @@ class ScrubAssistant:
 
     # ── ik picking (pick.mode == "ik") ────────────────────────────────────
 
-    def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float) -> np.ndarray:
+    def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float, allow_flip: bool = True) -> np.ndarray:
         """Joint vector for a top-down grasp pose, or TaskFailed if the arm can't reach it."""
         assert self.kin is not None, "pick.mode is not 'ik'"
         q = self.kin.ik_topdown(x_mm / 1000.0, y_mm / 1000.0, z_m, math.radians(yaw_deg),
-                                self.driver.q_command(), (self.cfg.lower, self.cfg.upper))
+                                self.driver.q_command(), (self.cfg.lower, self.cfg.upper), allow_flip=allow_flip)
         if q is None:
             raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm")
         return q
 
-    def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float) -> float:
+    def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float,
+                               allow_flip: bool = True) -> float:
         """Step the open gripper straight down from hover until the pile pushes back or z_floor is reached.
 
         Contact = any pick.contact_joints lagging its setpoint by more than pick.contact_deviation beyond
-        the lag measured at hover (gravity sag). Returns the z (m) the gripper stopped at.
+        the lag measured at hover (gravity sag). On contact, back off 1 mm and return that z (m).
+        Contact on the very first step means something is in the way at hover height: TaskFailed.
         """
         pk, d = self.cfg.pick, self.driver
         idx = [self.cfg.joint_index(n) for n in pk.contact_joints]
         slow = self.cfg.motion.approach_speed_scale
         z_hover = pk.table_z + pk.hover
-        d.move_to(self._solve(x_mm, y_mm, z_hover, yaw_deg))
-        baseline = np.nanmean([d.tracking_deviation()[idx] for _ in range(5)], axis=0)
-        z_prev, z = z_hover, z_hover
+        solve = lambda z: self._solve(x_mm, y_mm, z, yaw_deg, allow_flip)  # noqa: E731
+        d.move_to(solve(z_hover))
+        samples = []
+        for _ in range(5):
+            d.sleep(0.02)
+            samples.append(d.tracking_deviation()[idx])
+        baseline = np.nanmean(samples, axis=0)
+        z = z_hover
         while z > z_floor + 1e-9:
-            z_prev, z = z, max(z - pk.descend_step, z_floor)
-            d.move_to(self._solve(x_mm, y_mm, z, yaw_deg), speed=slow)
+            z = max(z - pk.descend_step, z_floor)
+            d.move_to(solve(z), speed=slow)
             d.sleep(0.02)   # let feedback catch up before judging contact
             dev = np.nanmax(np.abs(d.tracking_deviation()[idx] - baseline), initial=0.0)
             if dev > pk.contact_deviation:
-                d.move_to(self._solve(x_mm, y_mm, z_prev, yaw_deg), speed=slow)
-                return z_prev
+                if z >= z_hover - pk.descend_step - 1e-9:
+                    d.move_to(solve(z_hover), speed=slow)
+                    raise TaskFailed("something is in the way above the pile")
+                z = min(z + 0.001, z_hover)
+                d.move_to(solve(z), speed=slow)
+                return z
         return z
 
-    def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float) -> None:
-        """hover -> open -> contact descent -> grasp -> lift. TaskFailed on a miss (caller decides on retry)."""
+    def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
+                 allow_flip: bool = True) -> None:
+        """hover -> open -> contact descent -> grasp -> lift. TaskFailed on a miss (caller decides on retry).
+        allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         z_hover = pk.table_z + pk.hover
-        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg)   # fail before moving if unreachable
+        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip)   # fail before moving if unreachable
         self.phase = Phase.PICKING
         d.move_to(q_hover)
         d.gripper_open()
         z_floor = pk.table_z + thickness_mm / 2000.0 - 0.002
-        self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor)
+        self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor, allow_flip)
         got_it = d.gripper_grasp()
         d.move_to(q_hover, speed=self.cfg.motion.approach_speed_scale)
         if not got_it:
@@ -352,18 +374,35 @@ class ScrubAssistant:
             raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
         self._picked_from = (x_mm, y_mm, yaw_deg, thickness_mm)
 
-    def _place_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float) -> None:
-        """hover -> descend to just above the table -> open -> hover. No contact sensing (staging zone is flat)."""
+    def _place_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
+                  sense_contact: bool = False) -> None:
+        """hover -> descend -> open -> hover. sense_contact: stop on whatever is already there (putting an
+        instrument back onto the pile) instead of going down to just above the table."""
         pk, d = self.cfg.pick, self.driver
         slow = self.cfg.motion.approach_speed_scale
+        z_place = pk.table_z + thickness_mm / 2000.0 + 0.005
         q_hover = self._solve(x_mm, y_mm, pk.table_z + pk.hover, yaw_deg)
-        q_down = self._solve(x_mm, y_mm, pk.table_z + thickness_mm / 2000.0 + 0.005, yaw_deg)
+        q_down = self._solve(x_mm, y_mm, z_place, yaw_deg)       # both solved before any motion
         self.phase = Phase.RETURNING
         d.move_to(q_hover)
-        d.move_to(q_down, speed=slow)
+        if sense_contact:
+            try:
+                self._descend_until_contact(x_mm, y_mm, yaw_deg, z_place)
+            except TaskFailed:
+                pass              # something right under the hover point: let go from there, gently held above
+        else:
+            d.move_to(q_down, speed=slow)
         d.gripper_open()
         self.holding = None
         d.move_to(q_hover, speed=slow)
+
+    def _instrument(self, fid: str | None):
+        from .config import Instrument
+
+        if fid and fid in self.catalog.tray.instruments:
+            return self.catalog.tray.instruments[fid]
+        return Instrument(id=fid or "unknown", name=(fid or "instrument").replace("_", " "), category="unknown",
+                          orientable=False, aliases=[])
 
     def _oriented(self, pose: str, orientation: str | None) -> np.ndarray:
         """Pose with the wrist (joint6) rotated for forehand/backhand, wrapped into joint limits."""

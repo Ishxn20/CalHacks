@@ -59,20 +59,19 @@ def _contact_after(ik_app, n_moves):
     ik_app.driver.move_to = move_to
 
 
-def test_descend_stops_on_contact(ik_app):
+def test_descend_stops_1mm_above_contact(ik_app):
     a, pk = ik_app.assistant, ik_app.cfg.pick
-    z_floor = pk.table_z
-    _contact_after(ik_app, 3)   # hover move + 2 steps, contact on the 3rd call (2nd descent step)
-    z = a._descend_until_contact(300, 0, 0, z_floor)
-    assert z > z_floor + 2 * pk.descend_step
-    assert z < pk.table_z + pk.hover
-
-
-def test_contact_on_first_step_returns_to_hover(ik_app):
-    a, pk = ik_app.assistant, ik_app.cfg.pick
-    _contact_after(ik_app, 2)   # hover move, then contact on the first descent step
+    _contact_after(ik_app, 3)   # hover move + 2 steps: contact at the 2nd descent step
     z = a._descend_until_contact(300, 0, 0, pk.table_z)
-    assert z == pytest.approx(pk.table_z + pk.hover)
+    contact_z = pk.table_z + pk.hover - 2 * pk.descend_step
+    assert z == pytest.approx(contact_z + 0.001)       # spec: back off 1 mm, not a whole step
+
+
+def test_contact_on_first_step_is_an_obstacle_not_a_grasp(ik_app):
+    a, pk = ik_app.assistant, ik_app.cfg.pick
+    _contact_after(ik_app, 2)   # hover move, then contact on the very first descent step
+    with pytest.raises(TaskFailed):
+        a._descend_until_contact(300, 0, 0, pk.table_z)
 
 
 def test_no_contact_reaches_floor(ik_app):
@@ -86,3 +85,21 @@ def test_place_at_opens_gripper(ik_app):
     a._pick_at(300, 0, 0, 4.0)
     a._place_at(250, -200, 0, 4.0)
     assert abs(ik_app.driver.gripper_measured() - ik_app.cfg.gripper.open) < math.radians(2)
+
+
+def test_place_with_contact_stops_on_the_pile(ik_app):
+    a, pk = ik_app.assistant, ik_app.cfg.pick
+    a._pick_at(300, 0, 0, 4.0)
+    _contact_after(ik_app, 4)      # hover, then contact a couple of steps down: the pile is there
+    a._place_at(300, 0, 0, 4.0, sense_contact=True)
+    assert a.holding is None
+    assert a.kin.fk(ik_app.driver.q_command())[0][2] > pk.table_z + 0.03   # back up at hover, never pushed down
+
+
+def test_grasp_keeps_tip_direction(ik_app):
+    a = ik_app.assistant
+    for yaw in (10, 100, 190, 280):
+        q = a._solve(300, 0, ik_app.cfg.pick.table_z + 0.05, yaw, allow_flip=False)
+        _, R = a.kin.fk(q)
+        jaw = R @ a.kin.jaw_axis_local
+        assert np.dot(jaw[:2], [np.cos(np.radians(yaw)), np.sin(np.radians(yaw))]) > 0.999

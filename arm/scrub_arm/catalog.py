@@ -173,7 +173,10 @@ class Catalog:
         size_n = normalize_size(size)
         orient_n = normalize_orientation(orientation)
 
-        if not self.require_slot and not match.startswith("category:"):
+        if not self.require_slot and match.startswith("category:"):
+            label = match.split(":", 1)[1].replace("_", " ")
+            raise ResolveError(f"which {label}? say its name")
+        if not self.require_slot:
             inst = self.tray.instruments[match]
             orient = (orient_n or self.default_orientation) if inst.orientable else None
             return Resolved(slot=None, instrument=inst, orientation=orient)

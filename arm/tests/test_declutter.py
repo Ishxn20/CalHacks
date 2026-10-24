@@ -131,3 +131,38 @@ def test_client_rejects_missing_action():
     with pytest.raises(TaskFailed):
         PerceptionClient(fake.url).plan("forceps_resano")
     fake.httpd.shutdown()
+
+
+def test_unreachable_place_fails_before_lifting_the_mover(make_app):
+    far = {**ASIDE, "place": {"x_mm": 900, "y_mm": 0, "yaw_deg": 0}}
+    app, fake = make_app([far])
+    job = run(app)
+    assert job["status"] == "failed"
+    assert app.assistant.holding is None
+    assert not any("plan: move_aside" in e["msg"] and "picked" in e["msg"] for e in app.assistant.events)
+    assert app.assistant._picked_from is None          # never picked anything up
+
+
+def test_stop_while_carrying_a_mover_leaves_it_held_not_forgotten(make_app):
+    app, fake = make_app([ASIDE, GRASP])
+    real_place = app.assistant._place_at
+
+    def stop_instead(*a, **k):
+        app.assistant.stop()
+        app.driver.sleep(0.01)        # raises MotionAborted
+    app.assistant._place_at = stop_instead
+    job = run(app)
+    assert job["status"] == "stopped"
+    assert app.assistant.holding is not None and app.assistant.holding.instrument.id == "scissors_potts"
+    app.assistant._place_at = real_place
+
+
+@pytest.mark.parametrize("bad", [{"action": "grasp_target", "target": {}, "place": None, "say": ""},
+                                 {"action": "grasp_target", "target": {**TARGET, "x_mm": "nan"}, "place": None, "say": ""},
+                                 {"action": "grasp_target", "target": {**TARGET, "x_mm": None}, "place": None, "say": ""}])
+def test_bad_numbers_fail_with_speech_not_fault(bad):
+    fake = FakePerception([bad])
+    from scrub_arm.handoff import TaskFailed
+    with pytest.raises(TaskFailed):
+        PerceptionClient(fake.url).plan("forceps_resano")
+    fake.httpd.shutdown()

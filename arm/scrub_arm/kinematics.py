@@ -84,8 +84,12 @@ class Kinematics:
         return q[:N_ARM].copy()
 
     def ik_topdown(self, x: float, y: float, z: float, yaw: float, q_seed: np.ndarray,
-                   limits: tuple[np.ndarray, np.ndarray]) -> np.ndarray | None:
-        """Joint vector placing the tool at (x, y, z) m pointing straight down, jaws along `yaw`; None if unreachable."""
+                   limits: tuple[np.ndarray, np.ndarray], allow_flip: bool = True) -> np.ndarray | None:
+        """Joint vector placing the tool at (x, y, z) m pointing straight down, jaws along `yaw`; None if unreachable.
+
+        allow_flip: a two-finger pinch is symmetric, so yaw + pi grips equally well. Pass False when the
+        instrument's tip must end up on a known side of the gripper (the requested instrument: it is presented
+        handle-first from a taught pose)."""
         q_seed = np.asarray(q_seed, dtype=float)
         # Damped least squares is local: also start from the base turned toward the target with the
         # wrist pre-rotated, which escapes the minima a far-away seed (e.g. the scan pose) gets stuck in.
@@ -93,7 +97,7 @@ class Kinematics:
         seeds = [q_seed] + [np.array([base, np.radians(60), np.radians(70), 0.0, np.radians(50), w])
                             for w in (0.0, np.pi / 2, -np.pi / 2, 0.9 * np.pi, -0.9 * np.pi)]
         targets = [self.pin.SE3(self._target_rotation(yy), np.array([x, y, z], dtype=float))
-                   for yy in (yaw, yaw + np.pi)]
+                   for yy in ((yaw, yaw + np.pi) if allow_flip else (yaw,))]
         for group in (seeds[:1], seeds[1:]):       # restarts only if the direct solve fails both ways
             sols = [q for t in targets for s in group if (q := self._solve(t, s, limits)) is not None]
             if sols:

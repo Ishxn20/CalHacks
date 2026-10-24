@@ -129,3 +129,13 @@ def test_target_needs_near_full_view_to_grasp():
     partial = _det("needle_holder_castroviejo", "castroviejo", ["needle_holder_castroviejo"], 0.8, 50)
     p = plan([partial], "needle_holder_castroviejo", H, STAGING, set())
     assert p["action"] != "grasp_target"
+
+
+def test_unrecognised_blob_on_top_of_target_blocks_the_grasp():
+    from scrub_vision.identify import Detection
+    tgt = _det("forceps_resano", "forceps", ["forceps_resano"], 0.95, 100)
+    blob = Detection(mask=np.zeros((CAM.h, CAM.w), bool), coarse=None, fine_id=None, exposure=0.3, confidence=0.3)
+    blob.mask[60:150, 190:215] = True          # crosses the target and its grasp point, matches no template
+    tgt.mask[100:110, 190:215] = False         # the target is cut where the blob lies on it
+    p = plan([tgt, blob], "forceps_resano", H, STAGING, set())
+    assert p["action"] != "grasp_target"

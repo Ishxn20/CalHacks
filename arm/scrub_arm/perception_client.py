@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
 
@@ -26,8 +27,17 @@ class PerceptionClient:
             raise TaskFailed(f"perception unavailable: {e}") from e
         if not isinstance(data, dict) or data.get("action") not in ACTIONS:
             raise TaskFailed(f"perception gave a bad plan: {data!r}"[:200])
-        if data["action"] != "fail" and not isinstance(data.get("target"), dict):
-            raise TaskFailed("perception gave a plan without a target")
-        if data["action"] == "move_aside" and not isinstance(data.get("place"), dict):
-            raise TaskFailed("perception gave a move_aside without a place")
+        if data["action"] != "fail":
+            _numbers(data.get("target"), ("x_mm", "y_mm", "yaw_deg", "thickness_mm"), "target")
+        if data["action"] == "move_aside":
+            _numbers(data.get("place"), ("x_mm", "y_mm", "yaw_deg"), "place")
         return data
+
+
+def _numbers(d, keys, what) -> None:
+    if not isinstance(d, dict):
+        raise TaskFailed(f"perception gave a plan without a {what}")
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise TaskFailed(f"perception gave a bad {what} {k}: {v!r}")
