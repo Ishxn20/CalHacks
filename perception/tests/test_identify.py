@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from scrub_vision.identify import feasible, identify, measure, segment_hsv
+from scrub_vision.identify import feasible, identify, measure, segment_background
 from scrub_vision.render import CamSpec, pose, render_scene, scene_mesh
 from scrub_vision.templates import build_templates, load_instruments
 
@@ -24,10 +24,10 @@ def templates(insts):
     return build_templates(insts, 0.5)
 
 
-def render(insts, specs):
+def render(insts, specs, colours=None):
     items = [(scene_mesh(insts[f]), pose(x, y, z, yaw, flip))
              for f, x, y, z, yaw, flip in specs]
-    return render_scene(items, CAM, np.random.default_rng(0))
+    return render_scene(items, CAM, np.random.default_rng(0), colours=colours)
 
 
 def one(insts, fid, x=0, y=-20, yaw=0.4, flip=False):
@@ -103,14 +103,24 @@ def test_measure_length(insts):
     assert abs(length - 230) < 0.05 * 230
 
 
-def test_segment_hsv_finds_green_blobs_outside_gripper(insts):
+def test_segment_background_finds_blobs_outside_gripper(insts):
     t = scene_mesh(insts["forceps_resano"]).extents[2]
     bgr, _ = render(insts, [("forceps_resano", -80, -60, t / 2, 0.0, False),
-                            ("scissors_potts", 90, 40, t / 2, 1.0, False)])
+                            ("scissors_potts", 90, 40, t / 2, 1.0, False)], colours=[(30, 30, 200), (40, 40, 40)])
     gm = np.zeros(bgr.shape[:2], bool)
     gm[int(bgr.shape[0] * 0.75):] = True
-    blobs = segment_hsv(bgr, gripper_mask=gm)
+    blobs = segment_background(bgr, gripper_mask=gm)
     assert len(blobs) == 2
+
+
+@pytest.mark.parametrize("bgr_colour", [(40, 40, 200), (200, 120, 30), (35, 35, 35), (235, 235, 235), (0, 174, 66)])
+def test_segment_background_any_instrument_colour(bgr_colour):
+    import cv2
+    img = np.full((540, 960, 3), 150, np.uint8)                      # plain grey sheet
+    img = (img + np.random.default_rng(0).normal(0, 4, img.shape)).clip(0, 255).astype(np.uint8)
+    cv2.rectangle(img, (200, 200), (600, 225), bgr_colour, -1)        # a 400 x 25 px instrument
+    blobs = segment_background(img, gripper_mask=None)
+    assert len(blobs) == 1 and abs(blobs[0].sum() - 401 * 26) < 2000
 
 
 def test_above_uses_the_crossing(insts, templates):

@@ -92,3 +92,11 @@ def test_ambiguous_scalpel_is_flagged(insts, templates):
     p = plan(dets, "scalpel_15", H, STAGING, set())
     assert p["action"] == "grasp_target"
     assert p["target"]["ambiguous"] in (True, False)
+
+
+def test_blob_matching_no_instrument_is_never_moved(insts, templates):
+    from scrub_vision.identify import Detection
+    junk = Detection(mask=np.zeros((CAM.h, CAM.w), bool), coarse=None, fine_id=None, exposure=1.0, confidence=1.0)
+    junk.mask[100:105, 100:400] = True            # a sheet wrinkle
+    p = plan([junk], "forceps_resano", H, STAGING, set())
+    assert p["action"] == "fail"

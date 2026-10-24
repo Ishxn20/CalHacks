@@ -33,9 +33,10 @@ def train(datas: list[Path], model: str = "yolo11n-seg.pt", epochs: int = 30, im
 
     data = Path(datas[0]) if len(datas) == 1 else combine(datas, Path(project).parent / f"{name}_data.yaml")
     m = YOLO(model)
-    # Geometry augmentations only: hue jitter would teach the model that green isn't the instrument colour.
+    # Instruments come in any colour: full hue jitter on top of the renderer's per-instrument colours,
+    # so the model learns shape, not colour.
     r = m.train(data=str(data), epochs=epochs, imgsz=imgsz, device=device, batch=batch, project=str(project),
-                name=name, exist_ok=True, hsv_h=0.0, hsv_s=0.3, hsv_v=0.3, degrees=180, flipud=0.5, fliplr=0.5,
+                name=name, exist_ok=True, hsv_h=0.5, hsv_s=0.7, hsv_v=0.4, degrees=180, flipud=0.5, fliplr=0.5,
                 mosaic=0.5, plots=True, verbose=False)
     return Path(r.save_dir) / "weights" / "best.pt"
 

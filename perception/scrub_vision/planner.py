@@ -46,6 +46,7 @@ def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tup
     def in_staging(d: Detection) -> bool:
         return any(np.hypot(d.grasp_mm[0] - x, d.grasp_mm[1] - y) < STAGED_RADIUS_MM for x, y in staged_xy)
 
+    dets = [d for d in dets if d.candidates]          # blobs no instrument template explains: not instruments
     grabbable = [d for d in dets if on_top(d, dets) and feasible(d, dets, H)]
     targets = sorted((d for d in dets if matches(d, target_id)), key=lambda d: -d.confidence)
     for t in targets:

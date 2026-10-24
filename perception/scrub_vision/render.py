@@ -13,7 +13,15 @@ import trimesh
 
 from .templates import Instrument, fill_tris, mesh_for
 
-PLA_GREEN_RGB = (0, 174, 66)
+
+
+def random_filament_bgr(rng: np.random.Generator) -> np.ndarray:
+    """Any print colour: saturated hues of every kind plus whites, greys, silvers and blacks."""
+    if rng.random() < 0.2:
+        v = rng.uniform(25, 245)
+        return np.array([v, v, v], np.float32) + rng.normal(0, 4, 3)
+    hsv = np.uint8([[[rng.integers(0, 180), rng.integers(70, 256), rng.integers(60, 241)]]])
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0].astype(np.float32)
 
 
 @dataclass
@@ -56,8 +64,8 @@ def pose(x: float, y: float, z: float, yaw: float, flip: bool = False) -> np.nda
 
 
 def _noise_bg(cam: CamSpec, rng: np.random.Generator) -> np.ndarray:
-    base = rng.uniform(150, 245)
-    tint = rng.uniform(-8, 8, 3)
+    base = rng.uniform(40, 245)            # dark mats to white sheets
+    tint = rng.uniform(-25, 25, 3)
     low = cv2.resize(rng.normal(0, 1, (6, 10)).astype(np.float32), (cam.w, cam.h), interpolation=cv2.INTER_CUBIC)
     img = np.clip(base + tint + low[..., None] * rng.uniform(4, 18), 0, 255)
     for _ in range(rng.integers(0, 6)):        # sheet wrinkles
@@ -72,19 +80,19 @@ def _noise_bg(cam: CamSpec, rng: np.random.Generator) -> np.ndarray:
 
 
 def render_scene(items: list[tuple[trimesh.Trimesh, np.ndarray]], cam: CamSpec, rng: np.random.Generator,
-                 bg: np.ndarray | None = None) -> tuple[np.ndarray, list[np.ndarray]]:
+                 bg: np.ndarray | None = None, colours: list | None = None) -> tuple[np.ndarray, list[np.ndarray]]:
     """Render meshes at 4x4 poses. Returns BGR uint8 image and one bool mask per item (after occlusion)."""
     img = (_noise_bg(cam, rng) if bg is None else bg.astype(np.float32)).copy()
     ids = np.zeros((cam.h, cam.w), np.int32)
     light = rng.normal([0.3, -0.2, 1.0], 0.25)
     light /= np.linalg.norm(light)
     shadow_off = -light[:2] / max(light[2], 0.3) * rng.uniform(2, 6)
-    hue = rng.uniform(-0.12, 0.12)
-    base = np.array(PLA_GREEN_RGB[::-1], np.float32) * rng.uniform(0.75, 1.15)    # BGR
-    base = np.clip(base + hue * np.array([60, -20, 30]), 0, 255)
+    same_colour = rng.random() < 0.3      # sometimes the whole set is printed in one filament
+    shared = random_filament_bgr(rng)
     order = sorted(range(len(items)), key=lambda k: items[k][1][2, 3])
     for k in order:
         mesh, T = items[k]
+        base = np.array(colours[k], np.float32) if colours else (shared if same_colour else random_filament_bgr(rng))
         v = mesh.vertices @ T[:3, :3].T + T[:3, 3]
         tri = v[mesh.faces]
         n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])

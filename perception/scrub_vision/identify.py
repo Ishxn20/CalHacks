@@ -202,16 +202,29 @@ def feasible(det: Detection, others: list[Detection], H: np.ndarray,
     return not any((jaw & o.mask).any() and above(o.mask, det.mask) for o in others if o is not det)
 
 
-def segment_hsv(bgr: np.ndarray, lo=(40, 80, 40), hi=(90, 255, 255), gripper_mask: np.ndarray | None = None,
-                min_area_px: int = 300) -> list[np.ndarray]:
-    """Fallback segmenter: green filament blobs. Touching instruments merge (the trained model fixes that)."""
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    m = cv2.inRange(hsv, np.array(lo), np.array(hi))
-    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+def segment_background(bgr: np.ndarray, gripper_mask: np.ndarray | None = None, min_delta: float = 26.0,
+                       min_area_px: int = 300) -> list[np.ndarray]:
+    """Fallback segmenter, any instrument colour: pixels that differ from the table surface.
+
+    The table colour is estimated per region (median over a coarse grid, so vignetting and uneven light
+    don't count as objects). Weak backup only: on synthetic scenes with random instrument colours and
+    textured backgrounds it finds ~2/3 of instruments, misses ones close to the table colour, and merges
+    touching instruments. The trained model is the real segmenter.
+    """
+    lab = cv2.cvtColor(cv2.GaussianBlur(bgr, (3, 3), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+    h, w = lab.shape[:2]
+    small = cv2.resize(lab, (16, 9), interpolation=cv2.INTER_AREA)
+    # robust table estimate: per channel median of the coarse grid, blended with the cell's own value
+    med = np.median(small.reshape(-1, 3), 0)
+    cell = np.where(np.linalg.norm(small - med, axis=2, keepdims=True) < min_delta, small, med)
+    table = cv2.resize(cell, (w, h), interpolation=cv2.INTER_CUBIC)
+    m = (np.linalg.norm(lab - table, axis=2) > min_delta).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     if gripper_mask is not None:
         m[gripper_mask] = 0
-    n, lab, stats, _ = cv2.connectedComponentsWithStats(m)
-    return [lab == i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= min_area_px]
+    n, lab_ids, stats, _ = cv2.connectedComponentsWithStats(m)
+    return [lab_ids == i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= min_area_px]
 
 
 def annotate(bgr: np.ndarray, dets: list[Detection], highlight: Detection | None = None) -> np.ndarray:

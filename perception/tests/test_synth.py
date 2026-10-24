@@ -66,3 +66,29 @@ def test_template_mask_is_solid():
     _, hier = cv2.findContours((t.mask > 0).astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
     holes = sum(h[3] != -1 for h in hier[0])
     assert holes <= 1            # only the gap between the tines
+
+
+def test_instrument_colours_vary_beyond_green():
+    import cv2
+    insts = load_instruments()
+    m = scene_mesh(insts["clamp_side_biting"])
+    hues, vals = [], []
+    for seed in range(40):
+        bgr, (mask,) = render_scene([(m, pose(0, 0, m.extents[2] / 2, 0.0))], CamSpec(), np.random.default_rng(seed))
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[mask]
+        hues.append(np.median(hsv[:, 0]))
+        vals.append(np.median(hsv[:, 2]))
+    hues, vals = np.array(hues), np.array(vals)
+    assert ((hues < 35) | (hues > 95)).sum() >= 10      # plenty of non-green instruments
+    assert vals.min() < 90 and vals.max() > 180           # dark and light ones too
+
+
+def test_instances_in_one_scene_can_differ_in_colour():
+    insts = load_instruments()
+    m = scene_mesh(insts["forceps_resano"])
+    differ = 0
+    for seed in range(10):
+        bgr, (a, b) = render_scene([(m, pose(-80, 0, 5, 0.0)), (m, pose(80, 0, 5, 0.0))], CamSpec(),
+                                   np.random.default_rng(seed))
+        differ += np.abs(np.median(bgr[a], 0) - np.median(bgr[b], 0)).max() > 30
+    assert differ >= 5

@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 import yaml
 
-from .identify import Detection, annotate, identify, segment_hsv
+from .identify import Detection, annotate, identify, segment_background
 from .planner import plan
 from .templates import build_templates, load_instruments
 
@@ -33,11 +33,12 @@ ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE_MM_PER_PX = 0.5
 
 
-class HsvSegmenter:
-    """Fallback: green blobs; no class (identify() decides). Touching instruments merge."""
+class BackgroundSegmenter:
+    """Fallback: anything that isn't table surface, any colour; no class (identify() decides).
+    Touching instruments merge, so it only works on spread-out instruments."""
 
     def __call__(self, bgr: np.ndarray, gripper_mask: np.ndarray | None) -> list[tuple[np.ndarray, str | None, float]]:
-        return [(m, None, 1.0) for m in segment_hsv(bgr, gripper_mask=gripper_mask)]
+        return [(m, None, 1.0) for m in segment_background(bgr, gripper_mask=gripper_mask)]
 
 
 class YoloSegmenter:
@@ -210,11 +211,11 @@ def main(argv=None) -> None:
     gm = _gripper_mask(cam.get("gripper_mask_poly_px") or
                        [[0, int(shape[0] * .75)], [shape[1], int(shape[0] * .75)], [shape[1], shape[0]], [0, shape[0]]],
                        shape)
-    seg = YoloSegmenter(args.weights) if args.weights else HsvSegmenter()
+    seg = YoloSegmenter(args.weights) if args.weights else BackgroundSegmenter()
     svc = VisionService(source, H, gm, seg, staging, log_dir=Path(__file__).resolve().parents[1] / "logs",
                         staging_yaw_deg=float(pick.get("staging_yaw_deg", 0.0)))
     httpd = make_server(svc, args.host, args.port)
-    print(f"scrub_vision listening on http://{args.host}:{args.port} ({'YOLO' if args.weights else 'HSV'})",
+    print(f"scrub_vision listening on http://{args.host}:{args.port} ({'YOLO' if args.weights else 'background-difference fallback'})",
           flush=True)
     httpd.serve_forever()
 

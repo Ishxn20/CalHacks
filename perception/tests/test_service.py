@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from scrub_vision.render import CamSpec, pose, render_scene, scene_mesh
-from scrub_vision.service import HsvSegmenter, VisionService, make_server
+from scrub_vision.service import VisionService, make_server
 from scrub_vision.templates import load_instruments
 
 CAM = CamSpec()
@@ -16,18 +16,30 @@ STAGING = [(250.0, -200.0), (250.0, -260.0)]
 
 
 def frame(specs):
+    """Rendered frame plus its exact per-instance masks."""
     insts = load_instruments()
     items = [(scene_mesh(insts[f]), pose(x, y, scene_mesh(insts[f]).extents[2] / 2, yaw)) for f, x, y, yaw in specs]
-    bgr, _ = render_scene(items, CAM, np.random.default_rng(0))
-    return bgr
+    return render_scene(items, CAM, np.random.default_rng(0))
+
+
+class TrueInstances:
+    """Stands in for the trained model: these tests are about the service, not segmentation quality."""
+
+    def __init__(self, svc_holder):
+        self.h = svc_holder
+
+    def __call__(self, bgr, gripper_mask):
+        return [(m & ~gripper_mask if gripper_mask is not None else m, None, 1.0) for m in self.h["masks"]]
 
 
 @pytest.fixture
 def server(tmp_path):
-    img = frame([("forceps_resano", -60, -60, 0.0), ("scissors_potts", 120, 40, 1.0)])
+    world = {}
+    img, world["masks"] = frame([("forceps_resano", -60, -60, 0.0), ("scissors_potts", 120, 40, 1.0)])
     gm = np.zeros(img.shape[:2], bool)
     gm[int(img.shape[0] * 0.8):] = True
-    svc = VisionService(lambda: img, H, gm, HsvSegmenter(), STAGING, log_dir=tmp_path)
+    svc = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path)
+    svc.world = world
     httpd = make_server(svc, "127.0.0.1", 0)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}", svc, tmp_path
@@ -56,7 +68,8 @@ def test_plan_unknown_instrument_is_fail_not_500(server):
 
 def test_plan_marks_staging_used(server):
     url, svc, _ = server
-    svc.frame_source = lambda: frame([("forceps_resano", 0, -20, 0.0)])  # target only
+    img, svc.world["masks"] = frame([("forceps_resano", 0, -20, 0.0)])  # target only
+    svc.frame_source = lambda: img
     post(url + "/plan", {"instrument": "scissors_potts"})                 # not visible -> move resano aside
     assert svc.used_staging == {0}
     post(url + "/reset_staging", {})
@@ -65,7 +78,7 @@ def test_plan_marks_staging_used(server):
 
 def test_verify_matches(server):
     url, svc, _ = server
-    img = frame([("forceps_resano", 0, 60, np.pi / 2)])     # hanging into the gripper zone at the bottom
+    img, svc.world["masks"] = frame([("forceps_resano", 0, 60, np.pi / 2)])   # reaching into the gripper zone
     svc.frame_source = lambda: img
     v = post(url + "/verify", {"expected": "forceps_resano", "slot": None})
     assert v["ok"] is True and v["detected"] == "forceps_resano"
