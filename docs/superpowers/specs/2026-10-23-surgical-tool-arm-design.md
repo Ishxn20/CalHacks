@@ -142,15 +142,20 @@ Staging placement: a grid of fixed (x, y) spots in the staging zone, filled left
 
 A small CNN (or a regression head on the YOLO backbone) that takes the crop of one segmented instrument and predicts (grasp u, v, yaw) and a success probability. Labels come for free: every real grasp attempt logs the crop, the grasp used, and `gripper_grasp()`'s True/False. Start from the template grasp points as pseudo-labels, fine-tune on logged outcomes. Supervised, ~1 h to build, improves visibly over the hackathon. Only if §5.2–5.4 are done and tested.
 
-### 5.6 RL for arm reaching (decided by the user, 2026-10-24)
+### 5.6 RL for arm reaching, camera-guided (decided by the user, 2026-10-24)
 
-RL controls arm movement only, as a **reach** policy: given a top-down target tool pose (x, y, z, jaw yaw), it
-outputs joint-position deltas that bring the gripper there. It replaces inverse kinematics for that one job.
-Grasp-point selection (the rule planner, §5.4) and the scripted hover → open → contact descent → close → lift
-sequence are unchanged. Trained in MuJoCo with the B601-RS model built from the RS URDF; selectable with
-`pick.reach: ik | rl` (default `ik`). In `rl` mode every solution passes the same checks as IK (joint limits,
-forward-kinematics error ≤ 3 mm and ≤ 3°) or the move is refused. An earlier grasp-*selection* RL policy was
-trained and kept (branch `claude/rl-grasp-policy-f51e28`, `sim/policy/rl_grasp_policy_run1.json`) but is not used.
+RL controls arm movement only, as a **closed-loop reach**: the scan pose and rule planner (§5.4) still decide
+*which* instrument to grasp; the RL policy then drives the gripper to it while the **wrist camera keeps
+re-observing the target every step**, correcting as it goes (visual servoing), rather than computing a
+pose once from the scan and moving there blind. Observation per step: the target's grasp-point offset,
+apparent axis angle and apparent size in the current wrist image (from perception), a visibility flag,
+joint angles and the previous action; never the target's world pose. Trained in MuJoCo (B601-RS from the
+RS URDF, simulated wrist camera with randomised mount offset/tilt) on projected image features with
+perception-like noise, dropouts and gripper occlusion; verified on rendered frames through the real
+identification code, and on targets that move mid-reach. The scripted open → contact descent → close → lift
+stays. Selectable with `pick.reach: ik | rl` (default `ik`); in `rl` mode the same safety checks apply
+(joint limits, final pose within 3 mm / 3°) or the move is refused. A blind (non-camera) reach policy and
+an earlier grasp-selection policy were trained and kept as baselines (branch `claude/rl-grasp-policy-f51e28`).
 
 ### 5.8 Simulation track: MuJoCo digital twin (primary data generator + policy test bed)
 
@@ -229,7 +234,7 @@ Every step is logged with the frame, masks, chosen grasp and `gripper_grasp()` r
 - Single wrist camera; no tray; instruments in a cluttered pile.
 - ML is required; segmentation model is the core.
 - MuJoCo simulation track runs in parallel with the plain renderer; the plain renderer is the backup.
-- RL is for arm reaching only (user, 2026-10-24): replaces IK behind `pick.reach: rl`, same safety checks; grasp selection stays rule-based.
+- RL is for arm reaching only, closed-loop on the wrist camera (user, 2026-10-24): replaces IK behind `pick.reach: rl`, same safety checks; grasp selection stays rule-based.
 - Hand-rolled motion on the SDK's IK, not MoveIt/ROS 2.
 - Arm is driven from the M3 Max.
 
