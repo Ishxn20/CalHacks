@@ -93,6 +93,17 @@ pick:
   staging_mm: [[250, -130], [250, -215], [170, -300], [250, 130], [250, 215], [170, 300]]
   staging_yaw_deg: 90.0
 
+# Wrist webcam (used by the simulated camera-guided reach, sim/wrist_cam.py). NOT MEASURED: placeholders
+# for a camera on the gripper body, beside the jaws (perpendicular to the jaw axis), looking down the
+# fingers so the fingertips sit at the bottom centre of the image.
+wrist_camera:
+  width: 960
+  height: 540
+  hfov_deg: 80.0
+  back_mm: 110.0        # behind the fingertips, along the tool axis
+  side_mm: 60.0         # off the tool axis, perpendicular to the jaws
+  tilt_deg: 10.4        # optical axis pitched from the tool axis toward the fingers
+
 server:
   host: 127.0.0.1
   port: 8765

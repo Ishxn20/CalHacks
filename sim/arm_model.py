@@ -5,7 +5,8 @@
 Meshes: Seeed's `shared/` STLs (github.com/Seeed-Projects/reBotArm_control_py), decimated to keep the repo
 small; the URDF's visual-only parts are dropped. Added on top of the URDF: a table plane at pick.table_z,
 a `tool` site at the gripper_end frame (= scrub_arm Kinematics' tool frame), position actuators on
-joint1-6 with arm.yaml's MIT kp/kd and limits, and one actuator driving both fingers (coupled).
+joint1-6 with arm.yaml's MIT kp/kd and limits, one actuator driving both fingers (coupled), and the
+"wrist" camera at arm.yaml's nominal wrist_camera mount (sim/wrist_cam.py).
 """
 from __future__ import annotations
 
@@ -52,6 +53,11 @@ def build() -> None:
     w.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_PLANE, size=[1, 1, 0.01],
                pos=[0, 0, cfg.pick.table_z], rgba=[0.85, 0.85, 0.82, 1])
     spec.body("gripper_end").add_site(name="tool", size=[0.004] * 3, rgba=[1, 0, 0, 1])
+    from sim.wrist_cam import CAM_H, CAM_W, FOVY_DEG, NOMINAL, mount_pose
+
+    pos, quat = mount_pose(**NOMINAL)
+    spec.body("gripper_end").add_camera(name="wrist", pos=pos, quat=quat, fovy=FOVY_DEG)
+    spec.visual.global_.offwidth, spec.visual.global_.offheight = CAM_W, CAM_H
     for b in spec.bodies:
         b.gravcomp = 1.0                 # the real servos hold position; sag isn't what we study here
     for j in cfg.joints:
@@ -80,6 +86,7 @@ def set_arm(model: mujoco.MjModel, data: mujoco.MjData, q) -> None:
     """Place joint1-6 at q (rad) and update kinematics (no dynamics)."""
     data.qpos[arm_qpos_adr(model)] = q
     mujoco.mj_kinematics(model, data)
+    mujoco.mj_camlight(model, data)           # camera poses (the wrist camera)
 
 
 def tool_pose(model: mujoco.MjModel, data: mujoco.MjData) -> tuple[np.ndarray, np.ndarray]:

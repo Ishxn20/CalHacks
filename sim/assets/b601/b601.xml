@@ -1,6 +1,10 @@
 <mujoco model="ReBot_Arm_RS">
   <compiler angle="radian" meshdir="shared"/>
 
+  <visual>
+    <global offwidth="960" offheight="540"/>
+  </visual>
+
   <asset>
     <mesh name="base_link" content_type="model/stl" file="base_link.stl"/>
     <mesh name="link1" content_type="model/stl" file="link1.stl"/>
@@ -51,6 +55,7 @@
                     <inertial pos="-0.112752 0.000128443 -5.72602e-06" quat="0.504636 0.498456 -0.49563 0.501234" mass="0.65" diaginertia="0.000453574 0.000373537 0.000158259"/>
                     <geom pos="0 0 0" quat="1 0 0 0" type="mesh" mesh="gripper_end"/>
                     <site name="tool" size="0.004" rgba="1 0 0 1"/>
+                    <camera name="wrist" quat="0.543258 0.452626 -0.452626 -0.543258" pos="-0.11 0 0.06" fovy="50.534"/>
                     <body name="gripper_left" pos="-0.041939 -7.3385e-05 0" quat="0.499998 0.5 -0.5 0.500002" gravcomp="1">
                       <inertial pos="-0.00218009 0.018709 0.00932189" mass="0.0752" diaginertia="1.09878e-05 9.50146e-06 9.3078e-06"/>
                       <joint name="gripper_joint1" type="slide" range="0 0.05" actuatorfrcrange="-500 500"/>

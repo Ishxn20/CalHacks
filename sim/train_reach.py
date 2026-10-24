@@ -3,6 +3,7 @@
     python -m sim.train_reach --name A                       # adaptive step scale + steep reward
     python -m sim.train_reach --name B --her                 # + HER (future, 4 goals)
     python -m sim.train_reach --name C --her --gamma 0.99
+    python -m sim.train_reach --name V1 --env servo --seed 1   # camera-guided (sim/servo_env.py), no HER
     python -m sim.train_reach --resume sim/policy/checkpoints/B8          # continue a paused run to its target
 
 Every --eval-every steps the policy is rolled out DETERMINISTICALLY on 200 fixed held-out targets
@@ -31,7 +32,7 @@ from sim.reach_env import ReachEnv  # noqa: E402
 from sim.reach_policy import ReachPolicy  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "policy"
-FIELDS = ["steps", "success", "pos_mm_median", "pos_mm_p95", "rot_deg_median", "steps_median_success"]
+FIELDS = ["steps", "success", "pos_mm_median", "pos_mm_p95", "rot_deg_median", "steps_median_success", "reached"]
 EVAL_SEED = 777
 
 
@@ -45,8 +46,9 @@ class HeldOut(BaseCallback):
         self.cfg, self.out, self.stop_at = cfg, out, stop_at
         self.name, self.every = cfg["name"], cfg["eval_every"]
         self.stop, self.last = False, None
-        self.pol = ReachPolicy(None)
-        self.cases = held_out(self.pol.env, cfg["eval_n"], EVAL_SEED)
+        if cfg.get("env") != "servo":
+            self.pol = ReachPolicy(None)
+            self.cases = held_out(self.pol.env, cfg["eval_n"], EVAL_SEED)
         curve = out / f"reach_{self.name}_curve.csv"
         rows = list(csv.DictReader(curve.open())) if curve.exists() and cfg.get("resumed") else []
         self.best = max(map(_key, rows), default=None)
@@ -63,9 +65,14 @@ class HeldOut(BaseCallback):
         if self.num_timesteps % self.every or self.num_timesteps == self.last:
             return
         self.last = self.num_timesteps
-        self.pol.model = self.model
-        s = summary(rl_rows(self.pol, self.pol.env.kin, self.cases))
-        row = {"steps": self.num_timesteps, **{k: s[k] for k in FIELDS[1:]}}
+        if self.cfg.get("env") == "servo":
+            from sim.servo_env import evaluate
+
+            s = evaluate(self.model, self.cfg["eval_n"], EVAL_SEED)
+        else:
+            self.pol.model = self.model
+            s = summary(rl_rows(self.pol, self.pol.env.kin, self.cases))
+        row = {"steps": self.num_timesteps, **{k: s.get(k) for k in FIELDS[1:]}}
         self.w.writerow(row)
         self.fh.flush()
         print(json.dumps(row), flush=True)
@@ -87,12 +94,22 @@ def checkpoint(model: SAC, out: Path, cfg: dict) -> Path:
     return d
 
 
+def make_env(kind: str, seed: int):
+    if kind == "servo":
+        from sim.servo_env import VisualReachEnv
+
+        return VisualReachEnv(seed=seed)
+    return ReachEnv(seed=seed)
+
+
 def main(argv=None) -> SAC:
     ap = argparse.ArgumentParser(prog="sim.train_reach")
     ap.add_argument("--name")
     ap.add_argument("--resume", help="checkpoint dir; config comes from its meta.json")
     ap.add_argument("--steps", type=int, default=300_000)
     ap.add_argument("--stop-at", type=int)
+    ap.add_argument("--env", choices=["reach", "servo"], default="reach",
+                    help="reach: blind, target pose given; servo: camera-guided (sim/servo_env.py)")
     ap.add_argument("--her", action="store_true")
     ap.add_argument("--gamma", type=float, default=0.98)
     ap.add_argument("--seed", type=int, default=7)
@@ -107,19 +124,20 @@ def main(argv=None) -> SAC:
     if args.resume:
         d = Path(args.resume)
         cfg = {**json.loads((d / "meta.json").read_text()), "resumed": True}
-        model = SAC.load(d / "model.zip", env=ReachEnv(seed=cfg["seed"] + cfg["num_timesteps"]), device="cpu")
+        model = SAC.load(d / "model.zip", env=make_env(cfg.get("env", "reach"), cfg["seed"] + cfg["num_timesteps"]),
+                         device="cpu")
         if (d / "replay_buffer.pkl").exists():
             model.load_replay_buffer(d / "replay_buffer.pkl")
         else:
             print(f"no replay buffer in {d}: refilling one for {cfg['learning_starts']} steps first", flush=True)
             model.learning_starts = model.num_timesteps + cfg["learning_starts"]
     else:
-        cfg = {"name": args.name, "her": args.her, "gamma": args.gamma, "seed": args.seed,
+        cfg = {"name": args.name, "env": args.env, "her": args.her, "gamma": args.gamma, "seed": args.seed,
                "target_steps": args.steps, "eval_every": args.eval_every, "eval_n": args.eval_n,
                "eval_seed": EVAL_SEED, "learning_starts": args.learning_starts}
         her = {"replay_buffer_class": HerReplayBuffer,
                "replay_buffer_kwargs": {"n_sampled_goal": 4, "goal_selection_strategy": "future"}} if args.her else {}
-        model = SAC("MultiInputPolicy", ReachEnv(seed=args.seed), policy_kwargs={"net_arch": [256, 256]},
+        model = SAC("MultiInputPolicy" if args.env == "reach" else "MlpPolicy", make_env(args.env, args.seed), policy_kwargs={"net_arch": [256, 256]},
                     learning_rate=3e-4, buffer_size=args.steps, batch_size=256, gamma=args.gamma,
                     learning_starts=args.learning_starts, device="cpu", seed=args.seed, verbose=0, **her)
     remaining = cfg["target_steps"] - model.num_timesteps
