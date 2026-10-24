@@ -1,0 +1,78 @@
+# reBot Arm B601-RS hardware + motion config.
+# Motor IDs, models and gains mirror Seeed's official config
+# (reBotArm_control_py/config/rebotarm_rs.yaml). Joint limits come from
+# Rebot_Arm_description/RS/urdf/ReBot_Arm_RS.urdf.
+
+channel: can0            # Linux SocketCAN name; on macOS can0 -> PCAN_USBBUS1
+control_rate_hz: 200     # setpoint streaming rate for the control loop
+arm_mode: mit            # "mit" (official default) or "pos_vel"
+# Have every RobStride stream its status (comm_type 24) so measured positions stay
+# fresh; motorbridge docs say get_state() isn't otherwise guaranteed to update.
+# The collision guard, tug-release and settle checks all read that state.
+active_report: true
+
+joints:
+  - {name: joint1, motor_id: 0x01, feedback_id: 0xFD, model: rs-06, limits_deg: [-160, 160], max_vel_deg_s: 90,
+     mit: {kp: 50.0, kd: 3.0},  pos_vel: {vel_kp: 12.0, vel_ki: 0.1, pos_kp: 13.0, vlim: 10.0}}
+  - {name: joint2, motor_id: 0x02, feedback_id: 0xFD, model: rs-06, limits_deg: [0, 179], max_vel_deg_s: 60,
+     mit: {kp: 150.0, kd: 10.0}, pos_vel: {vel_kp: 14.0, vel_ki: 0.1, pos_kp: 16.0, vlim: 10.0}}
+  - {name: joint3, motor_id: 0x03, feedback_id: 0xFD, model: rs-06, limits_deg: [0, 179], max_vel_deg_s: 60,
+     mit: {kp: 150.0, kd: 10.0}, pos_vel: {vel_kp: 14.0, vel_ki: 0.1, pos_kp: 14.0, vlim: 10.0}}
+  - {name: joint4, motor_id: 0x04, feedback_id: 0xFD, model: rs-00, limits_deg: [-89, 89], max_vel_deg_s: 120,
+     mit: {kp: 50.0, kd: 5.0},  pos_vel: {vel_kp: 5.0, vel_ki: 0.1, pos_kp: 20.0, vlim: 10.0}}
+  - {name: joint5, motor_id: 0x05, feedback_id: 0xFD, model: rs-00, limits_deg: [-89, 89], max_vel_deg_s: 120,
+     mit: {kp: 50.0, kd: 4.0},  pos_vel: {vel_kp: 4.0, vel_ki: 0.1, pos_kp: 10.0, vlim: 10.0}}
+  - {name: joint6, motor_id: 0x06, feedback_id: 0xFD, model: rs-00, limits_deg: [-180, 180], max_vel_deg_s: 180,
+     mit: {kp: 50.0, kd: 4.0},  pos_vel: {vel_kp: 4.0, vel_ki: 0.1, pos_kp: 10.0, vlim: 10.0}}
+
+gripper:
+  motor_id: 0x07
+  feedback_id: 0xFD
+  model: rs-00
+  # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
+  # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
+  open_deg: 0.0
+  closed_deg: -60.0
+  calibrated: false
+  move_kp: 20.0          # stiffness while opening / free moves
+  move_kd: 1.0
+  grip_kp: 6.0           # soft stiffness while squeezing: torque ~= grip_kp * (closed - pos)
+  grip_kd: 0.5
+  settle_s: 0.6          # time to let the jaws close before checking the grasp
+  # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
+  holding_min_gap_deg: 4.0
+
+motion:
+  speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven
+  approach_speed_scale: 0.25   # extra multiplier for the final approach / retreat at the tray
+  min_move_s: 0.4
+  settle_tol_deg: 3.0          # measured-vs-target tolerance to call a move "arrived"
+  settle_timeout_s: 1.5
+  # Freeze the arm if any joint lags its setpoint by more than this (collision guard).
+  # Set to null to disable if feedback proves noisy on your unit.
+  tracking_error_limit_deg: 25.0
+
+handoff:
+  # Wrist (joint6) offset applied at the presentation pose, per requested orientation.
+  orientation_offsets_deg: {forehand: 0.0, backhand: 180.0}
+  default_orientation: forehand
+  release_wait_s: 0.5          # pause with jaws open before retreating
+  present_timeout_s: 60.0      # give up waiting for the surgeon and keep holding
+  # Tug-to-release: open the jaws when the surgeon pulls on the instrument.
+  # Off by default; tune thresholds on the real arm before enabling.
+  tug:
+    enabled: false
+    joints: [joint4, joint5, joint6]
+    deviation_deg: 4.0         # wrist deflection from its setpoint that counts as a tug
+    hold_s: 0.15               # must persist this long (debounce)
+
+verify:
+  # Tray-cam service (owned by the CV teammate). null disables verification.
+  url: null                    # e.g. http://127.0.0.1:8770/verify
+  timeout_s: 2.0
+  min_confidence: 0.6
+  fail_open: true              # if the CV service is unreachable, proceed (demo resilience)
+
+server:
+  host: 127.0.0.1
+  port: 8765
