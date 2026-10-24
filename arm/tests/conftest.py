@@ -1,3 +1,4 @@
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -16,6 +17,11 @@ def config_dir(tmp_path):
     d = tmp_path / "config"
     shutil.copytree(ROOT / "config", d)
     shutil.copy(DEFAULT_TRAY_PATH, d)
+    # Tests assume the placeholder gripper, not whatever `gcal` measured on the real arm.
+    text = (d / "arm.yaml").read_text()
+    for key, val in {"open_deg": "0.0", "closed_deg": "-60.0", "calibrated": "false"}.items():
+        text = re.sub(rf"^(\s*{key}:\s*)\S+", rf"\g<1>{val}", text, flags=re.M)
+    (d / "arm.yaml").write_text(text)
     return d
 
 
