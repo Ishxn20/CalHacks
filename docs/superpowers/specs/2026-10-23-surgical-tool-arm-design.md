@@ -59,7 +59,7 @@ Note: `compute_ik` loads the URDF via the SDK's `config/rebotarm.yaml` → `rebo
 
 ## 4. Instrument set and what separates each
 
-STL bounding boxes (mm, longest × middle × thickness). Prints are 1:1, single green filament (#00AE42, from the Bambu `.3mf` in the STL folder).
+STL bounding boxes (mm, longest × middle × thickness). Prints are 1:1 and **may be any colour, mixed within one set** (updated 2026-10-24: colour is never used as a cue; synthetic data randomises filament colour per instrument).
 
 | Class | Length | Width | Thick | Separated by |
 |---|---|---|---|---|
@@ -85,7 +85,10 @@ Facts the builder must design around:
 - Blades (35–50 mm, 2 mm thick) are glued onto handles; each scalpel is one object. My call; the only sliced plate shows one of each handle and blade.
 - Everything is flat (3–12 mm). Top-down pinch along the long axis is the only grasp.
 - Prints are mirror-ambiguous when flipped. Matching considers both flips.
-- The arm's own links and fingers are green PLA (per the RS URDF meshes). The gripper region in the image must be masked.
+- The gripper region in the image (bottom ~25 %) is masked.
+- Forward- and back-facing micro scissors have identical top-down silhouettes (the tip bend is out of the table plane); they are one visual class.
+- Scalpel #10/#11/#15 share handle #3 and differ by 1–3 mm of blade: identification returns a candidate list, not a guess.
+- Top-down reach (wrist vertical) is ~400 mm from the base at hover height: pile and staging must sit within ~350 mm.
 - Coronary probes have no STL; out of scope.
 
 ## 5. Identification system
@@ -125,7 +128,7 @@ For each mask: PCA → principal axis; length in mm via the homography; **length
 
 **Grasp feasibility check:** at the chosen grasp point, the jaw footprint (jaw width × opening, rotated to yaw) must not intersect another mask that is *above* this one. If it does, slide the grasp point along the shank; if nothing works, this instrument is not graspable yet.
 
-Known weaknesses: specular filament, deep shadows between instruments, a green or busy table. Mitigation: a plain white or grey sheet under the pile, diffuse light from two sides.
+Known weaknesses: specular filament, deep shadows between instruments, a busy table, and instruments the same colour as the table. Mitigation: a plain mid-grey matte sheet (contrasts with both white and black prints), diffuse light from two sides.
 
 ### 5.4 Declutter policy (rule-based)
 

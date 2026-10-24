@@ -87,10 +87,15 @@ class Kinematics:
                    limits: tuple[np.ndarray, np.ndarray]) -> np.ndarray | None:
         """Joint vector placing the tool at (x, y, z) m pointing straight down, jaws along `yaw`; None if unreachable."""
         q_seed = np.asarray(q_seed, dtype=float)
-        best = None
-        for yy in (yaw, yaw + np.pi):
-            target = self.pin.SE3(self._target_rotation(yy), np.array([x, y, z], dtype=float))
-            q = self._solve(target, q_seed, limits)
-            if q is not None and (best is None or np.linalg.norm(q - q_seed) < np.linalg.norm(best - q_seed)):
-                best = q
-        return best
+        # Damped least squares is local: also start from the base turned toward the target with the
+        # wrist pre-rotated, which escapes the minima a far-away seed (e.g. the scan pose) gets stuck in.
+        base = np.arctan2(y, x)
+        seeds = [q_seed] + [np.array([base, np.radians(60), np.radians(70), 0.0, np.radians(50), w])
+                            for w in (0.0, np.pi / 2, -np.pi / 2, 0.9 * np.pi, -0.9 * np.pi)]
+        targets = [self.pin.SE3(self._target_rotation(yy), np.array([x, y, z], dtype=float))
+                   for yy in (yaw, yaw + np.pi)]
+        for group in (seeds[:1], seeds[1:]):       # restarts only if the direct solve fails both ways
+            sols = [q for t in targets for s in group if (q := self._solve(t, s, limits)) is not None]
+            if sols:
+                return min(sols, key=lambda q: np.linalg.norm(q - q_seed))
+        return None

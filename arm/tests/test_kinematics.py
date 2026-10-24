@@ -57,3 +57,20 @@ def test_ik_respects_limits(kin, limits):
     lo, hi = limits
     q = kin.ik_topdown(0.30, 0.0, 0.05, 0.0, SEED, limits)
     assert np.all(q >= lo - 1e-9) and np.all(q <= hi + 1e-9)
+
+
+@pytest.mark.parametrize("yaw_deg", [0, 45, 90, 135])
+def test_ik_any_yaw_from_scan_seed(kin, limits, yaw_deg):
+    scan_seed = np.radians([0, 45, 70, 0, 65, 0])
+    q = kin.ik_topdown(0.345, -0.020, 0.080, np.radians(yaw_deg), scan_seed, limits)
+    assert q is not None
+
+
+def test_easy_target_does_not_try_restart_seeds(kin, limits, monkeypatch):
+    calls = []
+    real = kin._solve
+    monkeypatch.setattr(kin, "_solve", lambda *a, **k: calls.append(1) or real(*a, **k))
+    q0 = kin.ik_topdown(0.30, 0.0, 0.08, 0.0, SEED, limits)
+    calls.clear()
+    kin.ik_topdown(0.30, 0.0, 0.077, 0.0, q0, limits)       # one 3 mm descent step from a solved pose
+    assert len(calls) <= 2
