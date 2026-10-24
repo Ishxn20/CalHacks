@@ -64,14 +64,15 @@ def test_small_actions_make_fine_moves(env):
     assert np.abs(env.q - q0).max() <= MAX_DQ * 0.1 ** 3 + 1e-12
 
 
-def test_nudge_moves_the_target_5_to_20_mm_partway():
+def test_nudge_moves_the_target_10_to_30_mm_and_turns_it_partway():
     env = VisualReachEnv(seed=0, noise=False, mount_noise=False, pool_size=2, nudge=True)
     _, info = env.reset(seed=7)
     g0 = np.array(info["goal"][:2])
-    moved = None
+    yaw0, moved = info["goal"][3], None
     for _ in range(env.max_steps):
         *_, step_info = env.step(np.zeros(6))
         if step_info.get("nudged"):
-            moved = np.linalg.norm(np.array(env.goal[:2]) - g0)
+            moved, turned = np.linalg.norm(np.array(env.goal[:2]) - g0), abs(env.goal[3] - yaw0)
             break
-    assert moved is not None and 0.005 <= moved <= 0.020 + 1e-9
+    assert moved is not None and 0.010 <= moved <= 0.030 + 1e-9 and turned <= np.radians(15) + 1e-9
+    assert 30 <= env.steps <= 80

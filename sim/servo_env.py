@@ -7,11 +7,13 @@ Goal: tool at that grasp point, `h` above the table (40-120 mm, an input: the co
 jaws along the yaw (either way round: the pinch is symmetric).
 Observation (every step, from the camera, never the target's world pose):
   [visible, grasp-point pixel offset from the fingertips (u/W, v/H), sin/cos 2*(target axis - jaw axis) in
-   the image, apparent length / W, fingertip pixel (u/W, v/H), joints / pi, previous action, h / 0.1 m].
+   the image, apparent length / W, fingertip pixel (u/W, v/H), joints / pi, previous action, h / 0.1 m,
+   the 3 gripper LANDMARKS' pixels (u/W, v/H; always fresh, 3 px jitter)].
   Perception-like noise: 3 px jitter, 3 deg angle jitter, 7 % dropped frames, and the target is hidden while
   its grasp point is behind the fingers (below the fingertip pixel, +-0.2 W); hidden -> last features held,
   visible = 0.
-Mount: arm.yaml wrist_camera, randomised per episode (+-10 mm back/side, +-5 deg tilt).
+Mount: arm.yaml wrist_camera, randomised per episode (mount_noise=1: +-10 mm back/side, +-5 deg tilt;
+scaled by mount_noise, 0 = nominal).
 Action: joint deltas MAX_DQ * a^3 (a in [-1, 1]): 16 mm at the tool for a=1, sub-mm for |a| < 0.2. A
 true-error-adaptive scale (sim/reach_env.py) would leak the hidden goal, so the cube gives the coarse/fine
 range instead.
@@ -37,7 +39,11 @@ from sim.reach_env import POS_TOL, ROT_TOL_DEG
 from sim.wrist_cam import CAM_H, CAM_W, NOMINAL, WristCam
 
 MAX_DQ = 0.04
-N_OBS = 21
+N_OBS = 27
+# Gripper landmarks (tool frame, m) the camera always sees at fixed pixels (fiducials / finger corners):
+# between the fingertips, a marker 40 mm back on the finger top, a fingertip corner 20 mm along the jaws.
+# Their pixels depend only on the camera mount, so they let a controller calibrate the mount online.
+LANDMARKS = np.array([[0.0, 0.0, 0.0], [-0.04, 0.0, 0.019], [0.0, 0.02, 0.0]])
 FINGERS_HALF_W, FINGERS_ABOVE_TIP = 0.2 * CAM_W, 10.0       # px: the fingers hide what is behind/below the tips
 
 
@@ -69,7 +75,7 @@ def placed(t: dict, phi: float, at: np.ndarray, table_z: float) -> dict:
 class VisualReachEnv(gym.Env):
     OBS_VISIBLE = 0
 
-    def __init__(self, seed: int | None = None, noise: bool = True, mount_noise: bool = True, nudge: bool = False,
+    def __init__(self, seed: int | None = None, noise: bool = True, mount_noise: float = 1.0, nudge: bool = False,
                  max_steps: int = 150, pool_size: int = 64, table_penalty: float = 5.0,
                  limit_penalty: float = 0.1) -> None:
         cfg = load_arm_config()
@@ -114,12 +120,14 @@ class VisualReachEnv(gym.Env):
                 break
         mount = dict(NOMINAL)
         if self.mount_noise:
-            mount = {"back": mount["back"] + rng.uniform(-0.01, 0.01), "side": mount["side"] + rng.uniform(-0.01, 0.01),
-                     "tilt_deg": mount["tilt_deg"] + rng.uniform(-5, 5)}
+            k = float(self.mount_noise)                      # 1 = +-10 mm / +-5 deg (uncalibrated)
+            mount = {"back": mount["back"] + k * rng.uniform(-0.01, 0.01),
+                     "side": mount["side"] + k * rng.uniform(-0.01, 0.01),
+                     "tilt_deg": mount["tilt_deg"] + k * rng.uniform(-5, 5)}
         self.cam.set_mount(self.model, **mount)
         self.target, self.h, self.goal, self.q = t, h, goal, q0
         self.steps, self.prev_a, self.last = 0, np.zeros(6), np.zeros(7)
-        self.nudge_at = int(rng.integers(20, 60)) if self.nudge else -1
+        self.nudge_at = int(rng.integers(30, 81)) if self.nudge else -1
         set_arm(self.model, self.data, self.q)
         return self._obs(), {"goal": goal, "q_goal": q_goal, "fid": t["fid"], "mount": mount}
 
@@ -156,8 +164,12 @@ class VisualReachEnv(gym.Env):
         f = self.features(est)
         if f["visible"]:
             self.last = np.array([*f["offset"], *f["rel"], f["length"], *f["tip"]])
-        return np.concatenate([[float(f["visible"])], self.last, self.q / np.pi, self.prev_a, [self.h / 0.1]]
-                              ).astype(np.float32)
+        s = self.data.site("tool")
+        lm = self.cam.project(self.data, s.xpos + LANDMARKS @ s.xmat.reshape(3, 3).T)
+        if self.noise:
+            lm += self._rng.normal(0, 3.0, lm.shape)
+        return np.concatenate([[float(f["visible"])], self.last, self.q / np.pi, self.prev_a, [self.h / 0.1],
+                               (lm / [CAM_W, CAM_H]).ravel()]).astype(np.float32)
 
     # ── dynamics ──────────────────────────────────────────────────────────
     def errors(self) -> tuple[float, float]:
@@ -173,11 +185,16 @@ class VisualReachEnv(gym.Env):
         self.q = np.clip(self.q + MAX_DQ * a ** 3, self.lo, self.hi)
         self.prev_a, self.steps = a, self.steps + 1
         info = {}
-        if self.steps == self.nudge_at:
-            phi = self._rng.uniform(0, 2 * np.pi)
-            dxy = self._rng.uniform(0.005, 0.020) * np.array([np.cos(phi), np.sin(phi)])
-            self.target = {**self.target, "grasp": self.target["grasp"] + dxy, "centroid": self.target["centroid"] + dxy}
-            self.goal = (self.goal[0] + dxy[0], self.goal[1] + dxy[1], *self.goal[2:])
+        if self.steps == self.nudge_at:                # pushed 10-30 mm and turned up to 15 deg about its grasp point
+            rng, t = self._rng, self.target
+            phi = rng.uniform(0, 2 * np.pi)
+            dxy = rng.uniform(0.010, 0.030) * np.array([np.cos(phi), np.sin(phi)])
+            rot = rng.uniform(-np.radians(15), np.radians(15))
+            c, s = np.cos(rot), np.sin(rot)
+            cen = t["grasp"] + np.array([[c, -s], [s, c]]) @ (t["centroid"] - t["grasp"])
+            self.target = {**t, "grasp": t["grasp"] + dxy, "centroid": cen + dxy, "axis": t["axis"] + rot,
+                           "yaw": t["yaw"] + rot}
+            self.goal = (self.goal[0] + dxy[0], self.goal[1] + dxy[1], self.goal[2], self.goal[3] + rot)
             info["nudged"] = True
         set_arm(self.model, self.data, self.q)
         obs = self._obs(perceive(self) if perceive else None)
@@ -191,15 +208,19 @@ class VisualReachEnv(gym.Env):
         return obs, float(r), False, self.steps >= self.max_steps, info
 
 
-def evaluate(model, n: int = 200, seed: int = 777, **env_kw) -> dict:
+def evaluate(model, n: int = 200, seed: int = 777, env_cls=None, rows: list | None = None, **env_kw) -> dict:
     """Deterministic policy on n fixed held-out episodes. Scored at the LAST step (a deployment can't see the
-    true error, so it can't stop at the first good step); `reached` = within tolerance at any step."""
-    env = VisualReachEnv(seed=seed, **env_kw)
+    true error, so it can't stop at the first good step); `reached` = within tolerance at any step.
+    model: anything with predict(obs, deterministic) (SAC, sim.ibvs.IBVS); env_cls: VisualReachEnv or
+    sim.ibvs.ResidualEnv. rows: if given, per-episode results are appended to it."""
+    env = (env_cls or VisualReachEnv)(seed=seed, **env_kw)
     rng = np.random.default_rng(seed)
     targets = [make_target(rng) for _ in range(n)]
     pe, re_, ok, first = [], [], [], []
     for i, t in enumerate(targets):
         obs, _ = env.reset(seed=seed + 1 + i, options={"target": t})
+        if hasattr(model, "est"):                       # sim.ibvs.IBVS keeps per-episode state
+            model.reset()
         hit = None
         for _ in range(env.max_steps):
             obs, _, _, _, info = env.step(model.predict(obs, deterministic=True)[0])
@@ -209,6 +230,9 @@ def evaluate(model, n: int = 200, seed: int = 777, **env_kw) -> dict:
         re_.append(info["rot_err_deg"])
         ok.append(info["success"])
         first.append(hit)
+        if rows is not None:
+            rows.append({"fid": t["fid"], "success": bool(info["success"]), "pos_mm": pe[-1], "rot_deg": re_[-1],
+                         "reached_at": hit})
     pe, hits = np.array(pe), [h for h in first if h is not None]
     return {"success": float(np.mean(ok)), "reached": len(hits) / n, "pos_mm_median": float(np.median(pe)),
             "pos_mm_p95": float(np.percentile(pe, 95)), "rot_deg_median": float(np.median(re_)),

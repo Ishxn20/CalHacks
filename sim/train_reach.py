@@ -4,6 +4,7 @@
     python -m sim.train_reach --name B --her                 # + HER (future, 4 goals)
     python -m sim.train_reach --name C --her --gamma 0.99
     python -m sim.train_reach --name V1 --env servo --seed 1   # camera-guided (sim/servo_env.py), no HER
+    python -m sim.train_reach --name R1 --env residual --seed 1   # IBVS + learned residual (sim/ibvs.py)
     python -m sim.train_reach --resume sim/policy/checkpoints/B8          # continue a paused run to its target
 
 Every --eval-every steps the policy is rolled out DETERMINISTICALLY on 200 fixed held-out targets
@@ -46,7 +47,7 @@ class HeldOut(BaseCallback):
         self.cfg, self.out, self.stop_at = cfg, out, stop_at
         self.name, self.every = cfg["name"], cfg["eval_every"]
         self.stop, self.last = False, None
-        if cfg.get("env") != "servo":
+        if cfg.get("env") not in ("servo", "residual"):
             self.pol = ReachPolicy(None)
             self.cases = held_out(self.pol.env, cfg["eval_n"], EVAL_SEED)
         curve = out / f"reach_{self.name}_curve.csv"
@@ -65,10 +66,10 @@ class HeldOut(BaseCallback):
         if self.num_timesteps % self.every or self.num_timesteps == self.last:
             return
         self.last = self.num_timesteps
-        if self.cfg.get("env") == "servo":
+        if self.cfg.get("env") in ("servo", "residual"):
             from sim.servo_env import evaluate
 
-            s = evaluate(self.model, self.cfg["eval_n"], EVAL_SEED)
+            s = evaluate(self.model, self.cfg["eval_n"], EVAL_SEED, env_cls=make_env(self.cfg["env"], None, cls=True))
         else:
             self.pol.model = self.model
             s = summary(rl_rows(self.pol, self.pol.env.kin, self.cases))
@@ -94,12 +95,14 @@ def checkpoint(model: SAC, out: Path, cfg: dict) -> Path:
     return d
 
 
-def make_env(kind: str, seed: int):
+def make_env(kind: str, seed: int | None, cls: bool = False):
     if kind == "servo":
-        from sim.servo_env import VisualReachEnv
-
-        return VisualReachEnv(seed=seed)
-    return ReachEnv(seed=seed)
+        from sim.servo_env import VisualReachEnv as E
+    elif kind == "residual":
+        from sim.ibvs import ResidualEnv as E
+    else:
+        E = ReachEnv
+    return E if cls else E(seed=seed)
 
 
 def main(argv=None) -> SAC:
@@ -108,8 +111,9 @@ def main(argv=None) -> SAC:
     ap.add_argument("--resume", help="checkpoint dir; config comes from its meta.json")
     ap.add_argument("--steps", type=int, default=300_000)
     ap.add_argument("--stop-at", type=int)
-    ap.add_argument("--env", choices=["reach", "servo"], default="reach",
-                    help="reach: blind, target pose given; servo: camera-guided (sim/servo_env.py)")
+    ap.add_argument("--env", choices=["reach", "servo", "residual"], default="reach",
+                    help="reach: blind, target pose given; servo: camera-guided (sim/servo_env.py); "
+                         "residual: camera-guided IBVS + learned correction (sim/ibvs.py)")
     ap.add_argument("--her", action="store_true")
     ap.add_argument("--gamma", type=float, default=0.98)
     ap.add_argument("--seed", type=int, default=7)
