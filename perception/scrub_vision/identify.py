@@ -110,13 +110,10 @@ class _TemplateCanon:
         self.tip_q = (np.array([t.mask.shape[1], t.grasp_px[1]]) * s - self.c) @ _rot(-self.theta).T
 
 
-_canon_cache: dict[int, _TemplateCanon] = {}
-
-
 def _tc(t: Template) -> _TemplateCanon:
-    if id(t) not in _canon_cache:
-        _canon_cache[id(t)] = _TemplateCanon(t)
-    return _canon_cache[id(t)]
+    if t._canon is None:
+        t._canon = _TemplateCanon(t)
+    return t._canon
 
 
 def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: list[Template],

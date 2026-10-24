@@ -5,7 +5,7 @@ Convention for every template: instrument lying flat (resting on its largest fac
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -38,6 +38,7 @@ class Template:
     grasp_px: tuple[float, float]
     flipped: bool
     mm_per_px: float
+    _canon: object = field(default=None, repr=False, compare=False)   # identify.py's cached polygons
 
 
 _cfg_cache: dict | None = None

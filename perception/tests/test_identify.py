@@ -138,3 +138,10 @@ def test_scalpel_blades_are_candidates_not_a_guess(insts, templates):
 def test_castroviejo_vs_micro_scissors_by_length(insts, templates):
     d = identify(one(insts, "needle_holder_castroviejo"), None, table_H(), templates, insts)
     assert d.fine_id == "needle_holder_castroviejo"
+
+
+def test_canonical_cache_lives_on_the_template(templates):
+    from scrub_vision import identify as ident
+    t = templates[0]
+    assert ident._tc(t) is ident._tc(t)
+    assert not hasattr(ident, "_canon_cache")       # an id()-keyed cache returns stale shapes after GC
