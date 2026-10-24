@@ -1,0 +1,3101 @@
+{
+ "summary": {
+  "n": 200,
+  "success_rate": 0.94,
+  "outcomes": {
+   "grasped": 188,
+   "wrong": 2,
+   "ambiguous": 6,
+   "fail": 3,
+   "cap": 1
+  },
+  "mean_moves_success": 1.1861702127659575,
+  "fail_reasons": {
+   "I can't get to": 3
+  },
+  "wrong_targets": {
+   "scalpel_15->scalpel_15": 1,
+   "needle_holder_long->clamp_aortic_cross": 1
+  }
+ },
+ "episodes": [
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "needle_holder_long",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "clamp_side_biting",
+    "clamp_aortic_cross",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_10",
+    "scalpel_20",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "wrong",
+   "moves": 1,
+   "grasped_id": "scalpel_15",
+   "say": "moved the target aside",
+   "target": "scalpel_15",
+   "items": [
+    "clamp_side_biting",
+    "scissors_micro_back",
+    "scalpel_15",
+    "forceps_debakey",
+    "scissors_micro_forward",
+    "forceps_fine_vascular",
+    "scalpel_20",
+    "needle_holder_short"
+   ]
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_debakey",
+    "scissors_micro_forward",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "needle_holder_castroviejo",
+    "scalpel_15",
+    "scalpel_10",
+    "scissors_micro_forward",
+    "clamp_side_biting",
+    "scissors_potts",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scissors_micro_back",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scalpel_20",
+    "needle_holder_short",
+    "scissors_micro_forward",
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scalpel_15",
+    "scissors_micro_forward",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "needle_holder_long",
+    "forceps_debakey",
+    "scalpel_10",
+    "scissors_potts",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "I think this is the Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "needle_holder_long",
+    "forceps_debakey",
+    "forceps_fine_vascular",
+    "clamp_side_biting",
+    "scissors_micro_back",
+    "needle_holder_castroviejo",
+    "scissors_potts",
+    "forceps_resano"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "forceps_resano",
+    "clamp_side_biting",
+    "forceps_debakey",
+    "needle_holder_long",
+    "needle_holder_ryder",
+    "needle_holder_castroviejo",
+    "needle_holder_short",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scissors_micro_back",
+    "scalpel_10",
+    "scalpel_20",
+    "forceps_resano",
+    "scalpel_11",
+    "forceps_debakey",
+    "needle_holder_castroviejo",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "clamp_aortic_cross",
+    "scalpel_20",
+    "needle_holder_long",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "forceps_debakey",
+    "scissors_micro_forward",
+    "needle_holder_castroviejo",
+    "needle_holder_short",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "scissors_micro_back",
+    "scalpel_10",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_10",
+   "say": "#10 scalpel",
+   "target": "scalpel_10",
+   "items": [
+    "scalpel_10",
+    "scalpel_11",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "forceps_resano",
+    "needle_holder_long",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "scalpel_10",
+    "forceps_resano",
+    "scissors_micro_forward",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_castroviejo",
+    "needle_holder_short",
+    "scissors_potts",
+    "needle_holder_ryder",
+    "scissors_micro_forward",
+    "scalpel_20",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_10",
+   "say": "#10 scalpel",
+   "target": "scalpel_10",
+   "items": [
+    "scalpel_10",
+    "needle_holder_ryder",
+    "scissors_micro_forward",
+    "needle_holder_castroviejo",
+    "scalpel_20",
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "needle_holder_short",
+    "scissors_micro_forward",
+    "forceps_resano",
+    "scalpel_15",
+    "scalpel_10",
+    "clamp_side_biting",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "scalpel_15",
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "clamp_aortic_cross",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "needle_holder_short",
+    "scalpel_20",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_potts",
+    "clamp_side_biting",
+    "forceps_resano",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "needle_holder_ryder",
+    "scalpel_11",
+    "scissors_potts",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_ryder",
+    "needle_holder_long",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "needle_holder_ryder",
+    "scalpel_11",
+    "forceps_debakey"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "forceps_debakey",
+    "scissors_potts",
+    "scalpel_15",
+    "needle_holder_ryder",
+    "clamp_side_biting",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "needle_holder_castroviejo",
+    "needle_holder_short",
+    "scissors_micro_forward",
+    "forceps_resano",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_11",
+    "scalpel_10",
+    "forceps_resano",
+    "needle_holder_castroviejo",
+    "clamp_side_biting",
+    "clamp_aortic_cross",
+    "needle_holder_long"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_11",
+    "scissors_micro_back",
+    "forceps_debakey"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_potts",
+    "scalpel_10",
+    "needle_holder_ryder",
+    "needle_holder_short",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "needle_holder_long",
+    "scissors_potts",
+    "scalpel_11",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_15",
+    "scalpel_10",
+    "scissors_micro_forward",
+    "forceps_debakey",
+    "scalpel_11",
+    "needle_holder_short",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_11",
+    "scalpel_20",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "clamp_side_biting",
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_fine_vascular",
+    "forceps_debakey",
+    "clamp_side_biting",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scissors_potts",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "scalpel_15",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "forceps_resano",
+    "scalpel_15",
+    "needle_holder_short",
+    "needle_holder_castroviejo",
+    "scalpel_10",
+    "forceps_debakey",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "needle_holder_short",
+    "needle_holder_castroviejo",
+    "scalpel_15",
+    "needle_holder_long"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "clamp_side_biting",
+    "scissors_micro_forward",
+    "scalpel_15",
+    "forceps_debakey",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "scalpel_11",
+    "needle_holder_short",
+    "scalpel_20",
+    "scissors_micro_forward",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scissors_micro_forward",
+    "forceps_debakey",
+    "needle_holder_long",
+    "scissors_micro_back",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_20",
+    "forceps_fine_vascular",
+    "scalpel_10",
+    "scalpel_15",
+    "scalpel_11",
+    "forceps_resano"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_15",
+    "needle_holder_long",
+    "scalpel_11"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "scissors_potts",
+    "needle_holder_short",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scissors_micro_back",
+    "needle_holder_castroviejo",
+    "needle_holder_long",
+    "forceps_fine_vascular",
+    "scissors_micro_forward",
+    "scalpel_15",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "clamp_aortic_cross",
+    "forceps_debakey",
+    "needle_holder_ryder",
+    "scissors_micro_back",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "needle_holder_ryder",
+    "scissors_potts",
+    "clamp_aortic_cross",
+    "scalpel_15",
+    "scissors_micro_forward",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "forceps_fine_vascular",
+    "needle_holder_short",
+    "scalpel_10",
+    "scissors_potts",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_15",
+    "needle_holder_castroviejo",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scalpel_10",
+    "needle_holder_castroviejo",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "scissors_potts",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "fail",
+   "moves": 1,
+   "say": "I can't get to the Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "scissors_micro_back",
+    "clamp_aortic_cross",
+    "scalpel_15",
+    "scissors_micro_forward",
+    "needle_holder_short",
+    "forceps_debakey",
+    "clamp_side_biting"
+   ]
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_debakey",
+    "needle_holder_short",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "clamp_aortic_cross",
+    "scalpel_15",
+    "clamp_side_biting"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "needle_holder_long",
+    "scalpel_15",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scalpel_10",
+    "scissors_micro_back",
+    "forceps_fine_vascular",
+    "clamp_side_biting",
+    "scissors_micro_forward",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scalpel_15",
+    "forceps_debakey",
+    "needle_holder_ryder",
+    "needle_holder_short",
+    "clamp_aortic_cross",
+    "scalpel_10",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "forceps_debakey",
+    "scalpel_10",
+    "needle_holder_short",
+    "scissors_potts",
+    "scalpel_11"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "clamp_side_biting",
+    "needle_holder_castroviejo",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "scissors_potts",
+    "clamp_side_biting",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "needle_holder_ryder",
+    "needle_holder_short",
+    "forceps_debakey",
+    "scalpel_20",
+    "clamp_aortic_cross",
+    "scalpel_15",
+    "needle_holder_castroviejo",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "scissors_micro_back",
+    "needle_holder_ryder",
+    "scalpel_20",
+    "forceps_fine_vascular",
+    "scalpel_15",
+    "needle_holder_castroviejo",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "needle_holder_short",
+    "needle_holder_ryder",
+    "forceps_fine_vascular",
+    "scissors_potts",
+    "forceps_debakey",
+    "needle_holder_castroviejo",
+    "scissors_micro_forward",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "clamp_aortic_cross",
+    "scalpel_11",
+    "clamp_side_biting"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_11",
+    "scalpel_10",
+    "clamp_aortic_cross",
+    "needle_holder_castroviejo",
+    "needle_holder_long"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "scalpel_20",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "clamp_side_biting",
+    "forceps_debakey",
+    "needle_holder_castroviejo",
+    "scissors_potts"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scissors_potts",
+    "needle_holder_short",
+    "scalpel_10",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_10",
+   "say": "#10 scalpel",
+   "target": "scalpel_10",
+   "items": [
+    "scalpel_10",
+    "scissors_micro_forward",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "wrong",
+   "moves": 0,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "clamp_side_biting",
+    "needle_holder_ryder",
+    "needle_holder_castroviejo",
+    "scalpel_11",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "needle_holder_long",
+    "forceps_debakey",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "needle_holder_ryder",
+    "needle_holder_short",
+    "needle_holder_castroviejo",
+    "needle_holder_long",
+    "scalpel_15",
+    "forceps_resano",
+    "clamp_side_biting"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "scissors_micro_back",
+    "scissors_micro_forward",
+    "forceps_debakey",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_11",
+    "scissors_micro_forward",
+    "needle_holder_ryder",
+    "scissors_potts",
+    "scalpel_20",
+    "clamp_side_biting",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "forceps_resano",
+    "scalpel_15",
+    "needle_holder_long",
+    "forceps_fine_vascular",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "forceps_resano",
+    "forceps_debakey",
+    "scissors_micro_forward",
+    "clamp_aortic_cross",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "forceps_resano",
+    "clamp_aortic_cross",
+    "needle_holder_long",
+    "scalpel_20",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scalpel_10",
+    "scissors_micro_back",
+    "needle_holder_ryder",
+    "scissors_micro_forward",
+    "needle_holder_long",
+    "scalpel_15",
+    "needle_holder_short",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_10",
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "scissors_micro_back",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "needle_holder_castroviejo",
+    "scalpel_20",
+    "clamp_aortic_cross",
+    "scissors_potts"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "needle_holder_long",
+    "clamp_side_biting",
+    "scalpel_10",
+    "scissors_micro_back",
+    "forceps_debakey",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "needle_holder_castroviejo",
+    "scissors_micro_forward",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "clamp_side_biting",
+    "scalpel_20",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_potts",
+   "say": "I think this is the Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "scissors_potts",
+    "scalpel_11",
+    "scalpel_15",
+    "clamp_side_biting",
+    "needle_holder_short",
+    "forceps_debakey",
+    "scalpel_10",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "clamp_aortic_cross",
+    "forceps_fine_vascular",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "clamp_aortic_cross",
+    "forceps_debakey",
+    "scissors_micro_back",
+    "scalpel_11",
+    "needle_holder_long",
+    "scalpel_20",
+    "needle_holder_ryder",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "needle_holder_castroviejo",
+    "clamp_side_biting",
+    "scalpel_15",
+    "needle_holder_long",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "scissors_micro_forward",
+    "scalpel_10",
+    "needle_holder_long",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "scalpel_20",
+    "scalpel_15",
+    "clamp_side_biting"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 1,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "scalpel_11",
+    "scissors_potts",
+    "scissors_micro_forward",
+    "needle_holder_short",
+    "forceps_fine_vascular",
+    "scalpel_20",
+    "scalpel_15",
+    "clamp_side_biting"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "needle_holder_long",
+    "scissors_potts",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "forceps_fine_vascular",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "cap",
+   "moves": 6,
+   "say": "",
+   "target": "clamp_side_biting",
+   "items": [
+    "scalpel_11",
+    "forceps_resano",
+    "scalpel_20",
+    "needle_holder_long",
+    "needle_holder_short",
+    "needle_holder_ryder",
+    "needle_holder_castroviejo",
+    "clamp_side_biting"
+   ]
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scalpel_11",
+    "scissors_micro_forward",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "clamp_side_biting",
+    "scalpel_15",
+    "scissors_micro_forward",
+    "scalpel_10",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "forceps_fine_vascular",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "clamp_side_biting",
+    "needle_holder_long",
+    "scissors_potts",
+    "needle_holder_short",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scalpel_15",
+    "clamp_side_biting",
+    "clamp_aortic_cross",
+    "forceps_resano",
+    "scalpel_11",
+    "needle_holder_ryder",
+    "scalpel_20",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_20",
+    "needle_holder_long",
+    "needle_holder_short",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "scalpel_10",
+    "scissors_potts",
+    "scalpel_15",
+    "needle_holder_long",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scissors_micro_forward",
+    "needle_holder_long",
+    "needle_holder_ryder",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scissors_micro_back",
+    "needle_holder_short",
+    "scalpel_11",
+    "forceps_fine_vascular",
+    "forceps_resano",
+    "scissors_potts",
+    "scissors_micro_forward",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "forceps_resano",
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "needle_holder_castroviejo",
+    "needle_holder_ryder",
+    "scissors_potts",
+    "needle_holder_long"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "forceps_resano",
+    "clamp_side_biting",
+    "scalpel_15",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "scissors_micro_forward",
+    "needle_holder_castroviejo",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_back",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "needle_holder_ryder",
+    "scalpel_10",
+    "needle_holder_castroviejo",
+    "scalpel_15",
+    "needle_holder_long",
+    "scissors_micro_forward",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "needle_holder_short",
+    "needle_holder_long",
+    "clamp_side_biting",
+    "needle_holder_ryder",
+    "scissors_potts",
+    "forceps_fine_vascular",
+    "scissors_micro_back",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_20",
+    "clamp_side_biting",
+    "forceps_resano",
+    "needle_holder_short",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "needle_holder_short",
+    "scalpel_20",
+    "scalpel_11",
+    "scalpel_10",
+    "needle_holder_long"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_fine_vascular",
+    "clamp_side_biting",
+    "forceps_resano",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "needle_holder_castroviejo",
+    "scalpel_10",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "forceps_resano",
+    "scalpel_10",
+    "scalpel_20",
+    "scissors_potts",
+    "needle_holder_short",
+    "needle_holder_long",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_potts",
+    "forceps_resano",
+    "needle_holder_ryder",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "forceps_debakey",
+    "needle_holder_castroviejo",
+    "scissors_micro_forward",
+    "scissors_micro_back",
+    "needle_holder_long",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_11",
+    "clamp_aortic_cross",
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "scalpel_10",
+    "forceps_debakey",
+    "clamp_side_biting",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "scissors_potts",
+    "scalpel_15",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "I think this is the Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_15",
+    "needle_holder_ryder",
+    "clamp_side_biting",
+    "needle_holder_long",
+    "scissors_micro_forward",
+    "scissors_potts"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "forceps_fine_vascular",
+    "needle_holder_castroviejo",
+    "scalpel_15"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_forward",
+   "say": "I think this is the Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scalpel_20",
+    "needle_holder_short",
+    "clamp_side_biting",
+    "scalpel_10",
+    "forceps_debakey",
+    "forceps_resano",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scalpel_10",
+    "forceps_fine_vascular",
+    "needle_holder_short",
+    "needle_holder_ryder",
+    "clamp_side_biting",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "clamp_aortic_cross",
+    "scalpel_11",
+    "needle_holder_castroviejo",
+    "scalpel_20",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "needle_holder_short",
+    "clamp_aortic_cross",
+    "forceps_resano",
+    "needle_holder_long",
+    "scissors_micro_back",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "fail",
+   "moves": 2,
+   "say": "I can't get to the Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "clamp_side_biting",
+    "forceps_resano",
+    "clamp_aortic_cross",
+    "needle_holder_long"
+   ]
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "needle_holder_ryder",
+    "scalpel_15",
+    "forceps_debakey",
+    "scissors_micro_back"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scalpel_11",
+    "forceps_fine_vascular",
+    "needle_holder_short",
+    "scalpel_20",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_castroviejo",
+    "clamp_side_biting",
+    "forceps_debakey",
+    "needle_holder_long",
+    "scalpel_15",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "clamp_aortic_cross",
+    "clamp_side_biting",
+    "forceps_debakey",
+    "forceps_resano",
+    "needle_holder_castroviejo",
+    "scissors_micro_forward",
+    "scalpel_15",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_15",
+    "scalpel_10",
+    "clamp_aortic_cross",
+    "forceps_debakey",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "needle_holder_short",
+    "forceps_debakey",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "scissors_micro_back",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "scalpel_15",
+    "needle_holder_short",
+    "scalpel_11",
+    "scissors_micro_back",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "clamp_side_biting",
+    "scissors_potts",
+    "needle_holder_castroviejo",
+    "scalpel_20",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_fine_vascular",
+    "scissors_potts",
+    "clamp_side_biting",
+    "scalpel_20",
+    "scalpel_10"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "scalpel_11",
+    "needle_holder_castroviejo",
+    "forceps_debakey",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scissors_micro_forward",
+    "scalpel_11",
+    "needle_holder_long",
+    "scalpel_20",
+    "forceps_debakey",
+    "needle_holder_castroviejo",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scalpel_11",
+    "scissors_micro_forward",
+    "needle_holder_short",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "forceps_debakey",
+    "scissors_potts",
+    "clamp_side_biting",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "scissors_potts",
+    "scissors_micro_back",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "clamp_aortic_cross",
+    "scalpel_20",
+    "needle_holder_long",
+    "scissors_micro_back",
+    "needle_holder_ryder",
+    "scissors_micro_forward",
+    "needle_holder_castroviejo",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "clamp_side_biting",
+    "forceps_debakey",
+    "needle_holder_short",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_debakey",
+    "scissors_micro_back",
+    "needle_holder_long",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_ryder",
+   "say": "I think this is the Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "clamp_side_biting",
+    "needle_holder_long",
+    "forceps_debakey",
+    "scalpel_11",
+    "scissors_micro_back",
+    "scalpel_15",
+    "clamp_aortic_cross",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scalpel_15",
+    "scalpel_10",
+    "forceps_resano",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "scissors_potts",
+    "clamp_side_biting",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_debakey",
+    "needle_holder_long",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "scalpel_10",
+    "forceps_resano",
+    "clamp_aortic_cross",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "scalpel_20",
+   "say": "#20 scalpel",
+   "target": "scalpel_20",
+   "items": [
+    "scissors_potts",
+    "forceps_debakey",
+    "clamp_side_biting",
+    "scalpel_11",
+    "scalpel_10",
+    "scissors_micro_forward",
+    "scalpel_20",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "forceps_resano",
+    "forceps_debakey",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "forceps_debakey",
+    "scissors_potts",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "forceps_debakey",
+    "scalpel_11",
+    "needle_holder_short",
+    "scissors_micro_back"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "forceps_debakey",
+    "clamp_aortic_cross",
+    "needle_holder_short",
+    "needle_holder_long",
+    "scalpel_20",
+    "forceps_resano",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "clamp_side_biting",
+    "scalpel_15",
+    "scissors_potts",
+    "scalpel_20",
+    "needle_holder_ryder"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "forceps_fine_vascular",
+    "scissors_potts",
+    "scalpel_20",
+    "needle_holder_long",
+    "forceps_resano",
+    "scissors_micro_back",
+    "scalpel_15",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "scissors_micro_back",
+    "needle_holder_short",
+    "scalpel_10",
+    "forceps_fine_vascular",
+    "scalpel_20",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "clamp_side_biting",
+    "needle_holder_ryder",
+    "forceps_fine_vascular",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_10",
+    "needle_holder_castroviejo",
+    "scalpel_15"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "needle_holder_castroviejo",
+    "needle_holder_ryder",
+    "scissors_micro_forward",
+    "scalpel_11",
+    "scalpel_15",
+    "needle_holder_long",
+    "forceps_debakey",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "scalpel_11",
+    "forceps_fine_vascular",
+    "needle_holder_ryder",
+    "clamp_aortic_cross",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_micro_forward",
+    "needle_holder_ryder",
+    "forceps_resano",
+    "forceps_fine_vascular",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_potts",
+   "say": "Potts scissors",
+   "target": "scissors_potts",
+   "items": [
+    "needle_holder_short",
+    "scalpel_20",
+    "scissors_potts",
+    "scalpel_15",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "forceps_debakey",
+    "scalpel_15",
+    "scissors_potts",
+    "scalpel_11",
+    "clamp_side_biting",
+    "needle_holder_castroviejo",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "needle_holder_ryder",
+    "scalpel_10",
+    "scissors_micro_back",
+    "scalpel_20",
+    "clamp_side_biting",
+    "needle_holder_short",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "scalpel_20",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "needle_holder_ryder",
+    "scalpel_11",
+    "forceps_debakey",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "needle_holder_short",
+    "forceps_resano",
+    "forceps_debakey",
+    "scalpel_11",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "needle_holder_short",
+    "clamp_side_biting",
+    "needle_holder_ryder",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scissors_micro_back",
+    "forceps_fine_vascular",
+    "scissors_potts",
+    "scalpel_20",
+    "forceps_resano",
+    "needle_holder_castroviejo",
+    "needle_holder_long",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "forceps_debakey",
+    "needle_holder_ryder",
+    "scalpel_15",
+    "scalpel_11",
+    "scissors_micro_back",
+    "scissors_potts",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "scissors_micro_forward",
+    "scalpel_20",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "scalpel_11",
+    "scissors_micro_back",
+    "needle_holder_ryder",
+    "scalpel_20",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #10 scalpel",
+   "target": "scalpel_10",
+   "items": [
+    "scalpel_15",
+    "scalpel_10",
+    "clamp_aortic_cross",
+    "forceps_fine_vascular",
+    "needle_holder_short"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "clamp_aortic_cross",
+    "needle_holder_ryder",
+    "forceps_fine_vascular",
+    "needle_holder_long",
+    "scalpel_10",
+    "scissors_micro_back",
+    "scalpel_11",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "scalpel_10",
+    "scissors_micro_forward",
+    "forceps_resano",
+    "scissors_potts",
+    "needle_holder_short",
+    "needle_holder_castroviejo",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "needle_holder_castroviejo",
+    "scalpel_15",
+    "scissors_micro_forward"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "clamp_aortic_cross",
+    "needle_holder_long",
+    "forceps_fine_vascular",
+    "scissors_potts",
+    "scissors_micro_forward",
+    "forceps_resano",
+    "scalpel_10",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "clamp_side_biting",
+    "needle_holder_long",
+    "needle_holder_short"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "needle_holder_short",
+    "scalpel_11",
+    "scalpel_10",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "scissors_micro_back",
+   "say": "Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "needle_holder_long",
+    "scalpel_15",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "forceps_debakey",
+    "forceps_fine_vascular",
+    "scalpel_11",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "forceps_resano",
+   "say": "Resano forceps",
+   "target": "forceps_resano",
+   "items": [
+    "scissors_micro_forward",
+    "needle_holder_ryder",
+    "clamp_side_biting",
+    "forceps_fine_vascular",
+    "forceps_resano",
+    "scalpel_11"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "ambiguous",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "scalpel_15",
+    "scalpel_11",
+    "forceps_debakey"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "scissors_micro_forward",
+    "clamp_side_biting",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "needle_holder_short",
+    "scissors_micro_back",
+    "needle_holder_ryder",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_11",
+   "say": "I think this is the #11 scalpel",
+   "target": "scalpel_11",
+   "items": [
+    "scalpel_11",
+    "needle_holder_long",
+    "needle_holder_short"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_potts",
+    "needle_holder_long",
+    "scalpel_11",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 4,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "I think this is the Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scalpel_11",
+    "needle_holder_short",
+    "scalpel_20",
+    "forceps_resano",
+    "scissors_micro_back",
+    "clamp_side_biting",
+    "needle_holder_long",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "forceps_debakey",
+    "forceps_fine_vascular",
+    "needle_holder_short",
+    "forceps_resano",
+    "needle_holder_long",
+    "clamp_side_biting",
+    "scissors_potts",
+    "scissors_micro_back"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "fail",
+   "moves": 2,
+   "say": "I can't get to the Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "clamp_aortic_cross",
+    "scissors_micro_forward",
+    "scalpel_20"
+   ]
+  },
+  {
+   "outcome": "grasped",
+   "moves": 1,
+   "grasped_id": "scissors_micro_back",
+   "say": "I think this is the Back-facing micro scissors",
+   "target": "scissors_micro_back",
+   "items": [
+    "scalpel_10",
+    "needle_holder_ryder",
+    "needle_holder_long",
+    "scissors_micro_back",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "scissors_potts",
+    "needle_holder_short"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_castroviejo",
+   "say": "Castroviejo needle holder",
+   "target": "needle_holder_castroviejo",
+   "items": [
+    "scalpel_11",
+    "scalpel_20",
+    "forceps_resano",
+    "needle_holder_castroviejo",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "clamp_side_biting",
+   "say": "Side-biting clamp",
+   "target": "clamp_side_biting",
+   "items": [
+    "scalpel_20",
+    "clamp_aortic_cross",
+    "clamp_side_biting",
+    "scissors_potts",
+    "needle_holder_ryder",
+    "needle_holder_long"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_debakey",
+   "say": "I think this is the DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_debakey",
+    "scalpel_11",
+    "forceps_resano",
+    "needle_holder_ryder",
+    "scissors_micro_back",
+    "forceps_fine_vascular",
+    "clamp_aortic_cross"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 5,
+   "grasped_id": "forceps_debakey",
+   "say": "DeBakey forceps",
+   "target": "forceps_debakey",
+   "items": [
+    "forceps_debakey",
+    "clamp_side_biting",
+    "needle_holder_short",
+    "scissors_micro_forward",
+    "scalpel_11",
+    "scalpel_10",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_10",
+   "say": "#10 scalpel",
+   "target": "scalpel_10",
+   "items": [
+    "scissors_micro_back",
+    "scissors_potts",
+    "needle_holder_castroviejo",
+    "clamp_aortic_cross",
+    "scalpel_10",
+    "needle_holder_short",
+    "needle_holder_ryder",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_ryder",
+    "needle_holder_long",
+    "clamp_aortic_cross",
+    "scalpel_11",
+    "forceps_debakey"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scissors_micro_forward",
+   "say": "Forward micro scissors",
+   "target": "scissors_micro_forward",
+   "items": [
+    "needle_holder_long",
+    "scissors_micro_forward",
+    "scalpel_15",
+    "forceps_debakey",
+    "scissors_micro_back",
+    "forceps_fine_vascular",
+    "scalpel_20"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 3,
+   "grasped_id": "clamp_aortic_cross",
+   "say": "Aortic cross-clamp",
+   "target": "clamp_aortic_cross",
+   "items": [
+    "needle_holder_short",
+    "scalpel_15",
+    "clamp_aortic_cross",
+    "scissors_micro_back",
+    "scalpel_11",
+    "scissors_micro_forward",
+    "scalpel_10",
+    "clamp_side_biting"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_short",
+   "say": "Short needle holder",
+   "target": "needle_holder_short",
+   "items": [
+    "forceps_fine_vascular",
+    "scalpel_20",
+    "scalpel_11",
+    "needle_holder_ryder",
+    "needle_holder_short",
+    "scissors_micro_forward",
+    "forceps_resano"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "forceps_fine_vascular",
+   "say": "I think this is the Fine vascular forceps",
+   "target": "forceps_fine_vascular",
+   "items": [
+    "forceps_debakey",
+    "forceps_fine_vascular",
+    "needle_holder_castroviejo"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "needle_holder_ryder",
+   "say": "Ryder needle holder",
+   "target": "needle_holder_ryder",
+   "items": [
+    "forceps_debakey",
+    "needle_holder_ryder",
+    "forceps_fine_vascular",
+    "needle_holder_short",
+    "scalpel_20",
+    "scalpel_15",
+    "needle_holder_long",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  },
+  {
+   "outcome": "grasped",
+   "moves": 0,
+   "grasped_id": "scalpel_15",
+   "say": "I think this is the #15 scalpel",
+   "target": "scalpel_15",
+   "items": [
+    "scissors_micro_forward",
+    "needle_holder_ryder",
+    "scalpel_20",
+    "scalpel_15",
+    "scissors_micro_back",
+    "needle_holder_short",
+    "scalpel_10",
+    "forceps_fine_vascular"
+   ],
+   "ambiguous": true
+  },
+  {
+   "outcome": "grasped",
+   "moves": 2,
+   "grasped_id": "needle_holder_long",
+   "say": "Long needle holder",
+   "target": "needle_holder_long",
+   "items": [
+    "needle_holder_long",
+    "forceps_resano",
+    "scalpel_20",
+    "scissors_micro_back",
+    "scissors_micro_forward",
+    "needle_holder_ryder",
+    "scissors_potts"
+   ],
+   "ambiguous": false
+  }
+ ]
+}
