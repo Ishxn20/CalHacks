@@ -1,0 +1,16 @@
+[project]
+name = "scrub-arm"
+version = "0.1.0"
+description = "Robotic scrub assistant: voice-commanded instrument handoff on the reBot Arm B601-RS"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+hardware = ["motorbridge>=0.5.6"]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["scrub_arm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

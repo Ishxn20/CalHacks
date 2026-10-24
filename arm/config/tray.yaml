@@ -1,0 +1,57 @@
+# Instrument vocabulary + physical tray layout.
+#
+# `instruments` is what the voice/intent pipeline can ask for. `category` lets a
+# generic request ("needle holder, 6-0 Prolene") match any specific model whose
+# slot is loaded with the right suture.
+#
+# `slots` is what is physically on the tray. Each slot names the taught poses
+# (from poses.yaml) the gripper passes through from a safe hover to the grasp.
+# Retreat runs the same list in reverse.
+
+instruments:
+  needle_holder_castroviejo: {name: Castroviejo needle holder, category: needle_holder, orientable: true,
+                              aliases: [castroviejo, castro, fine needle holder]}
+  needle_holder_ryder:       {name: Ryder needle holder, category: needle_holder, orientable: true,
+                              aliases: [ryder, rider]}
+  needle_holder_long:        {name: Long needle holder, category: needle_holder, orientable: true,
+                              aliases: [long needle holder, long driver]}
+  needle_holder_short:       {name: Short needle holder, category: needle_holder, orientable: true,
+                              aliases: [short needle holder, short driver]}
+  forceps_debakey:           {name: DeBakey forceps, category: forceps,
+                              aliases: [debakey, de bakey, debakeys, pickups]}
+  forceps_resano:            {name: Resano forceps, category: forceps,
+                              aliases: [resano, heavy forceps]}
+  forceps_fine_vascular:     {name: Fine vascular forceps, category: forceps,
+                              aliases: [fine forceps, vascular forceps, fine pickups]}
+  scalpel_10:                {name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
+  scalpel_11:                {name: "#11 scalpel", category: scalpel, aliases: [11 blade, number 11, "#11", eleven blade]}
+  scalpel_15:                {name: "#15 scalpel", category: scalpel, aliases: [15 blade, number 15, "#15", fifteen blade]}
+  scalpel_20:                {name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
+  scissors_potts:            {name: Potts scissors, category: scissors, orientable: true,
+                              aliases: [potts, pots, pott scissors]}
+  scissors_micro:            {name: Micro scissors, category: scissors, orientable: true,
+                              aliases: [micro scissors, micros]}
+  clamp_aortic_cross:        {name: Aortic cross-clamp, category: clamp,
+                              aliases: [cross clamp, crossclamp, aortic clamp, cross-clamp]}
+  clamp_side_biting:         {name: Side-biting clamp, category: clamp,
+                              aliases: [side biting clamp, side biter, partial occlusion clamp]}
+  probe_coronary:            {name: Coronary probe, category: probe,
+                              aliases: [probe, coronary probe, coronary dilator]}
+
+# Canonical suture names and what people may say instead.
+sutures:
+  prolene:  [prolene, polypropylene, pro lean, prolean]
+  ethibond: [ethibond, polyester, ethi bond]
+  vicryl:   [vicryl, polyglactin, vicral]
+  goretex:  [goretex, gore-tex, gore tex, ptfe, cv-4, cv-5, cv4, cv5]
+
+# Demo tray: 8 slots. Change instrument/suture/size to match what's actually loaded.
+slots:
+  - {id: A1, instrument: needle_holder_castroviejo, suture: prolene, size: 6-0, approach: [A1.above, A1.grasp]}
+  - {id: A2, instrument: needle_holder_ryder,       suture: prolene, size: 4-0, approach: [A2.above, A2.grasp]}
+  - {id: A3, instrument: forceps_debakey,                                         approach: [A3.above, A3.grasp]}
+  - {id: A4, instrument: scalpel_11,                                              approach: [A4.above, A4.grasp]}
+  - {id: B1, instrument: scissors_potts,                                          approach: [B1.above, B1.grasp]}
+  - {id: B2, instrument: clamp_aortic_cross,                                      approach: [B2.above, B2.grasp]}
+  - {id: B3, instrument: clamp_side_biting,                                       approach: [B3.above, B3.grasp]}
+  - {id: B4, instrument: probe_coronary,             size: 1.5mm,                  approach: [B4.above, B4.grasp]}
