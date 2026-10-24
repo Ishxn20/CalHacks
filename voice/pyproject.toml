@@ -1,0 +1,16 @@
+[project]
+name = "scrub-voice"
+version = "0.1.0"
+description = "Speech to instrument code for the robotic scrub assistant"
+requires-python = ">=3.10"
+# scrub-arm is only needed for the shared config/tray.yaml vocabulary + Catalog; install it from ../arm.
+dependencies = ["scrub-arm", "faster-whisper", "sounddevice"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["scrub_voice"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -46,7 +46,7 @@ python -m scrub_arm send release
 
    Always save while holding, not while limp. That stores the *setpoint*, so the replay sags exactly as it did while you taught it.
    - `home`: clear of the tray, neutral.
-   - `<slot>.above` / `<slot>.grasp` for each slot in `config/tray.yaml` (A1…B4). Make `above` high enough that swinging between slots clears everything.
+   - `<slot>.above` / `<slot>.grasp` for each slot in `config/tray.yaml` at the repo root (A1…B4). Make `above` high enough that swinging between slots clears everything.
    - `handoff`: where the surgeon's hand will be. **Teach it with joint6 near −90°** so the +180° backhand rotation stays inside the joint limits.
    - `staged` (optional): hold-ready spot for predicted instruments. `verify` (optional): instrument in tray-cam view. `rest`: folded pose the arm parks in before shutdown.
 5. `check` lists anything still missing. Then `test needle holder, 6-0 prolene, backhand`, followed by `release`.
@@ -69,7 +69,7 @@ The real arm **refuses** to move to placeholder poses (`taught: false`) or to gr
 | `POST /return`, `POST /home` | – | Put the held tool back / go home |
 | `GET /status` | – | `phase` (idle/picking/verifying/presenting/…), `holding`, current/last job, joint angles, recent events |
 
-Field normalization is forgiving. `castro`/`Castroviejo`, `six-oh`/`6/0`/`60`, `polypropylene`→Prolene, and `backwards`→backhand all work. A generic `needle holder` picks whichever needle holder slot is loaded with the requested suture and size. Numbers are never fuzzy-matched: "11 blade" can't become "10 blade". The vocabulary and tray contents live in `config/tray.yaml`. Edit it to match what's physically loaded.
+Field normalization is forgiving. `castro`/`Castroviejo`, `six-oh`/`6/0`/`60`, `polypropylene`→Prolene, and `backwards`→backhand all work. A generic `needle holder` picks whichever needle holder slot is loaded with the requested suture and size. Numbers are never fuzzy-matched: "11 blade" can't become "10 blade". The vocabulary and tray contents live in the repo-root `config/tray.yaml`, shared with `voice/`. Edit it to match what's physically loaded.
 
 **Tray-cam contract (CV teammate).** Set `verify.url` in `arm.yaml`. While holding the tool at `verify`, the arm sends `POST {"expected": "<instrument id>", "slot": "A1"}` and expects `{"ok": bool, "detected": "<id>", "confidence": float}`. With `fail_open: true`, an unreachable service doesn't block the demo.
 
@@ -90,7 +90,7 @@ Field normalization is forgiving. `castro`/`Castroviejo`, `six-oh`/`6/0`/`60`, `
 
 ```
 config/arm.yaml     motors (IDs/gains from Seeed's rebotarm_rs.yaml), limits, speeds, gripper, handoff, verify
-config/tray.yaml    instrument vocabulary, suture names, slot → instrument/suture/size → poses
+../config/tray.yaml instrument vocabulary, suture names, slot → instrument/suture/size → poses
 config/poses.yaml   taught poses (written by `teach`)
 scrub_arm/bus.py        motorbridge RobStride backend + simulator
 scrub_arm/driver.py     control loop thread, min-jerk moves, gripper, collision guard

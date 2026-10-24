@@ -27,7 +27,7 @@ class App:
 def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
     d = Path(config_dir) if config_dir else DEFAULT_CONFIG_DIR
     cfg = load_arm_config(d / "arm.yaml")
-    tray = load_tray_config(d / "tray.yaml")
+    tray = load_tray_config(d / "tray.yaml" if config_dir else None)  # default: shared repo-root tray.yaml
     poses = load_poses(d / "poses.yaml")
     if sim:
         start = poses.poses["home"].q if "home" in poses.poses else np.zeros(cfg.n)

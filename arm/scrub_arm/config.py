@@ -15,6 +15,8 @@ import numpy as np
 import yaml
 
 DEFAULT_CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+# tray.yaml is shared with voice/ (and CV later), so it lives at the repo root.
+DEFAULT_TRAY_PATH = Path(__file__).resolve().parents[2] / "config" / "tray.yaml"
 
 
 @dataclass
@@ -287,7 +289,7 @@ def save_gripper_calibration(cfg: ArmConfig, open_rad: float | None, closed_rad:
 
 
 def load_tray_config(path: Path | str | None = None) -> TrayConfig:
-    path = Path(path) if path else DEFAULT_CONFIG_DIR / "tray.yaml"
+    path = Path(path) if path else DEFAULT_TRAY_PATH
     d = yaml.safe_load(path.read_text())
     instruments = {
         iid: Instrument(
