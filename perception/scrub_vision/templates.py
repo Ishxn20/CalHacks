@@ -26,7 +26,7 @@ class Instrument:
     tip: str
     grasp_frac: float
     thickness_mm: float
-    same_look_as: str | None = None
+    group: str | None = None      # interchangeable instruments (all scalpels; both micro scissors)
 
 
 @dataclass
@@ -51,6 +51,12 @@ def _cfg() -> dict:
     return _cfg_cache
 
 
+def interchangeable(instruments: dict[str, "Instrument"], fid: str) -> set[str]:
+    """fid plus every instrument in its group."""
+    g = instruments[fid].group
+    return {fid} if g is None else {k for k, v in instruments.items() if v.group == g}
+
+
 def classes() -> list[str]:
     return list(_cfg()["classes"])
 
@@ -61,7 +67,7 @@ def load_instruments(path: Path | None = None) -> dict[str, Instrument]:
     for iid, v in d["instruments"].items():
         stl = v["stl"] if isinstance(v["stl"], list) else [v["stl"]]
         out[iid] = Instrument(id=iid, coarse=v["coarse"], stl=stl, tip=v["tip"], grasp_frac=float(v["grasp_frac"]),
-                              thickness_mm=float(v["thickness_mm"]), same_look_as=v.get("same_look_as"))
+                              thickness_mm=float(v["thickness_mm"]), group=v.get("group"))
     return out
 
 

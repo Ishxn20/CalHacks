@@ -21,7 +21,7 @@ from scrub_vision.identify import annotate, identify  # noqa: E402
 from scrub_vision.planner import display_name, plan  # noqa: E402
 from scrub_vision.render import CamSpec, random_filament_bgr, render_scene, scene_mesh  # noqa: E402
 from scrub_vision.synth import PILE_CENTER_MM, PILE_HALF_MM  # noqa: E402
-from scrub_vision.templates import build_templates, load_instruments  # noqa: E402
+from scrub_vision.templates import build_templates, interchangeable, load_instruments  # noqa: E402
 
 from sim.pile_sim import _mjcf, _quat  # noqa: E402
 
@@ -183,7 +183,7 @@ class Episode:
                 return "fail"
             i = truth[id(chosen)]
             if p["action"] == "grasp_target":
-                ok = self.items[i] == self.target or self.items[i] == self.insts[self.target].same_look_as
+                ok = self.items[i] in interchangeable(self.insts, self.target)
                 self.caption = (f"Request: {display_name(self.target)}  -  "
                                 f"{'GOT IT' if ok else 'WRONG: ' + display_name(self.items[i])} after {moves} move(s)")
                 self.carry(i, None)

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-from .templates import Instrument, Template
+from .templates import Instrument, Template, interchangeable
 
 LENGTH_TOL = 0.08
 MARGIN_MIN = 0.05
@@ -26,7 +26,7 @@ class Detection:
     mask: np.ndarray
     coarse: str | None
     fine_id: str | None
-    alt_ids: list[str] = field(default_factory=list)   # look-alikes (micro scissors fwd/back)
+    alt_ids: list[str] = field(default_factory=list)   # interchangeable instruments (scalpels, micro scissors)
     candidates: list[str] = field(default_factory=list)  # fine ids this could be (all within MARGIN of best)
     length_mm: float = 0.0
     width_mm: float = 0.0
@@ -148,7 +148,7 @@ def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: lis
         return det
     scored.sort(key=lambda s: -s[0])
     best, fit, exposure, bt, be = scored[0]
-    looks = {bt.fine_id, instruments[bt.fine_id].same_look_as} - {None}
+    looks = interchangeable(instruments, bt.fine_id)
     rival = next((s[0] for s in scored if s[3].fine_id not in looks), 0.0)
     det.exposure = float(exposure)
     det.confidence = float(best * seg_conf)

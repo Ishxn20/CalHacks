@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "perception"))
 from scrub_vision.identify import identify  # noqa: E402
 from scrub_vision.planner import plan  # noqa: E402
 from scrub_vision.render import CamSpec, render_scene, scene_mesh  # noqa: E402
-from scrub_vision.templates import build_templates, load_instruments  # noqa: E402
+from scrub_vision.templates import build_templates, interchangeable, load_instruments  # noqa: E402
 
 from sim.pile_sim import settle_pile  # noqa: E402
 
@@ -64,7 +64,7 @@ def run_episode(rng: np.random.Generator, n_items: int | None = None, items: lis
                                                   d.grasp_mm[1] - p["target"]["y_mm"]))
         actual = truth[id(chosen)]
         if p["action"] == "grasp_target":
-            ok = actual == target or actual in (insts[target].same_look_as,)
+            ok = actual in interchangeable(insts, target)
             outcome = "grasped" if ok else ("ambiguous" if p["target"]["ambiguous"] else "wrong")
             return {"outcome": outcome, "moves": moves, "grasped_id": actual,
                     "say": p["say"], "target": target, "items": items, "ambiguous": p["target"]["ambiguous"]}

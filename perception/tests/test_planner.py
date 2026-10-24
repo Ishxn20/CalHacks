@@ -87,11 +87,18 @@ def test_already_staged_instruments_are_not_moved_again(insts, templates):
     assert p["action"] == "fail"
 
 
-def test_ambiguous_scalpel_is_flagged(insts, templates):
-    dets = scene(insts, templates, [("scalpel_15", 0, -20, 0.5, 0)])
+def test_any_scalpel_satisfies_any_scalpel_request(insts, templates):
+    dets = scene(insts, templates, [("scalpel_20", 0, -20, 0.5, 0)])
     p = plan(dets, "scalpel_15", H, STAGING, set())
     assert p["action"] == "grasp_target"
-    assert p["target"]["ambiguous"] in (True, False)
+    assert p["target"]["ambiguous"] is False
+    assert "I think" not in p["say"]
+
+
+def test_a_scalpel_is_never_moved_aside_when_a_scalpel_is_wanted(insts, templates):
+    dets = scene(insts, templates, [("scalpel_10", 0, -20, 0.5, 0)])
+    p = plan(dets, "scalpel_11", H, STAGING, set())
+    assert p["action"] == "grasp_target"
 
 
 def test_blob_matching_no_instrument_is_never_moved(insts, templates):
