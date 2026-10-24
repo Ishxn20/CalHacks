@@ -1,5 +1,6 @@
 """Camera calibration -> repo-root config/camera.yaml.
 
+    python -m scrub_arm.calibrate capture <dir> [--camera 0]      (space = save frame, q = quit)
     python -m scrub_arm.calibrate intrinsics <dir of checkerboard jpgs> [--cols 9 --rows 6 --square-mm 25]
     python -m scrub_arm.calibrate touch [--camera 0]
 
@@ -83,6 +84,30 @@ def cmd_intrinsics(args) -> None:
     print(f"intrinsics from {len(obj)} images, RMS {rms:.2f} px -> {CAMERA_YAML}")
 
 
+def cmd_capture(args) -> None:
+    import cv2
+
+    out = Path(args.dir)
+    out.mkdir(parents=True, exist_ok=True)
+    cap, n = cv2.VideoCapture(args.camera), len(list(out.glob("*.jpg")))
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        view = frame.copy()
+        cv2.putText(view, f"{n} saved - space: save, q: quit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.imshow("capture", view)
+        k = cv2.waitKey(1) & 0xFF
+        if k == ord(" "):
+            cv2.imwrite(str(out / f"{n:03d}.jpg"), frame)
+            n += 1
+        elif k == ord("q"):
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+    print(f"{n} images in {out}")
+
+
 def cmd_touch(args) -> None:
     import cv2
 
@@ -151,6 +176,10 @@ def cmd_touch(args) -> None:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="scrub_arm.calibrate")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("capture")
+    c.add_argument("dir")
+    c.add_argument("--camera", type=int, default=0)
+    c.set_defaults(fn=cmd_capture)
     i = sub.add_parser("intrinsics")
     i.add_argument("dir")
     i.add_argument("--cols", type=int, default=9)
