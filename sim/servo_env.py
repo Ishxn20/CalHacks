@@ -63,7 +63,7 @@ def placed(t: dict, phi: float, at: np.ndarray, table_z: float) -> dict:
     R = np.array([[np.cos(phi), -np.sin(phi)], [np.sin(phi), np.cos(phi)]])
     move = lambda p: R @ (np.asarray(p) - t["grasp"]) + at  # noqa: E731
     return {**t, "grasp": at.copy(), "centroid": move(t["centroid"]), "axis": t["axis"] + phi, "yaw": t["yaw"] + phi,
-            "z": table_z + t["thickness"] / 2, "phi": phi, "at": at.copy()}
+            "z": table_z + t["thickness"] / 2, "phi": phi, "at": at.copy(), "grasp_pile": t["grasp"]}
 
 
 class VisualReachEnv(gym.Env):
@@ -128,7 +128,10 @@ class VisualReachEnv(gym.Env):
 
     # ── camera ────────────────────────────────────────────────────────────
     def features(self, est: dict | None = None) -> dict:
-        """What the wrist camera reports about the target (`est`: a perception estimate; default ground truth)."""
+        """What the wrist camera reports about the target (`est`: a perception estimate, {"hidden": True} if
+        perception lost it; default: the ground truth)."""
+        if est is not None and est.get("hidden"):
+            return {"visible": False}
         t, rng = est or self.target, self._rng
         c, a, L, z = np.asarray(t["centroid"]), t["axis"], t["length"], t["z"]
         e = np.array([np.cos(a), np.sin(a)]) * L / 2
@@ -164,7 +167,8 @@ class VisualReachEnv(gym.Env):
                  for y in (self.goal[3], self.goal[3] + np.pi))
         return d, th
 
-    def step(self, action, est: dict | None = None):
+    def step(self, action, perceive=None):
+        """perceive(env) -> target estimate for this step's observation (sim/eval_servo.py); default ground truth."""
         a = np.clip(np.asarray(action, float), -1, 1)
         self.q = np.clip(self.q + MAX_DQ * a ** 3, self.lo, self.hi)
         self.prev_a, self.steps = a, self.steps + 1
@@ -176,7 +180,7 @@ class VisualReachEnv(gym.Env):
             self.goal = (self.goal[0] + dxy[0], self.goal[1] + dxy[1], *self.goal[2:])
             info["nudged"] = True
         set_arm(self.model, self.data, self.q)
-        obs = self._obs(est)
+        obs = self._obs(perceive(self) if perceive else None)
         d, th = self.errors()
         table = touches_table(self.model, self.data)
         pinned = int(np.sum((self.q <= self.lo + 1e-6) | (self.q >= self.hi - 1e-6)))

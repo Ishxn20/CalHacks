@@ -1,0 +1,12 @@
+{
+ "name": "B12",
+ "her": true,
+ "gamma": 0.98,
+ "seed": 12,
+ "target_steps": 300000,
+ "eval_every": 50000,
+ "eval_n": 200,
+ "eval_seed": 777,
+ "learning_starts": 5000,
+ "num_timesteps": 50000
+}
