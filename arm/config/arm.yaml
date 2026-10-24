@@ -93,16 +93,19 @@ pick:
   staging_mm: [[250, -130], [250, -215], [170, -300], [250, 130], [250, 215], [170, 300]]
   staging_yaw_deg: 90.0
 
-# Wrist webcam (used by the simulated camera-guided reach, sim/wrist_cam.py). NOT MEASURED: placeholders
-# for a camera on the gripper body, beside the jaws (perpendicular to the jaw axis), looking down the
-# fingers so the fingertips sit at the bottom centre of the image.
+# Wrist webcam (used by the simulated camera-guided reach, sim/wrist_cam.py). Mount NOT MEASURED: fitted so
+# the simulated view matches docs/reference/wrist_cam_reference.webp at a wrist-level pose (fingers a dark
+# block in the bottom ~26 % of rows, middle ~24 % of columns; horizon ~0.3 down; sim/policy/camera_match.png).
+# Camera on the gripper body beside the jaws (perpendicular to the jaw axis), looking along the fingers.
+# The real lens has barrel distortion; the pipeline undistorts every frame (scrub_arm.calibrate), so the
+# simulation is a pinhole camera in undistorted pixels.
 wrist_camera:
   width: 960
   height: 540
-  hfov_deg: 80.0
-  back_mm: 110.0        # behind the fingertips, along the tool axis
-  side_mm: 60.0         # off the tool axis, perpendicular to the jaws
-  tilt_deg: 10.4        # optical axis pitched from the tool axis toward the fingers
+  hfov_deg: 100.0
+  back_mm: 85.0         # behind the fingertips, along the tool axis
+  side_mm: 55.0         # off the tool axis, perpendicular to the jaws
+  tilt_deg: 15.0        # optical axis pitched from the tool axis toward the fingers
 
 server:
   host: 127.0.0.1
