@@ -90,6 +90,7 @@ class VerifyCfg:
 @dataclass
 class PickCfg:
     mode: str                      # "slots" | "ik"
+    reach: str                     # "ik" | "rl": how ik mode turns a tool pose into joints
     perception_url: str
     table_z: float                 # m
     hover: float                   # m
@@ -268,7 +269,8 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
 
     pk = d.get("pick", {}) or {}
     pick = PickCfg(
-        mode=str(pk.get("mode", "slots")).lower(), perception_url=str(pk.get("perception_url", "http://127.0.0.1:8770")),
+        mode=str(pk.get("mode", "slots")).lower(), reach=str(pk.get("reach", "ik")).lower(),
+        perception_url=str(pk.get("perception_url", "http://127.0.0.1:8770")),
         table_z=float(pk.get("table_z_mm", 0.0)) / 1000.0, hover=float(pk.get("hover_mm", 80.0)) / 1000.0,
         descend_step=float(pk.get("descend_step_mm", 3.0)) / 1000.0,
         contact_deviation=_rad(pk.get("contact_deviation_deg", 1.5)),
@@ -290,6 +292,8 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         raise ValueError(f"arm_mode must be 'mit' or 'pos_vel', got {cfg.arm_mode!r}")
     if cfg.pick.mode not in ("slots", "ik"):
         raise ValueError(f"pick.mode must be 'slots' or 'ik', got {cfg.pick.mode!r}")
+    if cfg.pick.reach not in ("ik", "rl"):
+        raise ValueError(f"pick.reach must be 'ik' or 'rl', got {cfg.pick.reach!r}")
     return cfg
 
 

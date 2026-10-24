@@ -1,6 +1,7 @@
 """Wire config -> bus -> driver -> assistant together."""
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,7 +42,13 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
         from .kinematics import Kinematics   # needs the `kinematics` extra (pinocchio)
 
         kin = Kinematics()
-    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify), kin=kin)
+    reach = None
+    if cfg.pick.mode == "ik" and cfg.pick.reach == "rl":
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root: the sim package
+        from sim.reach_policy import ReachPolicy   # needs mujoco + stable-baselines3
+
+        reach = ReachPolicy()
+    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify), kin=kin, reach=reach)
     return App(cfg, tray, poses, driver, catalog, assistant)
 
 

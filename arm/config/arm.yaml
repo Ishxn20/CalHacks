@@ -75,6 +75,10 @@ verify:
 
 pick:
   mode: slots            # slots (taught tray poses) | ik (camera-located, inverse kinematics)
+  # In ik mode, how a top-down tool pose becomes joint angles: ik (pinocchio) | rl (the reach policy
+  # sim/policy/reach_policy.zip rolled out in the MuJoCo model; its answer must still pass the joint-limit
+  # and 3 mm / 3 deg FK checks, else the job fails -- no fallback to ik).
+  reach: ik
   perception_url: http://127.0.0.1:8770
   table_z_mm: 0.0        # table height in the base frame, from touch calibration
   hover_mm: 80.0         # height above table_z for the approach/retreat waypoint

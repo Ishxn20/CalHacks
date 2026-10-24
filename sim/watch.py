@@ -62,6 +62,7 @@ class Episode:
         xml = xml.replace("<worldbody>", f'<visual><global offwidth="{W}" offheight="{H_PX}"/></visual>'
                           '<worldbody><light pos="0 -0.3 1.2" dir="0 0.2 -1" diffuse=".8 .8 .8"/>'
                           '<light pos="0.5 0.5 1" dir="-0.4 -0.4 -1" diffuse=".4 .4 .4"/>')
+        self.xml = xml                                   # sim/watch_arm.py adds the arm to it
         self.m = mujoco.MjModel.from_xml_string(xml)
         self.d = mujoco.MjData(self.m)
         self.r = mujoco.Renderer(self.m, H_PX, W)

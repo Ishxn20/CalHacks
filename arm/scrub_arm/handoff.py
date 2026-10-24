@@ -52,12 +52,13 @@ class TaskFailed(RuntimeError):
 
 
 class ScrubAssistant:
-    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier, kin=None) -> None:
+    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier, kin=None, reach=None) -> None:
         self.driver = driver
         self.catalog = catalog
         self.verifier = verifier
         self.cfg = driver.cfg
         self.kin = kin                      # Kinematics, only in pick.mode == "ik"
+        self.reach = reach                  # sim.reach_policy.ReachPolicy, only with pick.reach == "rl"
         self._picked_from: tuple | None = None   # (x_mm, y_mm, yaw_deg, thickness_mm) of the last ik pick
 
         self.phase = Phase.IDLE
@@ -315,10 +316,33 @@ class ScrubAssistant:
     def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float, allow_flip: bool = True) -> np.ndarray:
         """Joint vector for a top-down grasp pose, or TaskFailed if the arm can't reach it."""
         assert self.kin is not None, "pick.mode is not 'ik'"
+        if self.reach is not None:
+            return self._solve_rl(x_mm, y_mm, z_m, yaw_deg, allow_flip)
         q = self.kin.ik_topdown(x_mm / 1000.0, y_mm / 1000.0, z_m, math.radians(yaw_deg),
                                 self.driver.q_command(), (self.cfg.lower, self.cfg.upper), allow_flip=allow_flip)
         if q is None:
             raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm")
+        return q
+
+    def _solve_rl(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float, allow_flip: bool) -> np.ndarray:
+        """The reach policy's joint vector, accepted only if it is within limits and FK puts the tool within
+        3 mm and 3 deg of the pose. No fallback to IK: a refusal is a TaskFailed, reported like any other."""
+        p = np.array([x_mm / 1000.0, y_mm / 1000.0, z_m])
+        q = self.reach.solve(*p, math.radians(yaw_deg), self.driver.q_command(), allow_flip=allow_flip)
+        where = f"({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm"
+        if q is None:
+            raise TaskFailed(f"reach policy didn't converge on {where}")
+        try:
+            self.driver.check_limits(q)
+        except ArmFault as e:
+            raise TaskFailed(f"reach policy for {where}: {e}") from e
+        pos, R = self.kin.fk(q)
+        d_mm = float(np.linalg.norm(pos - p)) * 1000
+        yaws = (yaw_deg, yaw_deg + 180.0) if allow_flip else (yaw_deg,)
+        rot_deg = min(math.degrees(math.acos(np.clip((np.trace(self.kin._target_rotation(math.radians(y)).T @ R) - 1)
+                                                     / 2, -1, 1))) for y in yaws)
+        if d_mm > 3.0 or rot_deg > 3.0:
+            raise TaskFailed(f"reach policy for {where} is off by {d_mm:.1f} mm / {rot_deg:.1f} deg")
         return q
 
     def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float,
