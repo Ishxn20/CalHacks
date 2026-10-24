@@ -87,7 +87,7 @@ Facts the builder must design around:
 - Prints are mirror-ambiguous when flipped. Matching considers both flips.
 - The gripper region in the image (bottom ~25 %) is masked.
 - Forward- and back-facing micro scissors have identical top-down silhouettes (the tip bend is out of the table plane); they are one visual class.
-- Scalpel #10/#11/#15 share handle #3 and differ by 1–3 mm of blade: identification returns a candidate list, not a guess.
+- Scalpel #10/#11/#15 share handle #3 and differ by 1–3 mm of blade: identification returns a candidate list. **Decided (user, 2026-10-24):** the arm grasps the best candidate and says "I think this is the #15" rather than refusing.
 - Top-down reach (wrist vertical) is ~400 mm from the base at hover height: pile and staging must sit within ~350 mm.
 - Coronary probes have no STL; out of scope.
 
