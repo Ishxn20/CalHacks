@@ -10,6 +10,7 @@ joints start and stop together, so paths are smooth and repeatable.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -70,7 +71,10 @@ class ArmDriver:
         self._traj: MinJerk | None = None
         self._q_cmd = np.zeros(n)
         self._qd_cmd = np.zeros(n)
-        self._g_cmd = (cfg.gripper.open, cfg.gripper.move_kp, cfg.gripper.move_kd)
+        # Gripper: requested (target, kp, kd, torque cap, feed-forward torque) and the ramped
+        # setpoint actually sent. Grasping uses kp=0 + feed-forward torque (squeeze with a set force).
+        self._g_cmd = (cfg.gripper.open, cfg.gripper.move_kp, cfg.gripper.move_kd, cfg.gripper.move_torque, 0.0)
+        self._g_sp = float("nan")
         self._pos = np.full(n + 1, np.nan)
         self._tau = np.full(n + 1, np.nan)
         self._fault: str | None = None
@@ -111,7 +115,9 @@ class ArmDriver:
             self._traj = None
             self._q_cmd = q[:-1].copy()
             self._qd_cmd = np.zeros(self.cfg.n)
-            self._g_cmd = (float(q[-1]), self.cfg.gripper.move_kp, self.cfg.gripper.move_kd)
+            g = self.cfg.gripper
+            self._g_cmd = (float(q[-1]), g.move_kp, g.move_kd, g.move_torque, 0.0)
+            self._g_sp = float(q[-1])
             self._pos = q
         with self._bus_lock:
             self.bus.enable()
@@ -142,13 +148,13 @@ class ArmDriver:
                         self._traj = None
                     self._q_cmd, self._qd_cmd = q, qd
                 q, qd = self._q_cmd.copy(), self._qd_cmd.copy()
-                g_pos, g_kp, g_kd = self._g_cmd
+                g_pos, g_kp, g_kd, g_tau = self._step_gripper(period)
                 enabled = self._enabled
             try:
                 with self._bus_lock:
                     if enabled:
                         self.bus.send_arm(q, qd)
-                        self.bus.send_gripper(g_pos, g_kp, g_kd)
+                        self.bus.send_gripper(g_pos, g_kp, g_kd, g_tau)
                     self.bus.poll()
                     pos, tau = self.bus.cached()
                 self._bus_errors = 0
@@ -169,6 +175,20 @@ class ArmDriver:
                 time.sleep(sleep)
             else:
                 next_t = time.perf_counter()
+
+    def _step_gripper(self, dt: float) -> tuple[float, float, float, float]:
+        """Ramp the jaw setpoint toward its target and keep it within torque_cap/kp of the
+        measured angle, so MIT torque (kp * error) never exceeds the cap. Call with _lock held."""
+        target, kp, kd, tau_cap, tau_ff = self._g_cmd
+        sp = target if np.isnan(self._g_sp) else self._g_sp
+        step = self.cfg.gripper.max_vel * dt
+        sp += float(np.clip(target - sp, -step, step))
+        meas = self._pos[-1]
+        if kp > 0 and not np.isnan(meas):
+            lim = tau_cap / kp
+            sp = float(np.clip(sp, meas - lim, meas + lim))
+        self._g_sp = sp
+        return sp, kp, kd, tau_ff
 
     def _check_tracking(self, q_cmd: np.ndarray, pos: np.ndarray) -> None:
         limit = self.cfg.motion.tracking_error_limit
@@ -339,22 +359,86 @@ class ArmDriver:
         if not self.cfg.gripper.calibrated and not self.sim:
             raise ArmFault("gripper open/closed angles are placeholders; run `gcal` in the teach tool")
 
-    def set_gripper(self, pos: float, kp: float | None = None, kd: float | None = None) -> None:
+    def set_gripper(self, pos: float) -> None:
+        """Send the jaws toward `pos` (rad), ramped and torque-capped."""
         g = self.cfg.gripper
         with self._lock:
-            self._g_cmd = (float(pos), g.move_kp if kp is None else kp, g.move_kd if kd is None else kd)
+            self._g_cmd = (float(pos), g.move_kp, g.move_kd, g.move_torque, 0.0)
 
-    def gripper_open(self, wait_s: float = 0.4) -> None:
+    def _wait_gripper(self, target: float) -> None:
+        """Block until the jaws reach `target` or stop moving (blocked by an object / friction)."""
+        g = self.cfg.gripper
+        tol = math.radians(1.0)
+        deadline = time.monotonic() + abs(g.open - g.closed) / g.max_vel + 3.0
+        last, still_since = None, None
+        while time.monotonic() < deadline:
+            self.sleep(0.05)
+            pos = self.gripper_measured()
+            if np.isnan(pos):
+                continue
+            if abs(pos - target) < tol:
+                return
+            if last is not None and abs(pos - last) < math.radians(0.3):
+                still_since = still_since or time.monotonic()
+                if time.monotonic() - still_since >= g.settle_s:
+                    return
+            else:
+                still_since = None
+            last = pos
+        log.warning("gripper still moving after timeout")
+
+    def gripper_open(self, wait_s: float = 0.0) -> None:
+        """Open the jaws, wait until they're open, then pause `wait_s`."""
         self._check_gripper_calibrated()
         self.set_gripper(self.cfg.gripper.open)
-        self.sleep(wait_s)
+        self._wait_gripper(self.cfg.gripper.open)
+        if wait_s:
+            self.sleep(wait_s)
 
-    def gripper_grasp(self) -> bool:
-        """Squeeze softly toward fully closed. Returns True if the jaws stopped on an object."""
+    def gripper_grasp(self, force: float | None = None) -> bool:
+        """Close with a constant squeeze torque (Nm) and report whether the jaws stopped on something.
+
+        Same approach as Seeed's GraspDriver: pure torque close (kp=0), a stall after real
+        travel means contact, reaching the closed hard stop means a miss. The squeeze is
+        kept on while holding.
+        """
         self._check_gripper_calibrated()
         g = self.cfg.gripper
-        self.set_gripper(g.closed, g.grip_kp, g.grip_kd)
-        self.sleep(g.settle_s)
+        start = float(self.read_fresh()[-1])
+        if np.isnan(start):
+            start = self.gripper_measured()
+        sign = 1.0 if g.closed > g.open else -1.0
+        tau = sign * float(np.clip(abs(force if force is not None else g.grip_torque), 0.05, g.move_torque))
+        with self._lock:
+            self._g_cmd = (g.closed, 0.0, g.grip_kd, abs(tau), tau)
+
+        need = min(0.3, 0.5 * abs(start - g.closed)) if not np.isnan(start) else 0.0
+        free_speed = abs(tau) / max(g.grip_kd, 1e-3)          # rad/s once damping balances torque
+        deadline = time.monotonic() + abs(g.open - g.closed) / free_speed * 1.5 + 2.0
+        last, still_since = None, None
+        while time.monotonic() < deadline:
+            self.sleep(0.05)
+            pos = self.gripper_measured()
+            if np.isnan(pos):
+                continue
+            if abs(pos - g.closed) < g.holding_min_gap:
+                break                                          # reached the hard stop: nothing in the jaws
+            moved = np.isnan(start) or abs(pos - start) >= need
+            if last is not None and moved and abs(pos - last) < math.radians(0.3):
+                still_since = still_since or time.monotonic()
+                if time.monotonic() - still_since >= g.settle_s:
+                    break                                      # stalled on an object
+            else:
+                still_since = None
+            last = pos
+        holding = self.gripper_holding()
+        if not holding:
+            self.set_gripper(g.closed)                         # don't keep pushing into the hard stop
+        return holding
+
+    def gripper_holding(self) -> bool:
+        """True if the jaws are stopped short of fully closed, i.e. something is between them."""
+        g = self.cfg.gripper
         # Read the motor directly: a stale cached value would look like "stopped short" = holding.
         pos = float(self.read_fresh()[-1])
         if np.isnan(pos):

@@ -36,6 +36,8 @@ HELP = """\
   del <name>              delete a pose
   open | close            gripper open / soft close (close reports whether it's holding something)
   g <deg>                 gripper to an absolute motor angle
+  pose                    tool-point position (mm) and how far the gripper is from pointing straight down
+  ik <x> <y> <z> [yaw]    move to a top-down tool pose (mm / deg), e.g. ik 220 0 140 (a scan candidate)
   gcal open|closed        record the current gripper angle as the open / fully-closed endpoint
   check                   list placeholder/missing poses and other setup problems
   test <request>          full handoff, e.g.: test needle holder, 6-0 prolene, backhand
@@ -52,6 +54,15 @@ def _fmt(q) -> str:
 
 def run_teach(app: App) -> None:
     d, poses, asst = app.driver, app.poses, app.assistant
+    _kin = []
+
+    def kin():
+        if not _kin:
+            from .kinematics import Kinematics   # pinocchio; only needed for `pose` / `ik`
+
+            _kin.append(asst.kin or Kinematics())
+        return _kin[0]
+
     d.start()
     print("Connected. Motors are DISABLED. Type `hold` to energize where the arm is now, `help` for commands.")
     while True:
@@ -118,6 +129,23 @@ def run_teach(app: App) -> None:
                 print(f"  gripper at {math.degrees(d.gripper_measured()):.1f} deg - {'HOLDING' if held else 'empty'}")
             elif cmd == "g":
                 d.set_gripper(math.radians(float(args[0])))
+            elif cmd == "pose":
+                q = d.q_measured() if d.enabled else d.read_fresh()[:-1]
+                p, R = kin().fk(q)
+                tilt = math.degrees(math.acos(np.clip(-(R @ kin().tool_axis_local)[2], -1, 1)))
+                print(f"  tool point x={p[0]*1000:+.1f} y={p[1]*1000:+.1f} z={p[2]*1000:+.1f} mm, "
+                      f"{tilt:.1f} deg from straight down")
+            elif cmd == "ik":
+                x, y, z = (float(a) / 1000 for a in args[:3])
+                yaw = math.radians(float(args[3])) if len(args) > 3 else 0.0
+                q = kin().ik_topdown(x, y, z, yaw, d.q_command(), (app.cfg.lower, app.cfg.upper),
+                                                 allow_flip=False)
+                if q is None:
+                    print("  unreachable top-down")
+                    continue
+                print(f"  moving to {_fmt(q)}")
+                d.clear_abort()
+                d.move_to(q, speed=0.5)
             elif cmd == "gcal":
                 which = args[0]
                 pos = d.gripper_measured() if d.enabled else float(d.read_fresh()[-1])

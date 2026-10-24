@@ -36,11 +36,16 @@ gripper:
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
-  grip_kp: 6.0           # soft stiffness while squeezing: torque ~= grip_kp * (closed - pos)
-  grip_kd: 0.5
-  settle_s: 0.6          # time to let the jaws close before checking the grasp
+  grip_kd: 0.5           # damping while closing under torque; free closing speed ~= grip_torque / grip_kd
+  # The jaw setpoint is ramped and kept close to the measured angle so the motor
+  # torque never exceeds these caps, however far the jaws have to travel.
+  max_vel_deg_s: 180.0
+  move_torque_nm: 1.5    # cap while opening / free moves; raise if the jaws stall on friction
+  grip_torque_nm: 0.8    # constant squeeze torque when grasping (Seeed's RS default is 1.0-1.5)
+  settle_s: 0.4          # jaws must be still this long to count as stopped
   # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
-  holding_min_gap_deg: 4.0
+  # ~0.3 mm of jaw opening per degree, so 2.5 deg ~= 0.8 mm.
+  holding_min_gap_deg: 2.5
 
 motion:
   speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven
@@ -74,7 +79,7 @@ verify:
   fail_open: true              # if the CV service is unreachable, proceed (demo resilience)
 
 pick:
-  mode: slots            # slots (taught tray poses) | ik (camera-located, inverse kinematics)
+  mode: ik               # slots (taught tray poses) | ik (camera-located, inverse kinematics)
   # In ik mode, how a top-down tool pose becomes joint angles: ik (pinocchio) | rl (the reach policy
   # sim/policy/reach_policy.zip rolled out in the MuJoCo model; its answer must still pass the joint-limit
   # and 3 mm / 3 deg FK checks, else the job fails -- no fallback to ik).

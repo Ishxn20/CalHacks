@@ -103,8 +103,8 @@ class RobstrideBus:
             else:
                 m.send_mit(float(qi), float(qdi), j.kp, j.kd, 0.0)
 
-    def send_gripper(self, pos: float, kp: float, kd: float) -> None:
-        self._motors[6].send_mit(float(pos), 0.0, float(kp), float(kd), 0.0)
+    def send_gripper(self, pos: float, kp: float, kd: float, tau: float = 0.0) -> None:
+        self._motors[6].send_mit(float(pos), 0.0, float(kp), float(kd), float(tau))
 
     def poll(self) -> None:
         self._ctrl.poll_feedback_once()
@@ -184,8 +184,11 @@ class SimBus:
     def send_arm(self, q: np.ndarray, qd: np.ndarray) -> None:
         self.target[:6] = q
 
-    def send_gripper(self, pos: float, kp: float, kd: float) -> None:
+    def send_gripper(self, pos: float, kp: float, kd: float, tau: float = 0.0) -> None:
         g = self.cfg.gripper
+        if kp == 0.0 and tau != 0.0:
+            # Torque-mode close/open: the jaws run toward whichever end the torque pushes.
+            pos = g.closed if (tau > 0) == (g.closed > g.open) else g.open
         if self.object_in_jaws:
             # Jaws stop on the instrument shaft partway between open and closed.
             stall = g.open + 0.6 * (g.closed - g.open)

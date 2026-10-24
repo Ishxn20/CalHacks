@@ -46,8 +46,10 @@ class GripperCfg:
     calibrated: bool
     move_kp: float
     move_kd: float
-    grip_kp: float
     grip_kd: float
+    max_vel: float        # rad/s
+    move_torque: float    # Nm
+    grip_torque: float    # Nm
     settle_s: float
     holding_min_gap: float  # rad
 
@@ -235,7 +237,9 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         motor_id=int(g["motor_id"]), feedback_id=int(g["feedback_id"]), model=str(g["model"]),
         open=_rad(g["open_deg"]), closed=_rad(g["closed_deg"]), calibrated=bool(g.get("calibrated", False)),
         move_kp=float(g["move_kp"]), move_kd=float(g["move_kd"]),
-        grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
+        grip_kd=float(g["grip_kd"]),
+        max_vel=_rad(g.get("max_vel_deg_s", 180.0)), move_torque=float(g.get("move_torque_nm", 1.5)),
+        grip_torque=float(g.get("grip_torque_nm", 0.8)),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
     )
 
