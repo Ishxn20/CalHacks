@@ -64,9 +64,8 @@ def _polygon(mask: np.ndarray) -> np.ndarray | None:
     return c if len(c) >= 3 else None
 
 
-def write_yolo_sample(img_path: Path, lab_path: Path, bgr: np.ndarray, masks: list[np.ndarray],
-                      class_ids: list[int]) -> int:
-    h, w = bgr.shape[:2]
+def write_yolo_labels(lab_path: Path, shape: tuple[int, int], masks: list[np.ndarray], class_ids: list[int]) -> int:
+    h, w = shape
     lines = []
     for m, c in zip(masks, class_ids):
         poly = _polygon(m)
@@ -74,9 +73,14 @@ def write_yolo_sample(img_path: Path, lab_path: Path, bgr: np.ndarray, masks: li
             continue
         coords = (poly / [w, h]).clip(0, 1).ravel()
         lines.append(f"{c} " + " ".join(f"{x:.5f}" for x in coords))
-    cv2.imwrite(str(img_path), bgr, [cv2.IMWRITE_JPEG_QUALITY, int(np.random.default_rng().integers(70, 96))])
     lab_path.write_text("\n".join(lines) + ("\n" if lines else ""))
     return len(lines)
+
+
+def write_yolo_sample(img_path: Path, lab_path: Path, bgr: np.ndarray, masks: list[np.ndarray],
+                      class_ids: list[int]) -> int:
+    cv2.imwrite(str(img_path), bgr, [cv2.IMWRITE_JPEG_QUALITY, int(np.random.default_rng().integers(70, 96))])
+    return write_yolo_labels(lab_path, bgr.shape[:2], masks, class_ids)
 
 
 def make_dataset(out: Path | str, n: int, seed: int = 0, val_frac: float = 0.1,
