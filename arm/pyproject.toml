@@ -8,6 +8,8 @@ dependencies = ["numpy>=1.23", "pyyaml>=6.0"]
 [project.optional-dependencies]
 hardware = ["motorbridge>=0.5.6"]
 dev = ["pytest>=8"]
+kinematics = ["pin>=3.1"]
+calibrate = ["opencv-python>=4.9"]
 
 [tool.setuptools]
 packages = ["scrub_arm"]
