@@ -103,8 +103,8 @@ class RobstrideBus:
             else:
                 m.send_mit(float(qi), float(qdi), j.kp, j.kd, 0.0)
 
-    def send_gripper(self, pos: float, kp: float, kd: float) -> None:
-        self._motors[6].send_mit(float(pos), 0.0, float(kp), float(kd), 0.0)
+    def send_gripper(self, pos: float, kp: float, kd: float, tau: float = 0.0) -> None:
+        self._motors[6].send_mit(float(pos), 0.0, float(kp), float(kd), float(tau))
 
     def poll(self) -> None:
         self._ctrl.poll_feedback_once()
@@ -138,6 +138,8 @@ class RobstrideBus:
             return
         try:
             self._ctrl.disable_all()
+        except Exception as e:  # noqa: BLE001 - motors unpowered/unreachable; still release the adapter
+            log.warning("disable on close failed: %s", e)
         finally:
             for m in self._motors:
                 m.close()
@@ -153,6 +155,7 @@ class SimBus:
     Knobs for tests/demos:
       object_in_jaws  - gripper stalls short of closed (successful grasp) when True
       external_offset - added to measured positions (e.g. simulate a surgeon's tug)
+      arm_blocked     - arm joints stop moving (e.g. the tool is pressing on the table)
     """
 
     def __init__(self, cfg: ArmConfig, start: np.ndarray | None = None) -> None:
@@ -162,6 +165,7 @@ class SimBus:
         self.enabled = False
         self.object_in_jaws = True
         self.external_offset = np.zeros(7)
+        self.arm_blocked = False
         self._last = time.perf_counter()
         self._vmax = np.append(cfg.max_vel * 100.0, math.radians(2000))
 
@@ -184,8 +188,11 @@ class SimBus:
     def send_arm(self, q: np.ndarray, qd: np.ndarray) -> None:
         self.target[:6] = q
 
-    def send_gripper(self, pos: float, kp: float, kd: float) -> None:
+    def send_gripper(self, pos: float, kp: float, kd: float, tau: float = 0.0) -> None:
         g = self.cfg.gripper
+        if kp == 0.0 and tau != 0.0:
+            # Torque-mode close/open: the jaws run toward whichever end the torque pushes.
+            pos = g.closed if (tau > 0) == (g.closed > g.open) else g.open
         if self.object_in_jaws:
             # Jaws stop on the instrument shaft partway between open and closed.
             stall = g.open + 0.6 * (g.closed - g.open)
@@ -198,6 +205,8 @@ class SimBus:
         dt, self._last = now - self._last, now
         if self.enabled:
             step = np.clip(self.target - self.pos, -self._vmax * dt, self._vmax * dt)
+            if self.arm_blocked:
+                step[:6] = 0.0
             self.pos = self.pos + step
 
     def cached(self) -> tuple[np.ndarray, np.ndarray]:

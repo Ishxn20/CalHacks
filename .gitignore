@@ -8,3 +8,5 @@ last_command.json
 
 #coding agents
 .cursor
+# per-machine wrist-camera colour + calibration, written by `scrub_arm track`
+arm/config/vision.yaml

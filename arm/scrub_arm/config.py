@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,10 +47,25 @@ class GripperCfg:
     calibrated: bool
     move_kp: float
     move_kd: float
-    grip_kp: float
     grip_kd: float
+    max_vel: float        # rad/s
+    move_torque: float    # Nm
+    grip_torque: float    # Nm
     settle_s: float
     holding_min_gap: float  # rad
+
+
+@dataclass
+class GrabCfg:
+    table_z: float | None   # m
+    clearance: float        # m
+    speed: float            # m/s
+    max_depth: float        # m
+    floor_z: float          # m
+    contact: float          # rad
+    backoff: float          # m
+    lift: float             # m
+    max_tilt: float         # rad
 
 
 @dataclass
@@ -94,6 +110,7 @@ class ArmConfig:
     arm_mode: str
     joints: list[JointCfg]
     gripper: GripperCfg
+    grab: GrabCfg
     motion: MotionCfg
     handoff: HandoffCfg
     verify: VerifyCfg
@@ -219,8 +236,21 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         motor_id=int(g["motor_id"]), feedback_id=int(g["feedback_id"]), model=str(g["model"]),
         open=_rad(g["open_deg"]), closed=_rad(g["closed_deg"]), calibrated=bool(g.get("calibrated", False)),
         move_kp=float(g["move_kp"]), move_kd=float(g["move_kd"]),
-        grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
+        grip_kd=float(g["grip_kd"]),
+        max_vel=_rad(g.get("max_vel_deg_s", 180.0)), move_torque=float(g.get("move_torque_nm", 1.5)),
+        grip_torque=float(g.get("grip_torque_nm", 0.8)),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
+    )
+
+    gb = d.get("grab") or {}
+    tz = gb.get("table_z_m")
+    grab = GrabCfg(
+        table_z=float(tz) if tz is not None else None,
+        clearance=float(gb.get("clearance_mm", 3.0)) / 1000, speed=float(gb.get("descend_speed_mm_s", 20.0)) / 1000,
+        max_depth=float(gb.get("max_depth_mm", 150.0)) / 1000, floor_z=float(gb.get("floor_z_m", -0.01)),
+        contact=_rad(gb.get("contact_deg", 2.0)),
+        backoff=float(gb.get("backoff_mm", 3.0)) / 1000, lift=float(gb.get("lift_mm", 80.0)) / 1000,
+        max_tilt=_rad(gb.get("max_tilt_deg", 25.0)),
     )
 
     m = d["motion"]
@@ -254,7 +284,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
     s = d.get("server", {}) or {}
     cfg = ArmConfig(
         channel=str(d["channel"]), control_rate_hz=float(d["control_rate_hz"]),
-        arm_mode=str(d.get("arm_mode", "mit")).lower(), joints=joints, gripper=gripper,
+        arm_mode=str(d.get("arm_mode", "mit")).lower(), joints=joints, gripper=gripper, grab=grab,
         motion=motion, handoff=handoff, verify=verify,
         server_host=str(s.get("host", "127.0.0.1")), server_port=int(s.get("port", 8765)),
         active_report=bool(d.get("active_report", True)), path=path,
@@ -262,6 +292,16 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
     if cfg.arm_mode not in ("mit", "pos_vel"):
         raise ValueError(f"arm_mode must be 'mit' or 'pos_vel', got {cfg.arm_mode!r}")
     return cfg
+
+
+def save_table_z(cfg: ArmConfig, z: float) -> None:
+    """Write the measured table height into arm.yaml's grab section, keeping comments intact."""
+    assert cfg.path is not None
+    text, n = re.subn(r"^(\s*table_z_m:\s*)[^\s#]+", rf"\g<1>{z:.4f}", cfg.path.read_text(), count=1, flags=re.M)
+    if n != 1:
+        raise ValueError(f"no grab.table_z_m entry in {cfg.path}")
+    _atomic_write(cfg.path, text)
+    cfg.grab.table_z = z
 
 
 def save_gripper_calibration(cfg: ArmConfig, open_rad: float | None, closed_rad: float | None) -> None:

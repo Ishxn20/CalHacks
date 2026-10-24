@@ -55,6 +55,35 @@ def cmd_teach(args) -> None:
     run_teach(build(sim=args.sim, config_dir=args.config_dir))
 
 
+def cmd_track(args) -> None:
+    from .track import run_track
+
+    run_track(build(sim=args.sim, config_dir=args.config_dir), camera_index=args.camera, sim=args.sim)
+
+
+def cmd_cams(args) -> None:
+    """Save one snapshot per camera index so you can see which one is the wrist camera."""
+    import time
+
+    import cv2
+
+    for i in range(args.max):
+        cap = cv2.VideoCapture(i, cv2.CAP_AVFOUNDATION) if sys.platform == "darwin" else cv2.VideoCapture(i)
+        frame = None
+        if cap.isOpened():
+            for _ in range(15):
+                ok, f = cap.read()
+                frame = f if ok else frame
+                time.sleep(0.03)
+        cap.release()
+        if frame is None:
+            print(f"  camera {i}: nothing")
+            continue
+        path = f"camera_{i}.jpg"
+        cv2.imwrite(path, frame)
+        print(f"  camera {i}: {frame.shape[1]}x{frame.shape[0]} -> {path}")
+
+
 def cmd_check(args) -> None:
     app = build(sim=args.sim, config_dir=args.config_dir)
     app.driver.bus.connect()
@@ -106,7 +135,16 @@ def main(argv=None) -> None:
     common(t)
     t.set_defaults(fn=cmd_teach)
 
-    c = sub.add_parser("check", help="ping all 7 motors, print positions and setup problems")
+    tr = sub.add_parser("track", help="live wrist-camera window: learn the object, find it, grab it")
+    common(tr)
+    tr.add_argument("--camera", type=int, help="camera index (see `cams`); remembered in config/vision.yaml")
+    tr.set_defaults(fn=cmd_track)
+
+    cm = sub.add_parser("cams", help="save a snapshot from each camera index to find the wrist camera")
+    cm.add_argument("--max", type=int, default=4)
+    cm.set_defaults(fn=cmd_cams)
+
+    c = sub.add_parser("check",help="ping all 7 motors, print positions and setup problems")
     common(c)
     c.set_defaults(fn=cmd_check)
 
