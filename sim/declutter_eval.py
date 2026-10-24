@@ -4,7 +4,7 @@ Each episode: settle a pile in MuJoCo, render it, give the planner the exact ins
 quality is measured separately by training), and execute its plan: a moved instrument leaves the pile
 (placed in staging), the pile is re-settled, repeat until the target is grasped or the planner gives up.
 
-    python -m sim.declutter_eval --episodes 200          (from the repo root)
+    python -m sim.declutter_eval --episodes 200 [--policy sim/policy/grasp_policy.json]   (from the repo root)
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _assets():
 
 
 def run_episode(rng: np.random.Generator, n_items: int | None = None, items: list[str] | None = None,
-                target: str | None = None, max_moves: int = 6) -> dict:
+                target: str | None = None, max_moves: int = 6, planner=plan) -> dict:
     insts, templates = _assets()
     if items is None:
         n = n_items or int(rng.integers(3, 9))
@@ -57,7 +57,7 @@ def run_episode(rng: np.random.Generator, n_items: int | None = None, items: lis
             d = identify(m, None, H, templates, insts)
             dets.append(d)
             truth[id(d)] = fid
-        p = plan(dets, target, H, STAGING, used)
+        p = planner(dets, target, H, STAGING, used)
         if p["action"] == "fail":
             return {"outcome": "fail", "moves": moves, "say": p["say"], "target": target, "items": items}
         chosen = min(dets, key=lambda d: np.hypot(d.grasp_mm[0] - p["target"]["x_mm"],
@@ -95,11 +95,17 @@ def main(argv=None) -> None:
     ap.add_argument("--episodes", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="sim/declutter_eval.json")
+    ap.add_argument("--policy", help="learned grasp-selection policy (sim/rl_policy.py) instead of the rules")
     args = ap.parse_args(argv)
     rng = np.random.default_rng(args.seed)
+    planner = plan
+    if args.policy:
+        from sim.rl_policy import Policy
+
+        planner = Policy.load(args.policy).choose
     results = []
     for i in range(args.episodes):
-        results.append(run_episode(rng))
+        results.append(run_episode(rng, planner=planner))
         if (i + 1) % 20 == 0:
             print(f"{i + 1}/{args.episodes}: {summarise(results)['success_rate']:.0%} success", flush=True)
     s = summarise(results)
