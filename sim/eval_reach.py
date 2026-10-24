@@ -95,7 +95,8 @@ def _stats(rows: list[dict]) -> dict:
     pe, ro = np.array([r["pos_mm"] for r in rows]), np.array([r["rot_deg"] for r in rows])
     return {"n": len(rows), "success": float(np.mean([r["success"] for r in rows])),
             "pos_mm_median": float(np.median(pe)), "pos_mm_p90": float(np.percentile(pe, 90)),
-            "rot_deg_median": float(np.median(ro)), "rot_deg_p90": float(np.percentile(ro, 90))}
+            "pos_mm_p95": float(np.percentile(pe, 95)), "rot_deg_median": float(np.median(ro)),
+            "rot_deg_p90": float(np.percentile(ro, 90)), "rot_deg_p95": float(np.percentile(ro, 95))}
 
 
 def open_loop(kind: str, blind: ReachPolicy | None, n: int, seed: int, nudge: bool, mount: float) -> list[dict]:
@@ -144,7 +145,7 @@ def visual(argv) -> None:
     args = ap.parse_args(argv)
     res_model = SAC.load(args.residual, env=ResidualEnv(pool_size=1), device="cpu")
     blind = ReachPolicy(args.blind)
-    rows, out = {}, {"n": args.n, "seed": args.seed, "mount_noise": args.mount_noise, "residual": args.residual,
+    rows, out = {}, {"command": "python -m sim.eval_reach " + " ".join(argv), "n": args.n, "seed": args.seed, "mount_noise": args.mount_noise, "residual": args.residual,
                      "blind": args.blind, "noise": "3 px, 3 deg, 7 % dropped frames, finger occlusion",
                      "success": "true tool pose within 3 mm and 3 deg at the last of 150 steps"}
     for nudge in (False, True):

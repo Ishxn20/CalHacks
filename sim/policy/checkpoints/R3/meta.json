@@ -9,5 +9,5 @@
  "eval_n": 200,
  "eval_seed": 777,
  "learning_starts": 5000,
- "num_timesteps": 100000
+ "num_timesteps": 300000
 }
