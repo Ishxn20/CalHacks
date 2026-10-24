@@ -54,12 +54,13 @@ def main(argv=None) -> None:
     ap.add_argument("--steps", type=int, default=600_000)
     ap.add_argument("--threads", type=int, default=1)     # 1 is fastest for a 256x256 MLP
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--precision", type=float, default=0.0, help="ReachEnv precision-bonus weight")
     ap.add_argument("--out", default=str(OUT / "reach_policy.zip"))
     args = ap.parse_args(argv)
     out = Path(args.out)
     torch.set_num_threads(args.threads)
     OUT.mkdir(exist_ok=True)
-    model = SAC("MlpPolicy", ReachEnv(seed=args.seed), policy_kwargs={"net_arch": [256, 256]}, learning_rate=3e-4,
+    model = SAC("MlpPolicy", ReachEnv(seed=args.seed, precision=args.precision), policy_kwargs={"net_arch": [256, 256]}, learning_rate=3e-4,
                 buffer_size=1_000_000, batch_size=256, gamma=0.98, learning_starts=5000, device="cpu", seed=args.seed,
                 verbose=0)
     model.learn(args.steps, callback=Curve(out.with_name(out.stem + "_curve.csv"), 10_000, args.out))

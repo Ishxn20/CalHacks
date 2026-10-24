@@ -44,13 +44,14 @@ def _log3(R: np.ndarray) -> np.ndarray:
 
 class ReachEnv(gym.Env):
     def __init__(self, seed: int | None = None, max_steps: int = 100, table_penalty: float = 5.0,
-                 limit_penalty: float = 0.1) -> None:
+                 limit_penalty: float = 0.1, precision: float = 0.0) -> None:
         cfg = load_arm_config()
         self.lo, self.hi, self.table_z = cfg.lower, cfg.upper, cfg.pick.table_z
         self.model = load_model()
         self.data = mujoco.MjData(self.model)
         self.kin = Kinematics()
         self.max_steps, self.table_penalty, self.limit_penalty = max_steps, table_penalty, limit_penalty
+        self.precision = precision        # weight of a bounded bonus that keeps paying for the last few mm/deg
         self.action_space = gym.spaces.Box(-1.0, 1.0, (6,), np.float32)
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (29,), np.float32)
         self._rng = np.random.default_rng(seed)
@@ -104,6 +105,7 @@ class ReachEnv(gym.Env):
         pinned = int(np.sum((self.q <= self.lo + 1e-6) | (self.q >= self.hi - 1e-6)))
         success = d < POS_TOL and th < ROT_TOL_DEG and not table
         r = -d / 0.01 - th / 10 - self.limit_penalty * pinned - (self.table_penalty if table else 0.0)
+        r += self.precision * (2 - np.tanh(d / 0.005) - np.tanh(th / 5))
         if success:
             r += SUCCESS_BONUS
         truncated = self.steps >= self.max_steps
