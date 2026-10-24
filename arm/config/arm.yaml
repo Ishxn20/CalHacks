@@ -36,11 +36,28 @@ gripper:
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
-  grip_kp: 6.0           # soft stiffness while squeezing: torque ~= grip_kp * (closed - pos)
-  grip_kd: 0.5
-  settle_s: 0.6          # time to let the jaws close before checking the grasp
+  grip_kd: 0.5           # damping while closing under torque; free closing speed ~= grip_torque / grip_kd
+  # The jaw setpoint is ramped and kept close to the measured angle so the motor
+  # torque never exceeds these caps, however far the jaws have to travel.
+  max_vel_deg_s: 180.0
+  move_torque_nm: 1.5    # cap while opening / free moves; raise if the jaws stall on friction
+  grip_torque_nm: 0.8    # constant squeeze torque when grasping (Seeed's RS default is 1.0-1.5)
+  settle_s: 0.4          # jaws must be still this long to count as stopped
   # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
-  holding_min_gap_deg: 4.0
+  # ~0.3 mm of jaw opening per degree, so 2.5 deg ~= 0.8 mm: thin enough for a rubber band.
+  holding_min_gap_deg: 2.5
+
+grab:
+  # grab_below(): move straight down from the current pose, grasp, lift.
+  table_z_m: -0.0006         # tool-point height at the table surface; set with `table` in the teach tool
+  clearance_mm: 1.0        # fingertips stop this far above the table before closing (rubber band ~1.5 mm)
+  descend_speed_mm_s: 20.0
+  max_depth_mm: 150.0      # deepest it will go when table height is unknown (stops early on contact)
+  floor_z_m: -0.01         # never aim the tool point below this (base frame; the table is ~0 with the arm on it)
+  contact_deg: 2.0         # joint deflection that counts as touching something
+  backoff_mm: 1.0          # after touching, come back up this much before closing
+  lift_mm: 80.0
+  max_tilt_deg: 25.0       # refuse unless the gripper points within this of straight down
 
 motion:
   speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven

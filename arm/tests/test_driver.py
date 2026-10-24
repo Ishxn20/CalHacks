@@ -1,4 +1,5 @@
 import math
+import threading
 import time
 
 import numpy as np
@@ -51,6 +52,44 @@ def test_stale_feedback_right_after_enable_does_not_fault(app):
     d.bus.external_offset[:] = 0
     time.sleep(0.5)
     assert d.fault is None
+
+
+def test_gripper_torque_stays_capped_on_long_travel(app):
+    d, g = app.driver, app.cfg.gripper
+    g.open, g.closed = math.radians(260), 0.0  # the real B601-RS jaw range
+    d.bus.object_in_jaws = False
+    worst = {"move": 0.0, "grip": 0.0}
+    stop = False
+
+    def watch():
+        while not stop:
+            with d._lock:
+                _, kp, _, _, tau_ff = d._g_cmd
+                torque = kp * abs(d._g_sp - d._pos[-1]) + abs(tau_ff)
+            kind = "grip" if kp == 0.0 else "move"
+            worst[kind] = max(worst[kind], torque)
+            time.sleep(0.001)
+
+    t = threading.Thread(target=watch)
+    t.start()
+    try:
+        d.gripper_open()
+        assert abs(d.gripper_measured() - g.open) < math.radians(2)
+        d.bus.object_in_jaws = True  # jaws will stall on the instrument
+        assert d.gripper_grasp()
+    finally:
+        stop = True
+        t.join()
+    assert worst["move"] <= g.move_torque + 0.05
+    assert 0 < worst["grip"] <= g.grip_torque + 1e-9
+
+
+def test_grasp_on_nothing_reports_empty_and_stops_pushing(app):
+    d, g = app.driver, app.cfg.gripper
+    d.bus.object_in_jaws = False
+    d.gripper_open()
+    assert not d.gripper_grasp()
+    assert d._g_cmd[1] > 0 and d._g_cmd[4] == 0.0  # back to position hold, no squeeze into the stop
 
 
 def test_real_arm_refuses_placeholder_poses_and_uncalibrated_gripper(config_dir):

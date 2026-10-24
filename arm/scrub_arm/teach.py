@@ -21,7 +21,8 @@ import numpy as np
 
 from .app import App, check_poses
 from .catalog import ResolveError, parse_freeform
-from .config import save_gripper_calibration
+from .config import save_gripper_calibration, save_table_z
+from .grasp import grab_below, point_down, tilt_from_down
 from .handoff import Busy
 
 HELP = """\
@@ -35,6 +36,10 @@ HELP = """\
   poses                   list poses
   del <name>              delete a pose
   open | close            gripper open / soft close (close reports whether it's holding something)
+  pose                    tool-point position (mm) and how far the gripper is from pointing straight down
+  down                    tilt the wrist so the gripper points straight down (tool point stays put)
+  table                   touch the fingertips to the table, then `table` to record its height
+  grab [depth_mm]         grab whatever is directly below: descend, close, lift (stops on contact)
   g <deg>                 gripper to an absolute motor angle
   gcal open|closed        record the current gripper angle as the open / fully-closed endpoint
   check                   list placeholder/missing poses and other setup problems
@@ -118,6 +123,27 @@ def run_teach(app: App) -> None:
                 print(f"  gripper at {math.degrees(d.gripper_measured()):.1f} deg - {'HOLDING' if held else 'empty'}")
             elif cmd == "g":
                 d.set_gripper(math.radians(float(args[0])))
+            elif cmd == "pose":
+                q = d.q_measured() if d.enabled else d.read_fresh()[:-1]
+                xyz = app.kin.fk(q)[:3, 3] * 1000
+                print(f"  tool point x={xyz[0]:+.1f} y={xyz[1]:+.1f} z={xyz[2]:+.1f} mm, "
+                      f"{math.degrees(tilt_from_down(app.kin, q)):.1f} deg from straight down"
+                      + (f", {xyz[2] - app.cfg.grab.table_z * 1000:+.1f} mm above table"
+                         if app.cfg.grab.table_z is not None else ""))
+            elif cmd == "down":
+                d.clear_abort()
+                tilt = point_down(d, app.kin)
+                print(f"  pointing down ({math.degrees(tilt):.1f} deg off)")
+            elif cmd == "table":
+                # Works limp (hold the fingertips on the table by hand) or holding (jogged down to touch).
+                q = d.q_measured() if d.enabled else d.read_fresh()[:-1]
+                z = float(app.kin.fk(q)[2, 3])
+                save_table_z(app.cfg, z)
+                print(f"  table height = {z * 1000:.1f} mm (tool-point z, written to arm.yaml)")
+            elif cmd == "grab":
+                d.clear_abort()
+                depth = float(args[0]) / 1000 if args else None
+                print("  " + str(grab_below(d, app.kin, depth=depth)))
             elif cmd == "gcal":
                 which = args[0]
                 pos = d.gripper_measured() if d.enabled else float(d.read_fresh()[-1])

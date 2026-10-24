@@ -11,6 +11,7 @@ from .catalog import Catalog
 from .config import DEFAULT_CONFIG_DIR, ArmConfig, PoseLibrary, TrayConfig, load_arm_config, load_poses, load_tray_config
 from .driver import ArmDriver
 from .handoff import ScrubAssistant
+from .kinematics import Kinematics
 from .verify import Verifier
 
 
@@ -22,6 +23,7 @@ class App:
     driver: ArmDriver
     catalog: Catalog
     assistant: ScrubAssistant
+    kin: Kinematics
 
 
 def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
@@ -37,7 +39,8 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
     driver = ArmDriver(cfg, bus, poses, sim=sim)
     catalog = Catalog(tray, default_orientation=cfg.handoff.default_orientation)
     assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify))
-    return App(cfg, tray, poses, driver, catalog, assistant)
+    kin = Kinematics.from_urdf(lower=cfg.lower, upper=cfg.upper)
+    return App(cfg, tray, poses, driver, catalog, assistant, kin)
 
 
 def check_poses(app: App) -> list[str]:

@@ -2,24 +2,66 @@
 # Generated/updated by `python -m scrub_arm teach`. Poses with taught: false are
 # PLACEHOLDERS so the simulator runs; the real arm refuses to move to them.
 poses:
-  home: {joints_deg: [0.0, 20.0, 40.0, 0.0, 0.0, 0.0], taught: false}
-  verify: {joints_deg: [0.0, 45.0, 70.0, 0.0, 40.0, 0.0], taught: false}
-  handoff: {joints_deg: [90.0, 60.0, 50.0, 0.0, 10.0, -90.0], taught: false}
-  staged: {joints_deg: [70.0, 45.0, 60.0, 0.0, 20.0, -90.0], taught: false}
-  rest: {joints_deg: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], taught: false}
-  A1.above: {joints_deg: [-45.0, 55.0, 75.0, 0.0, 45.0, 0.0], taught: false}
-  A1.grasp: {joints_deg: [-45.0, 63.0, 72.0, 0.0, 50.0, 0.0], taught: false}
-  A2.above: {joints_deg: [-32.5, 55.0, 75.0, 0.0, 45.0, 0.0], taught: false}
-  A2.grasp: {joints_deg: [-32.5, 63.0, 72.0, 0.0, 50.0, 0.0], taught: false}
-  A3.above: {joints_deg: [-20.0, 55.0, 75.0, 0.0, 45.0, 0.0], taught: false}
-  A3.grasp: {joints_deg: [-20.0, 63.0, 72.0, 0.0, 50.0, 0.0], taught: false}
-  A4.above: {joints_deg: [-7.5, 55.0, 75.0, 0.0, 45.0, 0.0], taught: false}
-  A4.grasp: {joints_deg: [-7.5, 63.0, 72.0, 0.0, 50.0, 0.0], taught: false}
-  B1.above: {joints_deg: [5.0, 63.0, 67.0, 0.0, 45.0, 0.0], taught: false}
-  B1.grasp: {joints_deg: [5.0, 71.0, 64.0, 0.0, 50.0, 0.0], taught: false}
-  B2.above: {joints_deg: [17.5, 63.0, 67.0, 0.0, 45.0, 0.0], taught: false}
-  B2.grasp: {joints_deg: [17.5, 71.0, 64.0, 0.0, 50.0, 0.0], taught: false}
-  B3.above: {joints_deg: [30.0, 63.0, 67.0, 0.0, 45.0, 0.0], taught: false}
-  B3.grasp: {joints_deg: [30.0, 71.0, 64.0, 0.0, 50.0, 0.0], taught: false}
-  B4.above: {joints_deg: [42.5, 63.0, 67.0, 0.0, 45.0, 0.0], taught: false}
-  B4.grasp: {joints_deg: [42.5, 71.0, 64.0, 0.0, 50.0, 0.0], taught: false}
+  home:
+    joints_deg: [0.0, 20.0, 40.0, 0.0, 0.0, 0.0]
+    taught: false
+  verify:
+    joints_deg: [0.0, 45.0, 70.0, 0.0, 40.0, 0.0]
+    taught: false
+  handoff:
+    joints_deg: [90.0, 60.0, 50.0, 0.0, 10.0, -90.0]
+    taught: false
+  staged:
+    joints_deg: [70.0, 45.0, 60.0, 0.0, 20.0, -90.0]
+    taught: false
+  rest:
+    joints_deg: [-0.16, 0.04, 0.01, -0.02, -0.04, 0.0]
+    taught: true
+  A1.above:
+    joints_deg: [-45.0, 55.0, 75.0, 0.0, 45.0, 0.0]
+    taught: false
+  A1.grasp:
+    joints_deg: [-45.0, 63.0, 72.0, 0.0, 50.0, 0.0]
+    taught: false
+  A2.above:
+    joints_deg: [-32.5, 55.0, 75.0, 0.0, 45.0, 0.0]
+    taught: false
+  A2.grasp:
+    joints_deg: [-32.5, 63.0, 72.0, 0.0, 50.0, 0.0]
+    taught: false
+  A3.above:
+    joints_deg: [-20.0, 55.0, 75.0, 0.0, 45.0, 0.0]
+    taught: false
+  A3.grasp:
+    joints_deg: [-20.0, 63.0, 72.0, 0.0, 50.0, 0.0]
+    taught: false
+  A4.above:
+    joints_deg: [-7.5, 55.0, 75.0, 0.0, 45.0, 0.0]
+    taught: false
+  A4.grasp:
+    joints_deg: [-7.5, 63.0, 72.0, 0.0, 50.0, 0.0]
+    taught: false
+  B1.above:
+    joints_deg: [5.0, 63.0, 67.0, 0.0, 45.0, 0.0]
+    taught: false
+  B1.grasp:
+    joints_deg: [5.0, 71.0, 64.0, 0.0, 50.0, 0.0]
+    taught: false
+  B2.above:
+    joints_deg: [17.5, 63.0, 67.0, 0.0, 45.0, 0.0]
+    taught: false
+  B2.grasp:
+    joints_deg: [17.5, 71.0, 64.0, 0.0, 50.0, 0.0]
+    taught: false
+  B3.above:
+    joints_deg: [30.0, 63.0, 67.0, 0.0, 45.0, 0.0]
+    taught: false
+  B3.grasp:
+    joints_deg: [30.0, 71.0, 64.0, 0.0, 50.0, 0.0]
+    taught: false
+  B4.above:
+    joints_deg: [42.5, 63.0, 67.0, 0.0, 45.0, 0.0]
+    taught: false
+  B4.grasp:
+    joints_deg: [42.5, 71.0, 64.0, 0.0, 50.0, 0.0]
+    taught: false
