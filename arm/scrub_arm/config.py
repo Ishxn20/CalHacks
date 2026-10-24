@@ -88,6 +88,20 @@ class VerifyCfg:
 
 
 @dataclass
+class PickCfg:
+    mode: str                      # "slots" | "ik"
+    perception_url: str
+    table_z: float                 # m
+    hover: float                   # m
+    descend_step: float            # m
+    contact_deviation: float       # rad
+    contact_joints: list[str]
+    max_declutter_moves: int
+    staging: list[tuple[float, float]]   # m
+    staging_yaw: float             # rad
+
+
+@dataclass
 class ArmConfig:
     channel: str
     control_rate_hz: float
@@ -97,6 +111,7 @@ class ArmConfig:
     motion: MotionCfg
     handoff: HandoffCfg
     verify: VerifyCfg
+    pick: PickCfg
     server_host: str
     server_port: int
     active_report: bool = True
@@ -251,16 +266,30 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         min_confidence=float(v.get("min_confidence", 0.6)), fail_open=bool(v.get("fail_open", True)),
     )
 
+    pk = d.get("pick", {}) or {}
+    pick = PickCfg(
+        mode=str(pk.get("mode", "slots")).lower(), perception_url=str(pk.get("perception_url", "http://127.0.0.1:8770")),
+        table_z=float(pk.get("table_z_mm", 0.0)) / 1000.0, hover=float(pk.get("hover_mm", 80.0)) / 1000.0,
+        descend_step=float(pk.get("descend_step_mm", 3.0)) / 1000.0,
+        contact_deviation=_rad(pk.get("contact_deviation_deg", 1.5)),
+        contact_joints=[str(j) for j in pk.get("contact_joints", ["joint2", "joint3"])],
+        max_declutter_moves=int(pk.get("max_declutter_moves", 6)),
+        staging=[(float(x) / 1000.0, float(y) / 1000.0) for x, y in pk.get("staging_mm", [])],
+        staging_yaw=_rad(pk.get("staging_yaw_deg", 0.0)),
+    )
+
     s = d.get("server", {}) or {}
     cfg = ArmConfig(
         channel=str(d["channel"]), control_rate_hz=float(d["control_rate_hz"]),
         arm_mode=str(d.get("arm_mode", "mit")).lower(), joints=joints, gripper=gripper,
-        motion=motion, handoff=handoff, verify=verify,
+        motion=motion, handoff=handoff, verify=verify, pick=pick,
         server_host=str(s.get("host", "127.0.0.1")), server_port=int(s.get("port", 8765)),
         active_report=bool(d.get("active_report", True)), path=path,
     )
     if cfg.arm_mode not in ("mit", "pos_vel"):
         raise ValueError(f"arm_mode must be 'mit' or 'pos_vel', got {cfg.arm_mode!r}")
+    if cfg.pick.mode not in ("slots", "ik"):
+        raise ValueError(f"pick.mode must be 'slots' or 'ik', got {cfg.pick.mode!r}")
     return cfg
 
 

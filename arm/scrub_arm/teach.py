@@ -133,7 +133,7 @@ def run_teach(app: App) -> None:
                 fields = parse_freeform(rest)
                 r = app.catalog.resolve(fields.get("instrument", ""), fields.get("suture"), fields.get("size"),
                                         fields.get("orientation"))
-                print(f"  -> slot {r.slot.id}: {r.describe()}")
+                print(f"  -> slot {r.slot.id if r.slot else 'camera'}: {r.describe()}")
                 asst.submit("handoff" if cmd == "test" else "stage", r)
                 print("  running; `release` when the surgeon has it, `stop` to freeze, `s` for status")
             elif cmd == "release":

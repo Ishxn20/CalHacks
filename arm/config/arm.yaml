@@ -73,6 +73,18 @@ verify:
   min_confidence: 0.6
   fail_open: true              # if the CV service is unreachable, proceed (demo resilience)
 
+pick:
+  mode: slots            # slots (taught tray poses) | ik (camera-located, inverse kinematics)
+  perception_url: http://127.0.0.1:8770
+  table_z_mm: 0.0        # table height in the base frame, from touch calibration
+  hover_mm: 80.0         # height above table_z for the approach/retreat waypoint
+  descend_step_mm: 3.0   # contact-sensing descent step
+  contact_deviation_deg: 1.5   # joint lag beyond baseline that counts as touching the pile
+  contact_joints: [joint2, joint3]
+  max_declutter_moves: 6
+  staging_mm: [[250, -200], [250, -260], [250, -320], [310, -200], [310, -260], [310, -320]]
+  staging_yaw_deg: 0.0
+
 server:
   host: 127.0.0.1
   port: 8765

@@ -32,15 +32,15 @@ class ResolveError(ValueError):
 
 @dataclass
 class Resolved:
-    slot: Slot
+    slot: Slot | None         # None in ik mode: the camera decides where the instrument is
     instrument: Instrument
     orientation: str | None   # None for instruments where orientation doesn't apply
 
     def describe(self) -> str:
         parts = [self.instrument.name]
-        if self.slot.size:
+        if self.slot and self.slot.size:
             parts.append(self.slot.size)
-        if self.slot.suture:
+        if self.slot and self.slot.suture:
             parts.append(self.slot.suture.capitalize())
         if self.orientation:
             parts.append(self.orientation)
@@ -115,9 +115,10 @@ def parse_freeform(text: str) -> dict:
 
 
 class Catalog:
-    def __init__(self, tray: TrayConfig, default_orientation: str = "forehand") -> None:
+    def __init__(self, tray: TrayConfig, default_orientation: str = "forehand", require_slot: bool = True) -> None:
         self.tray = tray
         self.default_orientation = default_orientation
+        self.require_slot = require_slot   # False (ik mode): any known instrument resolves, slot=None
         # phrase -> instrument id, or "category:<name>" for generic requests
         self._phrases: dict[str, str] = {}
         for inst in tray.instruments.values():
@@ -171,6 +172,11 @@ class Catalog:
         suture_n = self.normalize_suture(suture)
         size_n = normalize_size(size)
         orient_n = normalize_orientation(orientation)
+
+        if not self.require_slot and not match.startswith("category:"):
+            inst = self.tray.instruments[match]
+            orient = (orient_n or self.default_orientation) if inst.orientable else None
+            return Resolved(slot=None, instrument=inst, orientation=orient)
 
         if match.startswith("category:"):
             cat = match.split(":", 1)[1]

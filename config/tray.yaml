@@ -29,8 +29,10 @@ instruments:
   scalpel_20:                {name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
   scissors_potts:            {name: Potts scissors, category: scissors, orientable: true,
                               aliases: [potts, pots, pott scissors]}
-  scissors_micro:            {name: Micro scissors, category: scissors, orientable: true,
-                              aliases: [micro scissors, micros]}
+  scissors_micro_forward:    {name: Forward micro scissors, category: scissors, orientable: true,
+                              aliases: [micro scissors, micros, forward micro scissors, forward facing micro scissors, forward scissors]}
+  scissors_micro_back:       {name: Back-facing micro scissors, category: scissors, orientable: true,
+                              aliases: [back micro scissors, back facing micro scissors, backward micro scissors, back scissors]}
   clamp_aortic_cross:        {name: Aortic cross-clamp, category: clamp,
                               aliases: [cross clamp, crossclamp, aortic clamp, cross-clamp]}
   clamp_side_biting:         {name: Side-biting clamp, category: clamp,

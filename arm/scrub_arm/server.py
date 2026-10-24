@@ -71,7 +71,7 @@ def make_handler(assistant: ScrubAssistant, catalog: Catalog):
                     r = catalog.resolve(
                         body.get("instrument", ""), body.get("suture"), body.get("size"), body.get("orientation")
                     )
-                    info = {"slot": r.slot.id, "instrument": r.instrument.id, "orientation": r.orientation,
+                    info = {"slot": r.slot.id if r.slot else None, "instrument": r.instrument.id, "orientation": r.orientation,
                             "say": r.describe()}
                     if path == "/resolve":
                         return self._send(200, info)

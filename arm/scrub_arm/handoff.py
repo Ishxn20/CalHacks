@@ -120,7 +120,7 @@ class ScrubAssistant:
         return {
             "phase": self.phase.value,
             "holding": self.holding.describe() if self.holding else None,
-            "holding_slot": self.holding.slot.id if self.holding else None,
+            "holding_slot": self.holding.slot.id if self.holding and self.holding.slot else None,
             "job": job,
             "last_job": last,
             "arm": self.driver.snapshot(),

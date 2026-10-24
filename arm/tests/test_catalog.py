@@ -5,8 +5,13 @@ from scrub_arm.config import load_tray_config
 
 
 @pytest.fixture
-def catalog(config_dir):
-    return Catalog(load_tray_config(config_dir / "tray.yaml"))
+def tray(config_dir):
+    return load_tray_config(config_dir / "tray.yaml")
+
+
+@pytest.fixture
+def catalog(tray):
+    return Catalog(tray)
 
 
 def test_generic_needle_holder_matches_suture_loaded_slot(catalog):
@@ -72,3 +77,20 @@ def test_parse_freeform(catalog):
     f = parse_freeform("Needle holder, 6-0 Prolene, backhand")
     assert f == {"instrument": "Needle holder", "size": "6-0", "suture": "Prolene", "orientation": "backhand"}
     assert catalog.resolve(**f).slot.id == "A1"
+
+
+def test_resolve_without_slot(tray):
+    c = Catalog(tray, require_slot=False)
+    r = c.resolve("resano")
+    assert r.slot is None and r.instrument.id == "forceps_resano"
+    assert "Resano" in r.describe()
+
+
+def test_resolve_with_slot_still_rejects_unloaded(tray):
+    with pytest.raises(ResolveError):
+        Catalog(tray).resolve("resano")
+
+
+def test_resolve_without_slot_keeps_orientation(tray):
+    r = Catalog(tray, require_slot=False).resolve("castro", orientation="backhand")
+    assert r.orientation == "backhand"

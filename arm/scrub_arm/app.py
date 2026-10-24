@@ -35,7 +35,7 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
     else:
         bus = RobstrideBus(cfg)
     driver = ArmDriver(cfg, bus, poses, sim=sim)
-    catalog = Catalog(tray, default_orientation=cfg.handoff.default_orientation)
+    catalog = Catalog(tray, default_orientation=cfg.handoff.default_orientation, require_slot=cfg.pick.mode == "slots")
     assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify))
     return App(cfg, tray, poses, driver, catalog, assistant)
 
