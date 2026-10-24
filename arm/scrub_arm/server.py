@@ -4,6 +4,9 @@
                     or {"text": "needle holder, 6-0 prolene, backhand"} (fallback if the LLM parser is down)
     POST /stage     same body - pick the predicted next instrument and hold it near the surgeon
     POST /resolve   same body - dry run: which slot would be used? (no motion)
+    POST /pick      {"instrument": "caliper"} or {"text": "caliper"}; optional "handoff": true carries it to the
+                    surgeon after the pick, "dry_run": true looks and plans without moving the arm.
+                    The tray camera finds the tool; no slot needed.
     POST /release   surgeon has it: open the jaws (also accepted mid-swing; latched)
     POST /return    put whatever is held back in its slot
     POST /home
@@ -20,7 +23,7 @@ import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .catalog import Catalog, ResolveError, parse_freeform
-from .handoff import Busy, ScrubAssistant
+from .handoff import Busy, ScrubAssistant, TaskFailed
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +80,14 @@ def make_handler(assistant: ScrubAssistant, catalog: Catalog):
                         return self._send(200, info)
                     job = assistant.submit(path.lstrip("/"), r)
                     return self._send(202, {"job": job, **info})
+                if path == "/pick":
+                    if "text" in body and not body.get("instrument"):
+                        body = {**body, **parse_freeform(str(body["text"]))}
+                    req = catalog.resolve_pick(body.get("instrument", ""))
+                    req.handoff = bool(body.get("handoff"))
+                    if body.get("dry_run"):
+                        return self._send(200, {"plan": assistant.plan_pick(req), "say": f"I would pick the {req.label}"})
+                    return self._send(202, {"job": assistant.submit("pick", req), "say": f"Picking the {req.label}"})
                 if path == "/release":
                     return self._send(200, assistant.release())
                 if path in ("/return", "/home"):
@@ -90,6 +101,8 @@ def make_handler(assistant: ScrubAssistant, catalog: Catalog):
                 self._send(404, {"error": "not found"})
             except ResolveError as e:
                 self._send(400, {"error": str(e), "say": str(e).capitalize()})
+            except TaskFailed as e:
+                self._send(422, {"error": str(e), "say": str(e).capitalize()})
             except Busy as e:
                 self._send(409, {"error": str(e), "say": "One moment, I'm still moving."})
             except (ValueError, json.JSONDecodeError) as e:

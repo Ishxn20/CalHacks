@@ -1,0 +1,1 @@
+/Users/varunpabreja/Desktop/CalHacks/vision/data/synth/labels/train/train_03354.txt

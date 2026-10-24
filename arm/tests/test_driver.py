@@ -80,3 +80,11 @@ def test_enable_holds_current_position(config_dir):
         assert np.allclose(bus.pos, start, atol=1e-6)
     finally:
         d.shutdown()
+
+
+def test_gripper_commands_are_clamped_to_the_hard_limit(app):
+    app.cfg.gripper.max = 1.0
+    app.driver.set_gripper(5.0)
+    assert app.driver._g_cmd[0] == 1.0
+    app.driver.set_gripper(0.5)
+    assert app.driver._g_cmd[0] == 0.5

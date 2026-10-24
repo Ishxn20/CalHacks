@@ -341,6 +341,8 @@ class ArmDriver:
 
     def set_gripper(self, pos: float, kp: float | None = None, kd: float | None = None) -> None:
         g = self.cfg.gripper
+        if g.max is not None:
+            pos = min(pos, g.max)   # past this the jaws hit their stop and the plastic breaks
         with self._lock:
             self._g_cmd = (float(pos), g.move_kp if kp is None else kp, g.move_kd if kd is None else kd)
 

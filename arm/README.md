@@ -62,6 +62,7 @@ The real arm **refuses** to move to placeholder poses (`taught: false`) or to gr
 |---|---|---|
 | `POST /handoff` | `{"instrument","suture"?,"size"?,"orientation"?}` | 202 + job. 400 if unknown or not on the tray ("No needle holder loaded with vicryl; have 4-0 prolene, 6-0 prolene"). 409 if busy. |
 | | `{"text": "needle holder, 6-0 prolene, backhand"}` | Fallback if the LLM parser is down |
+| `POST /pick` | `{"instrument"}` or `{"text"}`; `handoff?`, `dry_run?` | Camera-guided pick, no slot needed (see `docs/arm-control.md`). 202 + job; `dry_run` returns the plan and never moves. 422 if the camera can't see it or it can't be gripped safely. |
 | `POST /resolve` | same | Dry run: which slot, plus the `say` confirmation string. No motion. |
 | `POST /release` | – | Surgeon has it. Latched: if said mid-swing, it releases on arrival. |
 | `POST /stage` | same as handoff | Prediction stretch: pick the predicted tool and hold it at `staged`. A later `/handoff` for the same tool skips the pick. For a different tool, it puts the staged one back first. |
@@ -95,7 +96,10 @@ config/poses.yaml   taught poses (written by `teach`)
 scrub_arm/bus.py        motorbridge RobStride backend + simulator
 scrub_arm/driver.py     control loop thread, min-jerk moves, gripper, collision guard
 scrub_arm/catalog.py    intent → slot resolution
-scrub_arm/handoff.py    pick / verify / present / release job runner
+scrub_arm/handoff.py    pick / verify / present / release job runner (also the camera `pick` job)
+scrub_arm/pick.py       detection -> joint targets, wrist angle, safety checks
+scrub_arm/reach.py      taught pixel -> joints map (`reach` commands in teach)
+scrub_arm/vision.py     client for the tray-camera service (`python -m scrub_vision.serve`)
 scrub_arm/server.py     HTTP API
 scrub_arm/teach.py      interactive teaching CLI
 ```

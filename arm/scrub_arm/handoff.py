@@ -10,6 +10,11 @@ Handoff sequence for a request like "needle holder, 6-0 Prolene, backhand":
     -> lift -> [tray-cam verify; on mismatch put it back and report]
     -> swing to handoff pose with wrist rotated for forehand/backhand
     -> wait for release (voice "release", API call, or a tug) -> open -> home
+
+Camera-guided pick ("pick caliper"): no slot, the tray camera finds the tool.
+
+    tray_view -> look (two looks must agree) -> plan from the reach map -> hover, wrist turned to the grip angle
+    -> descend -> grasp (retry if the jaws closed on nothing) -> lift -> back to tray_view, holding it
 """
 from __future__ import annotations
 
@@ -23,15 +28,19 @@ from enum import Enum
 
 import numpy as np
 
-from .catalog import Catalog, Resolved
+from .catalog import Catalog, PickRequest, Resolved
 from .driver import ArmDriver, ArmFault, MotionAborted
+from .pick import GraspPlan, PickError, plan_grasp, wrap180
+from .reach import ReachMap
 from .verify import Verifier
+from .vision import VisionClient, VisionError
 
 log = logging.getLogger(__name__)
 
 
 class Phase(str, Enum):
     IDLE = "idle"
+    LOOKING = "looking"         # at tray_view, asking the camera where the tool is
     PICKING = "picking"
     VERIFYING = "verifying"
     RETURNING = "returning"
@@ -52,14 +61,17 @@ class TaskFailed(RuntimeError):
 
 
 class ScrubAssistant:
-    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier) -> None:
+    def __init__(self, driver: ArmDriver, catalog: Catalog, verifier: Verifier,
+                 vision: VisionClient | None = None, reach: ReachMap | None = None) -> None:
         self.driver = driver
         self.catalog = catalog
         self.verifier = verifier
+        self.vision = vision
+        self.reach = reach
         self.cfg = driver.cfg
 
         self.phase = Phase.IDLE
-        self.holding: Resolved | None = None
+        self.holding: Resolved | PickRequest | None = None   # PickRequest = picked by camera, no slot
         self._job: dict | None = None
         self._last_job: dict | None = None
         self._ids = itertools.count(1)
@@ -69,9 +81,10 @@ class ScrubAssistant:
 
     # ── public API (thread-safe) ──────────────────────────────────────────
 
-    def submit(self, kind: str, resolved: Resolved | None = None) -> dict:
+    def submit(self, kind: str, resolved: Resolved | PickRequest | None = None) -> dict:
         fn = {
             "handoff": self._do_handoff,
+            "pick": self._do_pick,
             "stage": self._do_stage,
             "home": self._do_home,
             "return": self._do_return,
@@ -83,6 +96,7 @@ class ScrubAssistant:
             job = {
                 "id": next(self._ids), "kind": kind, "status": "running", "error": None,
                 "request": resolved.describe() if resolved else None, "started": time.time(),
+                "handing": kind == "handoff" or bool(getattr(resolved, "handoff", False)),
             }
             self._job = job
             self._release.clear()
@@ -93,7 +107,7 @@ class ScrubAssistant:
     def release(self) -> dict:
         """Surgeon has the instrument: open the jaws. Works mid-handoff or after a present timeout."""
         with self._lock:
-            handing = self._job is not None and self._job["kind"] == "handoff"
+            handing = self._job is not None and self._job["handing"]
         if handing:
             # Latched: if the arm is still on its way out, it releases as soon as it's presented.
             self._release.set()
@@ -113,6 +127,13 @@ class ScrubAssistant:
         self._log("stop requested")
         self.driver.stop()
 
+    def plan_pick(self, req: PickRequest) -> dict:
+        """Dry run: look and plan exactly as a pick would, without moving the arm. Point the camera first
+        (arm at tray_view, e.g. `go tray_view` in teach)."""
+        self._require_reach()
+        _, plan = self._look_and_plan(req)
+        return plan.describe()
+
     def status(self) -> dict:
         with self._lock:
             job = dict(self._job) if self._job else None
@@ -120,7 +141,7 @@ class ScrubAssistant:
         return {
             "phase": self.phase.value,
             "holding": self.holding.describe() if self.holding else None,
-            "holding_slot": self.holding.slot.id if self.holding else None,
+            "holding_slot": self.holding.slot.id if self.holding and self.holding.slot else None,
             "job": job,
             "last_job": last,
             "arm": self.driver.snapshot(),
@@ -179,6 +200,48 @@ class ScrubAssistant:
         self._release_and_retreat()
         return f"handed {r.describe()} ({how})"
 
+    def _do_pick(self, req: PickRequest) -> str:
+        pc, d = self.cfg.pick, self.driver
+        self._require_reach()
+        view = d.poses.poses.get(pc.view_pose)
+        if view is None or not (view.taught or d.sim):
+            raise TaskFailed(f"the arm has not been taught its '{pc.view_pose}' pose yet")
+        if self.holding is not None:
+            raise TaskFailed(f"already holding {self.holding.describe()}; release it or return it first")
+        slow = self.cfg.motion.approach_speed_scale
+        for attempt in range(pc.retries + 1):
+            self.phase = Phase.LOOKING
+            d.move_pose(pc.view_pose)
+            d.gripper_open()
+            inst, plan = self._look_and_plan(req)
+            self._log(f"picking {inst.name}: px {plan.grasp_px[0]:.0f},{plan.grasp_px[1]:.0f} "
+                      f"grip {plan.grip_deg:+.0f} deg ({plan.anchor})")
+            self.phase = Phase.PICKING
+            d.move_to(plan.above_q)                 # the wrist turns up here, clear of the tray
+            d.move_to(plan.grasp_q, speed=slow)
+            got_it = d.gripper_grasp()
+            d.move_to(plan.above_q, speed=slow)
+            if got_it:
+                self.holding = PickRequest(candidates=[inst], label=inst.name, handoff=req.handoff)
+                break
+            d.gripper_open()
+            self._log(f"jaws closed on nothing (try {attempt + 1} of {pc.retries + 1})")
+        else:
+            d.move_pose(pc.view_pose)
+            self.phase = Phase.IDLE
+            raise TaskFailed(f"I couldn't get a grip on the {req.label} after {pc.retries + 1} tries")
+        if req.handoff:
+            self._present(self.holding)
+            how = self._wait_for_take()
+            if how == "timeout":
+                return f"presented {inst.name}; not taken, still holding"
+            self._release_and_retreat()
+            return f"picked {inst.name} and handed it over ({how})"
+        self.phase = Phase.MOVING
+        d.move_pose(pc.view_pose, speed=slow)
+        self.phase = Phase.IDLE
+        return f"picked {inst.name}; holding it at {pc.view_pose} (send release to let go)"
+
     def _do_stage(self, r: Resolved) -> str:
         self._acquire(r)
         self.phase = Phase.MOVING
@@ -195,6 +258,8 @@ class ScrubAssistant:
     def _do_return(self) -> str:
         if self.holding is None:
             return "not holding anything"
+        if self.holding.slot is None:
+            raise TaskFailed("objects picked by camera are not put back yet; use release")
         what = self.holding.describe()
         self._return_held()
         self.driver.move_pose("home")
@@ -208,8 +273,46 @@ class ScrubAssistant:
 
     # ── steps ─────────────────────────────────────────────────────────────
 
+    def _require_reach(self) -> None:
+        if self.reach is None or self.vision is None:
+            raise TaskFailed("camera picking is not set up (pick.vision_url, reach map)")
+        if missing := self.reach.ready():
+            raise TaskFailed("; ".join(missing) + " (use `reach` in the teach tool)")
+
+    def _look(self, req: PickRequest) -> dict:
+        """Ask the camera until two looks in a row agree, so the arm never chases a moving or flickering target."""
+        pc = self.cfg.pick
+        names = [i.id for i in req.candidates]
+        prev = None
+        for _ in range(pc.relook_max):
+            try:
+                det = self.vision.detect(names, pc.frames)
+            except VisionError as e:
+                raise TaskFailed(str(e)) from e
+            if not det.get("found"):
+                raise TaskFailed(f"I can't see a {req.label} on the tray")
+            if det["stable"] and prev is not None \
+                    and math.dist(prev["center_px"], det["center_px"]) <= pc.relook_tol_px \
+                    and abs(wrap180(prev["grip_deg"] - det["grip_deg"])) <= 5.0:
+                return det
+            prev = det if det["stable"] else None
+        raise TaskFailed(f"the {req.label} keeps moving, or the camera view is unsteady; not picking")
+
+    def _look_and_plan(self, req: PickRequest):
+        det = self._look(req)
+        inst = next((i for i in req.candidates if i.id == det.get("name")), req.candidates[0])
+        try:
+            plan: GraspPlan = plan_grasp(det, self.reach, self.cfg.pick, self.cfg.joints, inst.grasp_along)
+            self.driver.check_limits(plan.above_q)
+            self.driver.check_limits(plan.grasp_q)
+        except (PickError, ArmFault) as e:
+            raise TaskFailed(f"can't pick the {req.label}: {e}") from e
+        return inst, plan
+
     def _acquire(self, r: Resolved) -> None:
         """Make sure we're holding the requested slot's instrument, picking it if needed."""
+        if self.holding is not None and self.holding.slot is None:
+            raise TaskFailed(f"holding {self.holding.describe()}; release it first")
         if self.holding is not None:
             if self.holding.slot.id == r.slot.id:
                 self.holding = r          # same instrument; orientation may differ

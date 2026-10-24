@@ -10,7 +10,7 @@ import sys
 import urllib.error
 import urllib.request
 
-from .app import build, check_poses
+from .app import build, check_pick, check_poses
 
 
 def _raise_interrupt(*_) -> None:
@@ -27,6 +27,8 @@ def cmd_serve(args) -> None:
         print("Setup problems (fix with `python -m scrub_arm teach`):\n" + "\n".join(f"  - {p}" for p in problems))
         if not args.force:
             sys.exit(1)
+    if todo := check_pick(app):
+        print("Camera picking not ready yet (handoffs still work):\n" + "\n".join(f"  - {p}" for p in todo))
     app.driver.start()
     app.driver.enable()
     if args.home:
@@ -66,6 +68,7 @@ def cmd_check(args) -> None:
     print("  positions (deg): " + " ".join(f"{math.degrees(x):+.1f}" for x in q))
     problems = check_poses(app)
     print("Setup:\n" + ("\n".join(f"  - {p}" for p in problems) or "  all set"))
+    print("Camera picking:\n" + ("\n".join(f"  - {p}" for p in check_pick(app)) or "  all set"))
     app.driver.bus.close()
     sys.exit(0 if ok else 1)
 
@@ -76,6 +79,10 @@ def cmd_send(args) -> None:
         req = urllib.request.Request(url)
     else:
         body = {"text": " ".join(args.text)} if args.text else {}
+        if args.dry_run:
+            body["dry_run"] = True
+        if args.handoff:
+            body["handoff"] = True
         req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -111,9 +118,11 @@ def main(argv=None) -> None:
     c.set_defaults(fn=cmd_check)
 
     snd = sub.add_parser("send", help="send a command to a running server")
-    snd.add_argument("action", choices=["handoff", "stage", "resolve", "release", "return", "home", "stop", "reset", "status"])
+    snd.add_argument("action", choices=["handoff", "pick", "stage", "resolve", "release", "return", "home", "stop", "reset", "status"])
     snd.add_argument("text", nargs="*", help='e.g. "needle holder, 6-0 prolene, backhand"')
     snd.add_argument("--url", default="http://127.0.0.1:8765")
+    snd.add_argument("--dry-run", action="store_true", help="pick: look and plan, don't move the arm")
+    snd.add_argument("--handoff", action="store_true", help="pick: carry it to the handoff pose afterwards")
     snd.set_defaults(fn=cmd_send)
 
     args = p.parse_args(argv)

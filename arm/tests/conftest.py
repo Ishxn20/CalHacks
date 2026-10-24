@@ -15,7 +15,7 @@ from scrub_arm.config import DEFAULT_TRAY_PATH  # noqa: E402
 @pytest.fixture
 def config_dir(tmp_path):
     d = tmp_path / "config"
-    shutil.copytree(ROOT / "config", d)
+    shutil.copytree(ROOT / "config", d, ignore=shutil.ignore_patterns("reach_map.yaml"))   # tests start with no taught map
     shutil.copy(DEFAULT_TRAY_PATH, d)
     # Tests assume the placeholder gripper, not whatever `gcal` measured on the real arm.
     text = (d / "arm.yaml").read_text()

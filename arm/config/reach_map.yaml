@@ -1,0 +1,16 @@
+# Written by `scrub_arm teach` (reach ...). Marker pixel positions seen from the view pose, and
+# the joint angles taught at each marker. The fit is recomputed from these on load.
+view_pose: tray_view
+mm_per_px: 0.44768107338289476
+image: [1920, 1080]
+source: clicked
+lift_deg: null
+points:
+  0:
+    px: [691.0, 26.0]
+  1:
+    px: [717.0, 723.0]
+  2:
+    px: [1189.0, 715.0]
+  3:
+    px: [1008.0, 8.0]

@@ -50,6 +50,7 @@ class GripperCfg:
     grip_kd: float
     settle_s: float
     holding_min_gap: float  # rad
+    max: float | None = None  # rad; hard ceiling on any gripper command (mechanical stop is above it)
 
 
 @dataclass
@@ -88,6 +89,25 @@ class VerifyCfg:
 
 
 @dataclass
+class PickCfg:
+    """Camera-guided picking (`/pick`). Needs the vision service, a taught `view_pose` and a reach map."""
+    vision_url: str | None
+    timeout_s: float
+    frames: int                  # frames the vision service averages per look
+    min_conf: float
+    view_pose: str               # where the arm looks at the tray from
+    wrist_sign: float            # +1/-1: does a positive image angle turn joint6 positive? verify with --dry-run
+    retries: int                 # extra attempts if the jaws close on nothing
+    relook_tol_px: float         # two looks must agree this closely before the arm commits
+    relook_max: int
+    anchor_max_px: float         # max camera-pose drift (from the tray markers) we will correct
+    bounds_margin_px: float      # how far outside the calibrated markers a target may be
+    marker_mm: float | None      # printed side of the tray markers; gives mm per pixel
+    max_open_mm: float | None    # jaw opening; null disables the width and clearance checks
+    jaw_width_mm: float          # finger width, for the clearance check
+
+
+@dataclass
 class ArmConfig:
     channel: str
     control_rate_hz: float
@@ -97,6 +117,7 @@ class ArmConfig:
     motion: MotionCfg
     handoff: HandoffCfg
     verify: VerifyCfg
+    pick: PickCfg
     server_host: str
     server_port: int
     active_report: bool = True
@@ -132,6 +153,7 @@ class Instrument:
     category: str
     orientable: bool
     aliases: list[str]
+    grasp_along: float = 0.0   # shift the grasp point this fraction of the length toward the bulky end
 
 
 @dataclass
@@ -221,6 +243,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         move_kp=float(g["move_kp"]), move_kd=float(g["move_kd"]),
         grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
+        max=_rad(g["max_deg"]) if g.get("max_deg") is not None else None,
     )
 
     m = d["motion"]
@@ -251,11 +274,22 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         min_confidence=float(v.get("min_confidence", 0.6)), fail_open=bool(v.get("fail_open", True)),
     )
 
+    p = d.get("pick", {}) or {}
+    mm = lambda k: float(p[k]) if p.get(k) is not None else None  # noqa: E731
+    pick = PickCfg(
+        vision_url=p.get("vision_url"), timeout_s=float(p.get("timeout_s", 8.0)), frames=int(p.get("frames", 5)),
+        min_conf=float(p.get("min_conf", 0.4)), view_pose=str(p.get("view_pose", "tray_view")),
+        wrist_sign=float(p.get("wrist_sign", 1.0)), retries=int(p.get("retries", 2)),
+        relook_tol_px=float(p.get("relook_tol_px", 6.0)), relook_max=int(p.get("relook_max", 3)),
+        anchor_max_px=float(p.get("anchor_max_px", 40.0)), bounds_margin_px=float(p.get("bounds_margin_px", 20.0)),
+        marker_mm=mm("marker_mm"), max_open_mm=mm("max_open_mm"), jaw_width_mm=float(p.get("jaw_width_mm", 12.0)),
+    )
+
     s = d.get("server", {}) or {}
     cfg = ArmConfig(
         channel=str(d["channel"]), control_rate_hz=float(d["control_rate_hz"]),
         arm_mode=str(d.get("arm_mode", "mit")).lower(), joints=joints, gripper=gripper,
-        motion=motion, handoff=handoff, verify=verify,
+        motion=motion, handoff=handoff, verify=verify, pick=pick,
         server_host=str(s.get("host", "127.0.0.1")), server_port=int(s.get("port", 8765)),
         active_report=bool(d.get("active_report", True)), path=path,
     )
@@ -295,6 +329,7 @@ def load_tray_config(path: Path | str | None = None) -> TrayConfig:
         iid: Instrument(
             id=iid, name=str(v.get("name", iid)), category=str(v.get("category", iid)),
             orientable=bool(v.get("orientable", False)), aliases=[str(a) for a in v.get("aliases", [])],
+            grasp_along=float(v.get("grasp_along", 0.0)),
         )
         for iid, v in d["instruments"].items()
     }

@@ -23,10 +23,10 @@ instruments:
                               aliases: [resano, heavy forceps]}
   forceps_fine_vascular:     {name: Fine vascular forceps, category: forceps,
                               aliases: [fine forceps, vascular forceps, fine pickups]}
-  scalpel_10:                {name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
-  scalpel_11:                {name: "#11 scalpel", category: scalpel, aliases: [11 blade, number 11, "#11", eleven blade]}
-  scalpel_15:                {name: "#15 scalpel", category: scalpel, aliases: [15 blade, number 15, "#15", fifteen blade]}
-  scalpel_20:                {name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
+  scalpel_10:                {name: "#10 scalpel", category: scalpel, grasp_along: 0.0, aliases: [10 blade, number 10, "#10", ten blade]}
+  scalpel_11:                {name: "#11 scalpel", category: scalpel, grasp_along: 0.0, aliases: [11 blade, number 11, "#11", eleven blade]}
+  scalpel_15:                {name: "#15 scalpel", category: scalpel, grasp_along: 0.0, aliases: [15 blade, number 15, "#15", fifteen blade]}
+  scalpel_20:                {name: "#20 scalpel", category: scalpel, grasp_along: 0.0, aliases: [20 blade, number 20, "#20", twenty blade]}
   scissors_potts:            {name: Potts scissors, category: scissors, orientable: true,
                               aliases: [potts, pots, pott scissors]}
   scissors_micro:            {name: Micro scissors, category: scissors, orientable: true,
@@ -37,6 +37,12 @@ instruments:
                               aliases: [side biting clamp, side biter, partial occlusion clamp]}
   probe_coronary:            {name: Coronary probe, category: probe,
                               aliases: [probe, coronary probe, coronary dilator]}
+
+  # Sandbox stand-ins until the printed tools exist. No slot: they are found by the camera (`send pick`).
+  # The ids are the YOLO class names of the sandbox model (vision `sandbox` tool).
+  sandbox_plug_cover:        {name: Plug cover, category: sandbox_plug_cover,
+                              aliases: [plug cover, plug cap, outlet cover, socket cover]}
+  sandbox_caliper:           {name: Caliper, category: sandbox_caliper, aliases: [caliper, calipers]}
 
 # Canonical suture names and what people may say instead.
 sutures:

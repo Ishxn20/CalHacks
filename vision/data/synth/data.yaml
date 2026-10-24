@@ -1,0 +1,20 @@
+names:
+  0: needle_holder_castroviejo
+  1: needle_holder_ryder
+  2: needle_holder_long
+  3: needle_holder_short
+  4: forceps_debakey
+  5: forceps_resano
+  6: forceps_fine_vascular
+  7: scalpel_10
+  8: scalpel_11
+  9: scalpel_15
+  10: scalpel_20
+  11: scissors_potts
+  12: scissors_micro
+  13: clamp_aortic_cross
+  14: clamp_side_biting
+  15: probe_coronary
+path: /Users/varunpabreja/Desktop/CalHacks/vision/data/synth
+train: images/train
+val: images/val

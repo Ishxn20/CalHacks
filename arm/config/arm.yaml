@@ -18,7 +18,7 @@ joints:
      mit: {kp: 150.0, kd: 10.0}, pos_vel: {vel_kp: 14.0, vel_ki: 0.1, pos_kp: 16.0, vlim: 10.0}}
   - {name: joint3, motor_id: 0x03, feedback_id: 0xFD, model: rs-06, limits_deg: [0, 179], max_vel_deg_s: 60,
      mit: {kp: 150.0, kd: 10.0}, pos_vel: {vel_kp: 14.0, vel_ki: 0.1, pos_kp: 14.0, vlim: 10.0}}
-  - {name: joint4, motor_id: 0x04, feedback_id: 0xFD, model: rs-00, limits_deg: [-89, 89], max_vel_deg_s: 120,
+  - {name: joint4, motor_id: 0x04, feedback_id: 0xFD, model: rs-00, limits_deg: [-105, 105], max_vel_deg_s: 120,
      mit: {kp: 50.0, kd: 5.0},  pos_vel: {vel_kp: 5.0, vel_ki: 0.1, pos_kp: 20.0, vlim: 10.0}}
   - {name: joint5, motor_id: 0x05, feedback_id: 0xFD, model: rs-00, limits_deg: [-89, 89], max_vel_deg_s: 120,
      mit: {kp: 50.0, kd: 4.0},  pos_vel: {vel_kp: 4.0, vel_ki: 0.1, pos_kp: 10.0, vlim: 10.0}}
@@ -31,8 +31,10 @@ gripper:
   model: rs-00
   # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
   # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
-  open_deg: 259.42
-  closed_deg: -0.20
+  # Fully open (mechanical stop) reads 224.77 in this frame (measured Oct 24). Never command above max_deg.
+  open_deg: 200.0
+  closed_deg: -103.60
+  max_deg: 200.0         # HARD LIMIT on every gripper command (set_gripper clamps to it); do not raise
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
@@ -72,6 +74,24 @@ verify:
   timeout_s: 2.0
   min_confidence: 0.6
   fail_open: true              # if the CV service is unreachable, proceed (demo resilience)
+
+# Camera-guided picking (`send pick "<tool>"`). The arm looks at the tray from `view_pose`, asks the vision
+# service (python -m scrub_vision.serve) where the tool is and how it lies, then grips it.
+pick:
+  vision_url: http://127.0.0.1:8790
+  timeout_s: 8.0
+  frames: 5                    # frames the vision service averages per look
+  min_conf: 0.4
+  view_pose: tray_view         # taught pose; teach it with joint6 where it stays for the whole calibration
+  wrist_sign: 1                # +1/-1. If the jaws turn the wrong way for a rotated object, flip it
+  retries: 2                   # extra attempts when the jaws close on nothing
+  relook_tol_px: 6.0           # two looks must agree this closely before the arm moves
+  relook_max: 3
+  anchor_max_px: 40.0          # camera drift (seen on the tray markers) we correct; more means re-run `reach look`
+  bounds_margin_px: 20.0       # targets may be this far outside the calibrated markers, no more
+  marker_mm: 32.0              # TODO verify: estimate, not measured. Printed side of one tray marker (black square); sets mm/px
+  max_open_mm: 119.0           # fingertip gap at open_deg 200: ~4.7 in by ruler (measured). Enables width + clearance checks
+  jaw_width_mm: 25.0           # fingertip pad width (~1 in by ruler), for the clearance check
 
 server:
   host: 127.0.0.1

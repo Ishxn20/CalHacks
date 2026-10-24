@@ -11,7 +11,9 @@ from .catalog import Catalog
 from .config import DEFAULT_CONFIG_DIR, ArmConfig, PoseLibrary, TrayConfig, load_arm_config, load_poses, load_tray_config
 from .driver import ArmDriver
 from .handoff import ScrubAssistant
+from .reach import ReachMap, load_reach
 from .verify import Verifier
+from .vision import VisionClient
 
 
 @dataclass
@@ -22,6 +24,8 @@ class App:
     driver: ArmDriver
     catalog: Catalog
     assistant: ScrubAssistant
+    vision: VisionClient | None
+    reach: ReachMap
 
 
 def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
@@ -36,8 +40,10 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
         bus = RobstrideBus(cfg)
     driver = ArmDriver(cfg, bus, poses, sim=sim)
     catalog = Catalog(tray, default_orientation=cfg.handoff.default_orientation)
-    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify))
-    return App(cfg, tray, poses, driver, catalog, assistant)
+    reach = load_reach(d / "reach_map.yaml")
+    vision = VisionClient(cfg.pick) if cfg.pick.vision_url else None
+    assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify), vision=vision, reach=reach)
+    return App(cfg, tray, poses, driver, catalog, assistant, vision, reach)
 
 
 def check_poses(app: App) -> list[str]:
@@ -56,4 +62,16 @@ def check_poses(app: App) -> list[str]:
             problems.append(f"{name}: {e}")
     if not app.cfg.gripper.calibrated:
         problems.append("gripper open/closed angles not calibrated")
+    return problems
+
+
+def check_pick(app: App) -> list[str]:
+    """What `/pick` still needs. Informational: handoffs from taught slots work without any of it."""
+    problems = []
+    view = app.cfg.pick.view_pose
+    if view not in app.poses.poses or not app.poses.poses[view].taught:
+        problems.append(f"pick: pose {view} not taught")
+    problems += app.reach.ready()
+    if app.cfg.pick.marker_mm is None:
+        problems.append("pick: marker_mm not set (width/clearance checks need it)")
     return problems

@@ -23,6 +23,7 @@ from .app import App, check_poses
 from .catalog import ResolveError, parse_freeform
 from .config import save_gripper_calibration
 from .handoff import Busy
+from .reach import reach_cmd
 
 HELP = """\
   s | status              joint angles (deg), gripper, phase
@@ -38,6 +39,8 @@ HELP = """\
   g <deg>                 gripper to an absolute motor angle
   gcal open|closed        record the current gripper angle as the open / fully-closed endpoint
   check                   list placeholder/missing poses and other setup problems
+  reach look|touch|above|check   camera calibration for picking (type `reach` for details)
+  pick <tool>             camera-guided pick, e.g.: pick caliper   (add `dry` to only print the plan)
   test <request>          full handoff, e.g.: test needle holder, 6-0 prolene, backhand
   stage <request>         pick and hold at the staged pose
   release                 surgeon has it: open and go home
@@ -124,11 +127,25 @@ def run_teach(app: App) -> None:
                 if which not in ("open", "closed") or math.isnan(pos):
                     print("  usage: gcal open|closed (with a valid gripper reading)")
                     continue
+                if app.cfg.gripper.max is not None and pos > app.cfg.gripper.max:
+                    print(f"  refused: {math.degrees(pos):.1f} deg is above the gripper limit "
+                          f"({math.degrees(app.cfg.gripper.max):.0f} deg); close the jaws a little and retry")
+                    continue
                 save_gripper_calibration(app.cfg, pos if which == "open" else None, pos if which == "closed" else None)
                 print(f"  gripper {which} = {math.degrees(pos):.2f} deg (written to arm.yaml)")
             elif cmd == "check":
                 problems = check_poses(app)
                 print("\n".join(f"  - {p}" for p in problems) or "  all set")
+            elif cmd == "reach":
+                print(reach_cmd(app, args))
+            elif cmd == "pick":
+                dry = bool(args) and args[-1] == "dry"
+                req = app.catalog.resolve_pick(" ".join(args[:-1] if dry else args))
+                if dry:
+                    print(f"  {asst.plan_pick(req)}")
+                else:
+                    asst.submit("pick", req)
+                    print("  running; `s` for status, `stop` to freeze, `release` when done")
             elif cmd in ("test", "stage"):
                 fields = parse_freeform(rest)
                 r = app.catalog.resolve(fields.get("instrument", ""), fields.get("suture"), fields.get("size"),

@@ -47,6 +47,21 @@ class Resolved:
         return ", ".join(parts)
 
 
+@dataclass
+class PickRequest:
+    candidates: list[Instrument]   # camera may match any of these (a category has several)
+    label: str
+    handoff: bool = False          # after the pick, carry it to the handoff pose and wait for release
+    orientation: str | None = None
+
+    @property
+    def slot(self):                # picked objects have no tray slot
+        return None
+
+    def describe(self) -> str:
+        return self.label
+
+
 def _norm(text: str) -> str:
     text = text.lower().replace("_", " ").replace("’", "'")
     text = re.sub(r"[^a-z0-9#.\- ]+", " ", text)
@@ -199,6 +214,18 @@ class Catalog:
         inst = self.tray.instruments[slot.instrument]
         orient = (orient_n or self.default_orientation) if inst.orientable else None
         return Resolved(slot=slot, instrument=inst, orientation=orient)
+
+    def resolve_pick(self, instrument: str) -> "PickRequest":
+        """For camera-guided picking: any instrument (no slot needed); a category means 'whichever one is visible'."""
+        if not instrument or not str(instrument).strip():
+            raise ResolveError("no instrument specified")
+        match = self._match_instrument(str(instrument))
+        if match.startswith("category:"):
+            cat = match.split(":", 1)[1]
+            cands = [i for i in self.tray.instruments.values() if i.category == cat]
+            return PickRequest(candidates=cands, label=cat.replace("_", " "))
+        inst = self.tray.instruments[match]
+        return PickRequest(candidates=[inst], label=inst.name)
 
     def slot(self, slot_id: str) -> Slot:
         for s in self.tray.slots:
