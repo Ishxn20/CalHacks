@@ -100,3 +100,32 @@ def test_blob_matching_no_instrument_is_never_moved(insts, templates):
     junk.mask[100:105, 100:400] = True            # a sheet wrinkle
     p = plan([junk], "forceps_resano", H, STAGING, set())
     assert p["action"] == "fail"
+
+
+def _det(fid, coarse, cands, exposure, x0, y0=100, conf=0.9):
+    from scrub_vision.identify import Detection
+    m = np.zeros((CAM.h, CAM.w), bool)
+    m[y0:y0 + 10, x0:x0 + 200] = True
+    gx, gy = (x0 + 100) * S - CAM.w / 2 * S, (y0 + 5) * S - CAM.h / 2 * S
+    return Detection(mask=m, coarse=coarse, fine_id=fid, candidates=cands, exposure=exposure, confidence=conf,
+                     axis_deg=0.0, yaw_deg=90.0, grasp_mm=(gx, gy), grasp_px=(x0 + 100, y0 + 5))
+
+
+def test_never_moves_an_uncertain_same_class_instrument():
+    # a partly covered Resano reads short, as a DeBakey: it might be the target, so don't move it away
+    maybe = _det("forceps_debakey", "forceps", ["forceps_debakey"], 0.75, 50)
+    other = _det("scissors_potts", "potts", ["scissors_potts"], 1.0, 500)
+    p = plan([maybe, other], "forceps_resano", H, STAGING, set())
+    assert p["action"] == "move_aside" and p["target"]["id"] == "scissors_potts"
+
+
+def test_confident_same_class_sibling_can_be_moved():
+    sib = _det("forceps_debakey", "forceps", ["forceps_debakey"], 0.97, 50)
+    p = plan([sib], "forceps_resano", H, STAGING, set())
+    assert p["action"] == "move_aside" and p["target"]["id"] == "forceps_debakey"
+
+
+def test_target_needs_near_full_view_to_grasp():
+    partial = _det("needle_holder_castroviejo", "castroviejo", ["needle_holder_castroviejo"], 0.8, 50)
+    p = plan([partial], "needle_holder_castroviejo", H, STAGING, set())
+    assert p["action"] != "grasp_target"

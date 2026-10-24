@@ -11,9 +11,11 @@ import numpy as np
 import yaml
 
 from .identify import Detection, above, feasible, on_top
+from .templates import load_instruments
 
 TRAY_YAML = Path(__file__).resolve().parents[2] / "config" / "tray.yaml"
 STAGED_RADIUS_MM = 60.0
+SURE_EXPOSURE = 0.9      # identity is only trusted when nearly the whole instrument is visible
 _names: dict[str, str] | None = None
 
 
@@ -31,6 +33,20 @@ def matches(d: Detection, target_id: str) -> bool:
     return d.fine_id == target_id or target_id in d.alt_ids or (d.fine_id is None and target_id in d.candidates)
 
 
+_coarse: dict[str, str] | None = None
+
+
+def might_be(d: Detection, target_id: str) -> bool:
+    """Could this detection be the target? Partly covered instruments measure short, so a same-class
+    instrument that isn't fully in view might be the target misread as a shorter sibling."""
+    global _coarse
+    if _coarse is None:
+        _coarse = {k: v.coarse for k, v in load_instruments().items()}
+    if matches(d, target_id) or target_id in d.candidates:
+        return True
+    return d.coarse == _coarse.get(target_id) and (d.fine_id is None or d.exposure < SURE_EXPOSURE)
+
+
 def _target_json(d: Detection, fid: str | None, ambiguous: bool = False) -> dict:
     return {"id": fid, "x_mm": round(d.grasp_mm[0], 1), "y_mm": round(d.grasp_mm[1], 1),
             "yaw_deg": round(d.yaw_deg, 1), "thickness_mm": d.thickness_mm,
@@ -39,7 +55,7 @@ def _target_json(d: Detection, fid: str | None, ambiguous: bool = False) -> dict
 
 def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tuple[float, float]],
          used_staging: set[int], staged_xy: list[tuple[float, float]] | None = None,
-         exposure_min: float = 0.7, conf_min: float = 0.5, staging_yaw_deg: float = 0.0) -> dict:
+         exposure_min: float = SURE_EXPOSURE, conf_min: float = 0.5, staging_yaw_deg: float = 0.0) -> dict:
     name = display_name(target_id)
     staged_xy = staged_xy or []
 
@@ -56,7 +72,7 @@ def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tup
             return {"action": "grasp_target", "target": _target_json(t, target_id, ambiguous), "place": None,
                     "say": say}
 
-    movers = [d for d in grabbable if not matches(d, target_id) and not in_staging(d)]
+    movers = [d for d in grabbable if not might_be(d, target_id) and not in_staging(d)]
     if not movers:
         why = f"I can't get to the {name}" if targets else f"I don't see a {name}"
         return {"action": "fail", "target": None, "place": None, "say": why}
