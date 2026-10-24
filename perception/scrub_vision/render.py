@@ -87,12 +87,14 @@ def render_scene(items: list[tuple[trimesh.Trimesh, np.ndarray]], cam: CamSpec, 
     light = rng.normal([0.3, -0.2, 1.0], 0.25)
     light /= np.linalg.norm(light)
     shadow_off = -light[:2] / max(light[2], 0.3) * rng.uniform(2, 6)
-    same_colour = rng.random() < 0.3      # sometimes the whole set is printed in one filament
+    # A set is printed in one filament (any colour, different between sets); individual prints vary
+    # slightly in shade, so nothing in a pile can be told apart by colour.
     shared = random_filament_bgr(rng)
     order = sorted(range(len(items)), key=lambda k: items[k][1][2, 3])
     for k in order:
         mesh, T = items[k]
-        base = np.array(colours[k], np.float32) if colours else (shared if same_colour else random_filament_bgr(rng))
+        base = (np.array(colours[k], np.float32) if colours else
+                np.clip(shared * rng.uniform(0.93, 1.07) + rng.normal(0, 3, 3), 0, 255))
         v = mesh.vertices @ T[:3, :3].T + T[:3, 3]
         tri = v[mesh.faces]
         n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])

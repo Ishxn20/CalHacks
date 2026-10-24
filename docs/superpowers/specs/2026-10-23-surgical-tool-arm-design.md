@@ -59,7 +59,7 @@ Note: `compute_ik` loads the URDF via the SDK's `config/rebotarm.yaml` → `rebo
 
 ## 4. Instrument set and what separates each
 
-STL bounding boxes (mm, longest × middle × thickness). Prints are 1:1 and **may be any colour, mixed within one set** (updated 2026-10-24: colour is never used as a cue; synthetic data randomises filament colour per instrument).
+STL bounding boxes (mm, longest × middle × thickness). Prints are 1:1 and **one colour per set, but that colour can be anything** (updated 2026-10-24: colour is never a cue; synthetic piles use one random filament colour each, with slight print-to-print shade variation).
 
 | Class | Length | Width | Thick | Separated by |
 |---|---|---|---|---|

@@ -83,12 +83,15 @@ def test_instrument_colours_vary_beyond_green():
     assert vals.min() < 90 and vals.max() > 180           # dark and light ones too
 
 
-def test_instances_in_one_scene_can_differ_in_colour():
+def test_one_colour_per_pile_but_it_varies_between_piles():
     insts = load_instruments()
     m = scene_mesh(insts["forceps_resano"])
-    differ = 0
+    scene_cols = []
     for seed in range(10):
         bgr, (a, b) = render_scene([(m, pose(-80, 0, 5, 0.0)), (m, pose(80, 0, 5, 0.0))], CamSpec(),
                                    np.random.default_rng(seed))
-        differ += np.abs(np.median(bgr[a], 0) - np.median(bgr[b], 0)).max() > 30
-    assert differ >= 5
+        ca, cb = np.median(bgr[a], 0), np.median(bgr[b], 0)
+        assert np.abs(ca - cb).max() < 25          # same filament (small print-to-print shade variation)
+        scene_cols.append(ca)
+    spread = np.ptp(np.array(scene_cols), axis=0).max()
+    assert spread > 100                            # different sets are different colours

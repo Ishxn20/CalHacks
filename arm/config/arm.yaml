@@ -82,7 +82,9 @@ pick:
   contact_deviation_deg: 1.5   # joint lag beyond baseline that counts as touching the pile
   contact_joints: [joint2, joint3]
   max_declutter_moves: 6
-  staging_mm: [[250, -200], [250, -260], [250, -320], [310, -200], [310, -260], [310, -320]]
+  # Top-down reach (wrist vertical) is ~400 mm from the base at hover height, ~450 mm at the table;
+  # keep the pile centre and every staging spot inside ~350 mm.
+  staging_mm: [[180, -180], [240, -180], [300, -180], [180, -230], [240, -230], [300, -230]]
   staging_yaw_deg: 0.0
 
 server:
