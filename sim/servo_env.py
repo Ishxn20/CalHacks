@@ -127,7 +127,12 @@ class VisualReachEnv(gym.Env):
         self.cam.set_mount(self.model, **mount)
         self.target, self.h, self.goal, self.q = t, h, goal, q0
         self.steps, self.prev_a, self.last = 0, np.zeros(6), np.zeros(7)
-        self.nudge_at = int(rng.integers(30, 81)) if self.nudge else -1
+        self.nudge_at, self.push = -1, None
+        if self.nudge:                                 # drawn here so every method on this episode gets the same push
+            phi = rng.uniform(0, 2 * np.pi)
+            self.nudge_at = int(rng.integers(30, 81))
+            self.push = (rng.uniform(0.010, 0.030) * np.array([np.cos(phi), np.sin(phi)]),
+                         rng.uniform(-np.radians(15), np.radians(15)))
         set_arm(self.model, self.data, self.q)
         return self._obs(), {"goal": goal, "q_goal": q_goal, "fid": t["fid"], "mount": mount}
 
@@ -186,10 +191,7 @@ class VisualReachEnv(gym.Env):
         self.prev_a, self.steps = a, self.steps + 1
         info = {}
         if self.steps == self.nudge_at:                # pushed 10-30 mm and turned up to 15 deg about its grasp point
-            rng, t = self._rng, self.target
-            phi = rng.uniform(0, 2 * np.pi)
-            dxy = rng.uniform(0.010, 0.030) * np.array([np.cos(phi), np.sin(phi)])
-            rot = rng.uniform(-np.radians(15), np.radians(15))
+            t, (dxy, rot) = self.target, self.push
             c, s = np.cos(rot), np.sin(rot)
             cen = t["grasp"] + np.array([[c, -s], [s, c]]) @ (t["centroid"] - t["grasp"])
             self.target = {**t, "grasp": t["grasp"] + dxy, "centroid": cen + dxy, "axis": t["axis"] + rot,
