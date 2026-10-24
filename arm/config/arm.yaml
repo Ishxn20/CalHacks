@@ -31,9 +31,9 @@ gripper:
   model: rs-00
   # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
   # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
-  open_deg: 0.0
-  closed_deg: -60.0
-  calibrated: false
+  open_deg: 259.42
+  closed_deg: -0.20
+  calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
   grip_kp: 6.0           # soft stiffness while squeezing: torque ~= grip_kp * (closed - pos)
