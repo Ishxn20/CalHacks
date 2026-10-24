@@ -8,3 +8,13 @@ last_command.json
 
 #coding agents
 .cursor
+vision/data/
+data.zip
+*.pt
+!vision/results/**/*.pt
+runs/
+.DS_Store
+last_detection.json
+last_crop.jpg
+last_annotated.jpg
+vision/*.log

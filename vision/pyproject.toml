@@ -1,0 +1,16 @@
+[project]
+name = "scrub-vision"
+version = "0.1.0"
+description = "Find the requested instrument in the tray camera image"
+requires-python = ">=3.10"
+# scrub-arm is only needed for the shared config/tray.yaml vocabulary; install it from ../arm.
+dependencies = ["scrub-arm", "ultralytics", "opencv-python", "pyyaml", "trimesh"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["scrub_vision"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
