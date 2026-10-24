@@ -119,6 +119,8 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
     src = None
     if args.source == "mujoco":
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root, for the `sim` package
         from sim.pile_sim import poses_source as src   # Track C
     print(make_dataset(args.out, args.n, args.seed, poses_source=src, prefix=args.source[0]))
 
