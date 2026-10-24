@@ -83,6 +83,47 @@ class Kinematics:
             return None
         return q[:N_ARM].copy()
 
+    def tilt_from_down(self, q: np.ndarray) -> float:
+        """Angle (rad) between where the fingers point and straight down."""
+        _, R = self.fk(q)
+        return float(np.arccos(np.clip(-(R @ self.tool_axis_local)[2], -1.0, 1.0)))
+
+    def pivot_down(self, q_now: np.ndarray, limits: tuple[np.ndarray, np.ndarray], yaw: float | None = None,
+                   step_deg: float = 2.0, max_joint_step_deg: float = 15.0) -> tuple[np.ndarray, float]:
+        """Joint waypoints that turn the gripper to point straight down with its tip as the pivot.
+
+        The orientation is interpolated along the shortest rotation in `step_deg` slices and each slice is
+        solved with the tip pinned at its current position, so the tip stays put for the whole motion,
+        not just at the ends. yaw: base-frame direction the jaws should close along at the end; None keeps
+        the current jaw heading. Either way the symmetric flip (yaw + pi) is used if it's the shorter turn.
+        Returns (waypoints, final yaw). Raises ValueError if the tip can't be held still the whole way.
+        """
+        pin = self.pin
+        q_now = np.asarray(q_now, dtype=float)
+        p, R0 = self.fk(q_now)
+        if yaw is None:
+            jaw = R0 @ self.jaw_axis_local
+            if np.hypot(jaw[0], jaw[1]) < 0.2:       # jaws nearly vertical: no heading to keep
+                yaw = float(np.arctan2(p[1], p[0]) + np.pi / 2)
+            else:
+                yaw = float(np.arctan2(jaw[1], jaw[0]))
+        yaw = min((yaw, yaw + np.pi), key=lambda a: np.linalg.norm(pin.log3(R0.T @ self._target_rotation(a))))
+        w = pin.log3(R0.T @ self._target_rotation(yaw))   # the turn, as a rotation vector in the tool frame
+        n = max(1, int(np.ceil(np.degrees(np.linalg.norm(w)) / step_deg)))
+        qs = [q_now]
+        for k in range(1, n + 1):
+            target = pin.SE3(R0 @ pin.exp3(w * k / n), p)
+            q = self._solve(target, qs[-1], limits)
+            if q is None:
+                raise ValueError(f"can't keep the tip still past {np.degrees(np.linalg.norm(w)) * (k - 1) / n:.0f} "
+                                 f"of {np.degrees(np.linalg.norm(w)):.0f} deg of turn (joint limit or out of reach); "
+                                 "move the tip closer to the table / the middle of the workspace")
+            jump = np.degrees(np.max(np.abs(q - qs[-1])))
+            if jump > max_joint_step_deg:
+                raise ValueError(f"turning down needs a {jump:.0f} deg joint jump here (near a singularity)")
+            qs.append(q)
+        return np.array(qs), float(np.arctan2(np.sin(yaw), np.cos(yaw)))
+
     def ik_topdown(self, x: float, y: float, z: float, yaw: float, q_seed: np.ndarray,
                    limits: tuple[np.ndarray, np.ndarray], allow_flip: bool = True) -> np.ndarray | None:
         """Joint vector placing the tool at (x, y, z) m pointing straight down, jaws along `yaw`; None if unreachable.

@@ -38,6 +38,10 @@ HELP = """\
   g <deg>                 gripper to an absolute motor angle
   pose                    tool-point position (mm) and how far the gripper is from pointing straight down
   ik <x> <y> <z> [yaw]    move to a top-down tool pose (mm / deg), e.g. ik 220 0 140 (a scan candidate)
+  pivot [yaw]             turn the gripper to point straight down about its tip (tip stays put);
+                          yaw = jaw direction in deg (default: keep the current jaw heading)
+  grabhere [thick] [yaw]  pick up what's under the tip: pivot down, open, descend to contact, grasp, lift
+                          (thick = instrument thickness in mm, default 3)
   gcal open|closed        record the current gripper angle as the open / fully-closed endpoint
   check                   list placeholder/missing poses and other setup problems
   test <request>          full handoff, e.g.: test needle holder, 6-0 prolene, backhand
@@ -146,6 +150,18 @@ def run_teach(app: App) -> None:
                 print(f"  moving to {_fmt(q)}")
                 d.clear_abort()
                 d.move_to(q, speed=0.5)
+            elif cmd in ("pivot", "grabhere"):
+                if asst.kin is None:
+                    asst.kin = kin()
+                d.clear_abort()
+                if cmd == "pivot":
+                    x, y, z, yaw = asst.pivot_down(float(args[0]) if args else None)
+                    print(f"  pointing down at x={x:.0f} y={y:.0f} mm, tip {z * 1000:.0f} mm up, jaws at {yaw:.0f} deg "
+                          f"({math.degrees(kin().tilt_from_down(d.q_command())):.1f} deg off vertical)")
+                else:
+                    thick = float(args[0]) if args else 3.0
+                    asst.grab_here(thick, float(args[1]) if len(args) > 1 else None)
+                    print("  HOLDING" if d.gripper_holding() else "  empty")
             elif cmd == "gcal":
                 which = args[0]
                 pos = d.gripper_measured() if d.enabled else float(d.read_fresh()[-1])

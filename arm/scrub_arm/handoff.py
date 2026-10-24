@@ -346,7 +346,7 @@ class ScrubAssistant:
         return q
 
     def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float,
-                               allow_flip: bool = True) -> float:
+                               allow_flip: bool = True, z_start: float | None = None) -> float:
         """Step the open gripper straight down from hover until the pile pushes back or z_floor is reached.
 
         Contact = any pick.contact_joints lagging its setpoint by more than pick.contact_deviation beyond
@@ -356,7 +356,7 @@ class ScrubAssistant:
         pk, d = self.cfg.pick, self.driver
         idx = [self.cfg.joint_index(n) for n in pk.contact_joints]
         slow = self.cfg.motion.approach_speed_scale
-        z_hover = pk.table_z + pk.hover
+        z_hover = pk.table_z + pk.hover if z_start is None else z_start
         solve = lambda z: self._solve(x_mm, y_mm, z, yaw_deg, allow_flip)  # noqa: E731
         d.move_to(solve(z_hover))
         samples = []
@@ -397,6 +397,49 @@ class ScrubAssistant:
             d.gripper_open()
             raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
         self._picked_from = (x_mm, y_mm, yaw_deg, thickness_mm)
+
+    # ── grabbing from wherever the reach left the gripper ──────────────────
+
+    def pivot_down(self, yaw_deg: float | None = None) -> tuple[float, float, float, float]:
+        """Turn the gripper to point straight down, pivoting about its tip (the tip doesn't move).
+
+        yaw_deg: direction the jaws should close along (base frame); None keeps their current heading.
+        Returns (x_mm, y_mm, tip z in m, final yaw_deg). TaskFailed (before moving) if it can't be done here.
+        """
+        assert self.kin is not None, "needs the kinematics (pick.mode: ik)"
+        d = self.driver
+        pk = self.cfg.pick
+        q = d.q_command()
+        tip, _ = self.kin.fk(q)
+        if tip[2] < pk.table_z + 0.01:
+            raise TaskFailed(f"tip is only {(tip[2] - pk.table_z) * 1000:.0f} mm above the table; lift it first")
+        try:
+            qs, yaw = self.kin.pivot_down(q, (self.cfg.lower, self.cfg.upper),
+                                          None if yaw_deg is None else math.radians(yaw_deg))
+        except ValueError as e:
+            raise TaskFailed(str(e)) from e
+        d.follow_path(qs, speed=self.cfg.motion.approach_speed_scale)
+        return tip[0] * 1000, tip[1] * 1000, float(tip[2]), math.degrees(yaw)
+
+    def grab_here(self, thickness_mm: float = 3.0, yaw_deg: float | None = None) -> None:
+        """Pick up the instrument under the gripper tip, from wherever the reach (RL or IK) stopped:
+        pivot down about the tip -> open -> step down until contact -> grasp -> lift back to the start height.
+        thickness_mm: the instrument's thickness, to set how low the descent may go. TaskFailed on a miss."""
+        pk, d = self.cfg.pick, self.driver
+        self.phase = Phase.PICKING
+        x_mm, y_mm, z_start, yaw = self.pivot_down(yaw_deg)
+        self._log(f"pointing down at ({x_mm:.0f}, {y_mm:.0f}) mm, {(z_start - pk.table_z) * 1000:.0f} mm "
+                  f"above the table, jaws at {yaw:.0f} deg")
+        q_top = d.q_command()
+        d.gripper_open()
+        z_floor = pk.table_z + thickness_mm / 2000.0 - 0.002
+        self._descend_until_contact(x_mm, y_mm, yaw, z_floor, z_start=z_start)
+        got_it = d.gripper_grasp()
+        d.move_to(q_top, speed=self.cfg.motion.approach_speed_scale)
+        if not got_it:
+            d.gripper_open()
+            raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
+        self._picked_from = (x_mm, y_mm, yaw, thickness_mm)
 
     def _place_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
                   sense_contact: bool = False) -> None:

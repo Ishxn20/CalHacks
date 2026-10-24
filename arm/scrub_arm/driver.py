@@ -48,6 +48,30 @@ class MinJerk:
         return self.q0 + s * dq, ds * dq, False
 
 
+@dataclass
+class JointPath:
+    """Dense joint waypoints (e.g. a pivot about the tool tip) played back with min-jerk timing."""
+    qs: np.ndarray
+    t0: float
+    duration: float
+
+    @property
+    def q1(self) -> np.ndarray:
+        return self.qs[-1]
+
+    def sample(self, t: float) -> tuple[np.ndarray, np.ndarray, bool]:
+        tau = (t - self.t0) / self.duration
+        if tau >= 1.0 or len(self.qs) < 2:
+            return self.qs[-1].copy(), np.zeros(self.qs.shape[1]), True
+        tau = max(tau, 0.0)
+        s = 10 * tau**3 - 15 * tau**4 + 6 * tau**5
+        ds = (30 * tau**2 - 60 * tau**3 + 30 * tau**4) / self.duration
+        x = s * (len(self.qs) - 1)
+        i = min(int(x), len(self.qs) - 2)
+        seg = self.qs[i + 1] - self.qs[i]
+        return self.qs[i] + (x - i) * seg, seg * (len(self.qs) - 1) * ds, False
+
+
 def min_jerk_duration(dq: np.ndarray, vmax: np.ndarray, min_s: float) -> float:
     # Peak velocity of a min-jerk profile is 1.875 * distance / duration.
     return max(float(np.max(1.875 * np.abs(dq) / vmax)), min_s)
@@ -306,6 +330,24 @@ class ArmDriver:
             self._traj = MinJerk(q0=q0, q1=q.copy(), t0=time.perf_counter(), duration=T)
         if wait:
             self.wait_motion()
+
+    def follow_path(self, qs: np.ndarray, speed: float = 1.0) -> None:
+        """Play dense joint waypoints that start at the current setpoint, as one smooth motion.
+
+        Duration comes from the summed joint travel along the path, so `speed` means the same as in move_to.
+        """
+        qs = np.asarray(qs, dtype=float)
+        self._check_ready()
+        for q in qs:
+            self.check_limits(q)
+        m = self.cfg.motion
+        with self._lock:
+            if np.max(np.abs(qs[0] - self._q_cmd)) > np.radians(0.5):
+                raise ArmFault("path does not start at the current setpoint")
+            travel = np.sum(np.abs(np.diff(qs, axis=0)), axis=0)
+            T = min_jerk_duration(travel, self.cfg.max_vel * m.speed_scale * speed, m.min_move_s)
+            self._traj = JointPath(qs=qs.copy(), t0=time.perf_counter(), duration=T)
+        self.wait_motion()
 
     def wait_motion(self) -> None:
         while True:
