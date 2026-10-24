@@ -47,7 +47,10 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
 
 def check_poses(app: App) -> list[str]:
     """Problems that would stop a handoff: missing/untaught poses, out-of-limit poses."""
-    needed = {"home", "handoff"} | {p for s in app.tray.slots for p in s.approach}
+    if app.cfg.pick.mode == "ik":
+        needed = {"home", "handoff", "scan"}
+    else:
+        needed = {"home", "handoff"} | {p for s in app.tray.slots for p in s.approach}
     problems = []
     for name in sorted(needed):
         if name not in app.poses.poses:

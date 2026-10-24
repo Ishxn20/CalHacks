@@ -211,16 +211,50 @@ class ScrubAssistant:
     # ── steps ─────────────────────────────────────────────────────────────
 
     def _acquire(self, r: Resolved) -> None:
-        """Make sure we're holding the requested slot's instrument, picking it if needed."""
+        """Make sure we're holding the requested instrument, picking it if needed."""
         if self.holding is not None:
-            if self.holding.slot.id == r.slot.id:
+            same = (self.holding.instrument.id == r.instrument.id) if r.slot is None else \
+                (self.holding.slot is not None and self.holding.slot.id == r.slot.id)
+            if same:
                 self.holding = r          # same instrument; orientation may differ
                 self._log(f"already holding {r.describe()}")
                 return
             self._log(f"putting back {self.holding.describe()} first")
             self._return_held()
-        self._pick(r)
+        if self.cfg.pick.mode == "ik":
+            self._acquire_ik(r)
+        else:
+            self._pick(r)
         self._verify(r)
+
+    def _acquire_ik(self, r: Resolved) -> None:
+        """Look at the pile, uncover the requested instrument if it's buried, then pick it."""
+        from .perception_client import PerceptionClient
+
+        pk, d = self.cfg.pick, self.driver
+        client = PerceptionClient(pk.perception_url)
+        missed = False
+        for _ in range(pk.max_declutter_moves):
+            self.phase = Phase.MOVING
+            d.move_pose("scan")
+            plan = client.plan(r.instrument.id)
+            if plan["action"] == "fail":
+                raise TaskFailed(plan.get("say") or f"I can't find the {r.instrument.name}")
+            t = plan["target"]
+            self._log(f"plan: {plan['action']} {t.get('id')} at ({t['x_mm']:.0f}, {t['y_mm']:.0f})")
+            try:
+                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"])
+            except TaskFailed:
+                if missed:
+                    raise
+                missed = True        # the pile may have shifted: look again once
+                continue
+            if plan["action"] == "grasp_target":
+                self.holding = r
+                return
+            p = plan["place"]
+            self._place_at(p["x_mm"], p["y_mm"], p["yaw_deg"], t["thickness_mm"])
+        raise TaskFailed(f"couldn't uncover the {r.instrument.name} in {pk.max_declutter_moves} moves")
 
     def _pick(self, r: Resolved) -> None:
         d, slot = self.driver, r.slot
@@ -246,15 +280,18 @@ class ScrubAssistant:
         verify_pose = self.driver.poses.poses.get("verify")
         if verify_pose is not None and (verify_pose.taught or self.driver.sim):
             self.driver.move_pose("verify")   # otherwise verify from the hover pose
-        res = self.verifier.verify(r.instrument.id, r.slot.id)
+        res = self.verifier.verify(r.instrument.id, r.slot.id if r.slot else None)
         self._log(f"tray-cam: ok={res.ok} detected={res.detected} conf={res.confidence} {res.note}".strip())
         if not res.ok:
             self._return_held()
             self.phase = Phase.IDLE
-            raise TaskFailed(f"wrong instrument in {r.slot.id}: {res.note}")
+            raise TaskFailed(f"wrong instrument {'in ' + r.slot.id if r.slot else 'picked'}: {res.note}")
 
     def _return_held(self) -> None:
         assert self.holding is not None
+        if self.holding.slot is None:      # ik pick: put it back where it came from
+            self._place_at(*self._picked_from)
+            return
         d, slot = self.driver, self.holding.slot
         slow = self.cfg.motion.approach_speed_scale
         self.phase = Phase.RETURNING

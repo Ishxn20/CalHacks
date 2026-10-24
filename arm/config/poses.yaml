@@ -6,6 +6,7 @@ poses:
   verify: {joints_deg: [0.0, 45.0, 70.0, 0.0, 40.0, 0.0], taught: false}
   handoff: {joints_deg: [90.0, 60.0, 50.0, 0.0, 10.0, -90.0], taught: false}
   staged: {joints_deg: [70.0, 45.0, 60.0, 0.0, 20.0, -90.0], taught: false}
+  scan: {joints_deg: [0.0, 45.0, 70.0, 0.0, 65.0, 0.0], taught: false}
   rest: {joints_deg: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], taught: false}
   A1.above: {joints_deg: [-45.0, 55.0, 75.0, 0.0, 45.0, 0.0], taught: false}
   A1.grasp: {joints_deg: [-45.0, 63.0, 72.0, 0.0, 50.0, 0.0], taught: false}
