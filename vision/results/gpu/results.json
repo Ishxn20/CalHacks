@@ -1,0 +1,202 @@
+{
+  "run": "gpu",
+  "git_commit": "8b9b053ff4d7b47345799433542ce2ed9bc07d72",
+  "seconds": 3246,
+  "device": "NVIDIA GB200",
+  "torch": "2.11.0+cu128",
+  "ultralytics": "8.4.185",
+  "model": "yolo11s.pt",
+  "imgsz": 640,
+  "batch": 32,
+  "epochs_requested": 100,
+  "epochs_completed": 100,
+  "dataset": {
+    "train": 7959,
+    "val": 997
+  },
+  "map50": 0.9948,
+  "map50_95": 0.9935,
+  "per_class": [
+    {
+      "class": "needle_holder_castroviejo",
+      "precision": 0.9992,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "needle_holder_ryder",
+      "precision": 0.9989,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "needle_holder_long",
+      "precision": 1.0,
+      "recall": 0.9963,
+      "map50": 0.995
+    },
+    {
+      "class": "needle_holder_short",
+      "precision": 0.9993,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "forceps_debakey",
+      "precision": 0.9998,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "forceps_resano",
+      "precision": 0.9994,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "forceps_fine_vascular",
+      "precision": 0.9981,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "scalpel_10",
+      "precision": 0.9959,
+      "recall": 0.9922,
+      "map50": 0.9938
+    },
+    {
+      "class": "scalpel_11",
+      "precision": 0.9927,
+      "recall": 0.987,
+      "map50": 0.9941
+    },
+    {
+      "class": "scalpel_15",
+      "precision": 0.9863,
+      "recall": 0.9808,
+      "map50": 0.9945
+    },
+    {
+      "class": "scalpel_20",
+      "precision": 0.9979,
+      "recall": 1.0,
+      "map50": 0.9946
+    },
+    {
+      "class": "scissors_potts",
+      "precision": 0.9992,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "scissors_micro",
+      "precision": 0.9993,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "clamp_aortic_cross",
+      "precision": 1.0,
+      "recall": 0.9978,
+      "map50": 0.995
+    },
+    {
+      "class": "clamp_side_biting",
+      "precision": 0.9992,
+      "recall": 1.0,
+      "map50": 0.995
+    },
+    {
+      "class": "probe_coronary",
+      "precision": 0.9993,
+      "recall": 1.0,
+      "map50": 0.995
+    }
+  ],
+  "confusions": [
+    {
+      "true": "needle_holder_castroviejo",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "needle_holder_ryder",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "needle_holder_long",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "needle_holder_short",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "forceps_debakey",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "forceps_resano",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "forceps_fine_vascular",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "scalpel_10",
+      "pred": "scalpel_15",
+      "rate": 0.0061
+    },
+    {
+      "true": "scalpel_11",
+      "pred": "scalpel_15",
+      "rate": 0.009
+    },
+    {
+      "true": "scalpel_15",
+      "pred": "scalpel_11",
+      "rate": 0.0096
+    },
+    {
+      "true": "scalpel_20",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "scissors_potts",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "scissors_micro",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "clamp_aortic_cross",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "clamp_side_biting",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    },
+    {
+      "true": "probe_coronary",
+      "pred": "needle_holder_castroviejo",
+      "rate": 0.0
+    }
+  ],
+  "max_confusion": 0.05,
+  "confusion_pass": true,
+  "confusion_failures": []
+}
