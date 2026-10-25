@@ -1,0 +1,125 @@
+# Fitted by scripts/fit_red_parts.py on ../hw_check/real/views (233 parts, 51 views).
+# features: length, mean width, median width, narrow-end width (mm), narrow end / median width
+classes:
+  forceps_fine_vascular:
+    mu:
+    - 188.739
+    - 8.062
+    - 9.247
+    - 4.732
+    - 0.507
+    n: 32
+    ringed: false
+    sd:
+    - 3.0
+    - 0.78
+    - 0.6
+    - 1.058
+    - 0.08
+  micro_scissors@flat:
+    mu:
+    - 157.041
+    - 9.127
+    - 10.122
+    - 5.613
+    - 0.547
+    n: 33
+    ringed: false
+    sd:
+    - 3.0
+    - 1.544
+    - 1.56
+    - 1.353
+    - 0.05
+  micro_scissors@side:
+    mu:
+    - 157.124
+    - 7.896
+    - 8.733
+    - 4.688
+    - 0.533
+    n: 36
+    ringed: false
+    sd:
+    - 3.0
+    - 0.856
+    - 0.809
+    - 0.8
+    - 0.05
+  needle_holder_ryder:
+    mu:
+    - 184.368
+    - 11.013
+    - 9.042
+    - 6.041
+    - 0.669
+    n: 17
+    ringed: true
+    sd:
+    - 3.0
+    - 0.6
+    - 0.6
+    - 0.8
+    - 0.05
+  needle_holder_short:
+    mu:
+    - 155.326
+    - 12.683
+    - 10.685
+    - 7.074
+    - 0.662
+    n: 31
+    ringed: true
+    sd:
+    - 3.0
+    - 0.6
+    - 0.6
+    - 0.8
+    - 0.05
+  scalpel_10:
+    mu:
+    - 154.538
+    - 11.824
+    - 12.85
+    - 10.068
+    - 0.784
+    n: 36
+    ringed: false
+    sd:
+    - 3.0
+    - 0.6
+    - 0.6
+    - 0.8
+    - 0.05
+  scalpel_11_long:
+    mu:
+    - 237.939
+    - 12.565
+    - 13.266
+    - 11.795
+    - 0.889
+    n: 26
+    ringed: false
+    sd:
+    - 3.0
+    - 0.6
+    - 0.6
+    - 0.8
+    - 0.05
+  scalpel_20:
+    mu:
+    - 171.36
+    - 13.809
+    - 14.963
+    - 11.847
+    - 0.792
+    n: 22
+    ringed: false
+    sd:
+    - 3.0
+    - 0.671
+    - 0.738
+    - 0.8
+    - 0.05
+# Measured joints (rad) at the scan pose with the gripper open: the camera pose the service assumes.
+scan_q: [0.06213, 1.60996, 1.88494, -1.15857, -0.00268, -0.05177]

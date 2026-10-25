@@ -65,6 +65,21 @@ class YoloSegmenter:
         return out
 
 
+class RedPartsSegmenter:
+    """Our red printed parts on white paper, identified by measured shape (red_parts.py), at the scan pose."""
+
+    def __init__(self) -> None:
+        from .red_parts import RedPartsDetector
+        self.det = RedPartsDetector()
+        self.q = np.array(self.det.model["scan_q"], float)
+
+    def H(self, shape) -> np.ndarray:
+        return self.det.cam.H_px_to_mm(self.q, shape)
+
+    def detect(self, bgr: np.ndarray) -> list[Detection]:
+        return self.det.detect(bgr, self.q)
+
+
 class VisionService:
     def __init__(self, frame_source: Callable[[], np.ndarray], H: np.ndarray, gripper_mask: np.ndarray,
                  segmenter, log_dir: Path | None = None, region: np.ndarray | None = None) -> None:
@@ -77,6 +92,8 @@ class VisionService:
         self.last_debug: np.ndarray | None = None
 
     def detect(self, bgr: np.ndarray, mask_gripper: bool = True) -> list[Detection]:
+        if isinstance(self.segmenter, RedPartsSegmenter):
+            return self.segmenter.detect(bgr)
         segs = self.segmenter(bgr, self.gripper_mask if mask_gripper else None)
         if self.region is not None:
             segs = [s for s in segs if (s[0] & self.region).sum() >= 0.8 * s[0].sum()]
@@ -185,6 +202,7 @@ def _gripper_mask(poly, shape) -> np.ndarray:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="scrub_vision.service")
     ap.add_argument("--weights", help="YOLO-seg weights; omit for the HSV fallback segmenter")
+    ap.add_argument("--red-parts", action="store_true", help="our 8 red printed parts (red_parts.py); ignores --weights")
     ap.add_argument("--frame", help="analyse this image instead of the camera (testing)")
     ap.add_argument("--camera-yaml", default=str(ROOT / "config" / "camera.yaml"))
     ap.add_argument("--host", default="127.0.0.1")
@@ -208,11 +226,13 @@ def main(argv=None) -> None:
     gm = _gripper_mask(cam.get("gripper_mask_poly_px") or
                        [[0, int(shape[0] * .75)], [shape[1], int(shape[0] * .75)], [shape[1], shape[0]], [0, shape[0]]],
                        shape)
-    seg = YoloSegmenter(args.weights) if args.weights else BackgroundSegmenter()
+    seg = RedPartsSegmenter() if args.red_parts else YoloSegmenter(args.weights) if args.weights else BackgroundSegmenter()
+    if args.red_parts:
+        H = seg.H(shape)               # its own camera model (FK + hand-eye), the frame its grasp points are in
     svc = VisionService(source, H, gm, seg, log_dir=Path(__file__).resolve().parents[1] / "logs",
-                        region=region_mask(cam["mat_mm"], H, shape) if cam.get("mat_mm") else None)
+                        region=region_mask(cam["mat_mm"], H, shape) if cam.get("mat_mm") and not args.red_parts else None)
     httpd = make_server(svc, args.host, args.port)
-    print(f"scrub_vision listening on http://{args.host}:{args.port} ({'YOLO' if args.weights else 'background-difference fallback'})",
+    print(f"scrub_vision listening on http://{args.host}:{args.port} ({'red parts' if args.red_parts else 'YOLO' if args.weights else 'background-difference fallback'})",
           flush=True)
     httpd.serve_forever()
 
