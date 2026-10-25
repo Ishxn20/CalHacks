@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 venv/
 last_command.json
+# predict/: downloaded demo video and per-run prediction logs
+*.mp4
+predictions.jsonl
 
 #coding agents
 .cursor.superpowers/
