@@ -114,3 +114,13 @@ def test_audit_endpoint_reports_a_tampered_log(make_server):
     assert code == 200 and body["ok"] and body["entries"] == 1
     audit.path.write_text(audit.path.read_text().replace("potts", "ryder"))
     assert call(base, "/audit", headers=auth())[1]["ok"] is False
+
+
+def test_status_since_returns_samples_and_still_needs_the_token(make_server):
+    base, _ = make_server(token=TOKEN)
+    assert call(base, "/status?since=0")[0] == 401
+    code, body, _ = call(base, "/status?since=0", headers=auth())
+    assert code == 200 and isinstance(body["samples"], list)
+    assert "samples" not in call(base, "/status", headers=auth())[1]
+    for bad in ("abc", "nan", "inf"):
+        assert call(base, f"/status?since={bad}", headers=auth())[0] == 400

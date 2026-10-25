@@ -25,10 +25,18 @@ class BitdeerClient:
                  model: str = "deepseek-ai/DeepSeek-V4-Pro", timeout_s: float = 60.0) -> None:
         self.api_key, self.base_url, self.model, self.timeout_s = api_key, base_url.rstrip("/"), model, timeout_s
 
-    def chat(self, messages: list[dict], max_tokens: int = 800) -> str:
-        body = json.dumps({"model": self.model, "messages": messages, "max_tokens": max_tokens}).encode()
-        req = urllib.request.Request(self.base_url + "/chat/completions", data=body, headers={
-            "Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"})
+    def _headers(self) -> dict:
+        # Bitdeer's gateway is picky about clients: send a real Accept and User-Agent on every call.
+        return {"Authorization": "Bearer " + self.api_key, "Accept": "application/json",
+                "User-Agent": "CalHacks-scrub-console/0.1"}
+
+    def chat(self, messages: list[dict], max_tokens: int = 800, response_format: dict | None = None) -> str:
+        payload = {"model": self.model, "messages": messages, "max_tokens": max_tokens}
+        if response_format is not None:
+            payload.update(response_format=response_format, temperature=0)
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(self.base_url + "/chat/completions", data=body,
+                                     headers={**self._headers(), "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 data = json.loads(resp.read())
@@ -38,7 +46,7 @@ class BitdeerClient:
 
     def models(self) -> list[str]:
         """Model ids this key can use (OpenAI-compatible GET /models)."""
-        req = urllib.request.Request(self.base_url + "/models", headers={"Authorization": "Bearer " + self.api_key})
+        req = urllib.request.Request(self.base_url + "/models", headers=self._headers())
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 return sorted(m["id"] for m in json.loads(resp.read()).get("data", []))
@@ -116,7 +124,15 @@ def predict_next(history: list[str], remaining: dict[str, str], client: BitdeerC
         'next? Answer with JSON only: {"instrument": "<id from the tray list>", "reason": "<one short sentence>"}.'
     )
     try:
-        text = client.chat([{"role": "user", "content": prompt}], max_tokens=200)
+        text = client.chat([{"role": "user", "content": prompt}], max_tokens=1024, response_format={
+            "type": "json_schema", "json_schema": {
+                "name": "next_instrument", "strict": True,
+                "schema": {"type": "object", "additionalProperties": False,
+                           "properties": {"instrument": {"type": "string", "enum": list(remaining)},
+                                          "reason": {"type": "string"}},
+                           "required": ["instrument", "reason"]},
+            },
+        })
         m = re.search(r"\{.*?\}", text, re.S)
         choice = json.loads(m.group()) if m else {}
     except (BitdeerError, ValueError):

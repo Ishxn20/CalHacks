@@ -9,7 +9,7 @@
     POST /home
     POST /stop      freeze immediately (motors stay energized, nothing drops)
     POST /reset     clear a stop/fault so jobs are accepted again
-    GET  /status
+    GET  /status    ?since=<unix s> adds "samples": the arm's 20 Hz readings taken after that time
     GET  /audit     is the audit log's hash chain intact? {"ok", "entries", "head", "error"}
 
 Errors come back as {"error": ..., "say": ...}; `say` is short enough to feed straight to TTS.
@@ -27,7 +27,9 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 from .audit import AuditLog
 from .catalog import Catalog, ResolveError, parse_freeform
@@ -113,9 +115,19 @@ def make_handler(assistant: ScrubAssistant, catalog: Catalog, token: str | None 
             self._audited, self._fields = None, {}
             if not self._allowed():
                 return
-            path = self.path.rstrip("/")
+            url = urlsplit(self.path)
+            path = url.path.rstrip("/")
             if path in ("/status", ""):
-                self._send(200, assistant.status())
+                since = parse_qs(url.query).get("since")
+                if since is None:
+                    return self._send(200, assistant.status())
+                try:
+                    t = float(since[0])
+                    if not math.isfinite(t):
+                        raise ValueError
+                except ValueError:
+                    return self._send(400, {"error": "since must be a number (unix seconds)"})
+                self._send(200, assistant.status(since=t))
             elif path == "/audit":
                 v = audit.verify() if audit else None
                 self._send(200, {"ok": v.ok, "entries": v.entries, "head": v.head, "error": v.error}

@@ -34,8 +34,8 @@ class ArmClient:
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise ArmError(f"arm unreachable: {e}", "I can't reach the arm.") from e
 
-    def status(self) -> dict:
-        return self._call("GET", "/status")
+    def status(self, since: float | None = None) -> dict:
+        return self._call("GET", "/status" if since is None else f"/status?since={since:.3f}")
 
     def audit(self) -> dict:
         return self._call("GET", "/audit")

@@ -112,7 +112,7 @@ class ScriptedArm:
     def __init__(self, *statuses):
         self.script, self.i = list(statuses), 0
 
-    def status(self):
+    def status(self, since=None):
         s = self.script[min(self.i, len(self.script) - 1)]
         self.i += 1
         if isinstance(s, Exception):
@@ -200,3 +200,34 @@ def test_the_question_is_forgotten_after_a_while(rig, monkeypatch):
     bridge.handle_text("hand me a sponge")
     monkeypatch.setattr(b, "ASK_MEMORY_S", 0.0)
     assert "you just asked" not in bridge.context()
+
+
+def test_arm_readings_are_batched_into_one_metrics_event_per_5_s_and_kept_off_the_browser_stream():
+    class Recording:
+        def __init__(self):
+            self.got = []
+
+        def publish(self, kind, data):
+            self.got.append((kind, data))
+
+    def reading(t):
+        return {"t": t, "q": [0.0] * 6, "q_cmd": [0.0] * 6, "tau": [None] * 6, "gripper": 1.0,
+                "moving": False, "enabled": True}
+
+    def polled(ts, **kw):
+        return idle(samples=[reading(t) for t in ts], job={"id": 7}, **kw)
+
+    # 20 Hz readings; the first poll only syncs to the arm's clock, the second repeats nothing (since= worked).
+    polls = [polled([99.9, 100.0]), polled([100.05 + 0.05 * i for i in range(60)]),
+             polled([103.05 + 0.05 * i for i in range(60)]), polled([])]
+    rec = Recording()
+    b = Bridge(ScriptedArm(*polls), Ledger(["scalpel_11"]), lambda t, c: None, sinks=[rec])
+    for _ in polls:
+        b.poll()
+    batches = [d for k, d in rec.got if k == "metrics"]
+    assert len(batches) == 1 and "metrics" not in kinds(b)
+    ts = [s["t"] for s in batches[0]["samples"]]
+    assert ts[0] == 100.05 and ts == sorted(set(ts)) and batches[0]["t1"] - batches[0]["t0"] >= 5.0
+    assert batches[0]["source"] == "arm"
+    assert batches[0]["samples"][0] | {"phase": "idle", "job": 7, "fault": None} == batches[0]["samples"][0]
+    assert len(ts) == 120 and b._batch == []                          # nothing dropped, nothing left over

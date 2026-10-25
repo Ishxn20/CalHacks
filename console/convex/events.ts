@@ -28,3 +28,19 @@ export const prune = internalMutation({
     return old.length;
   },
 });
+
+// The log view: newest first, only the kinds asked for (utterance, command, arm_event, fault, job, ...).
+export const byKind = query({
+  args: { kinds: v.array(v.string()), limit: v.optional(v.number()) },
+  handler: async (ctx, { kinds, limit }) => {
+    const n = Math.max(1, Math.min(limit ?? 100, 300));
+    const per = await Promise.all(
+      kinds.slice(0, 20).map((k) => ctx.db.query("events").withIndex("by_kind", (q) => q.eq("kind", k)).order("desc").take(n)),
+    );
+    return per
+      .flat()
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, n)
+      .map((r) => ({ seq: r.seq, t: r.t, kind: r.kind, data: r.data }));
+  },
+});

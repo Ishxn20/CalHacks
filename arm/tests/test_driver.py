@@ -119,3 +119,16 @@ def test_enable_holds_current_position(config_dir):
         assert np.allclose(bus.pos, start, atol=1e-6)
     finally:
         d.shutdown()
+
+
+def test_samples_are_taken_at_about_20_hz_and_drained_by_time(app):
+    d = app.driver
+    t0 = time.time()
+    time.sleep(1.0)
+    got = d.samples(t0)
+    assert 10 <= len(got) <= 40                  # ~20 Hz, generous for a loaded CI box
+    s = got[-1]
+    assert len(s["q"]) == len(s["q_cmd"]) == len(s["tau"]) == 6 and "gripper" in s and "moving" in s
+    assert all(x is None or isinstance(x, float) for x in s["tau"])
+    assert d.samples(got[-1]["t"]) == [] or d.samples(got[-1]["t"])[0]["t"] > got[-1]["t"]
+    assert "tau_nm" in d.snapshot() and "gripper_tau_nm" in d.snapshot()
