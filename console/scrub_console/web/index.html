@@ -206,6 +206,8 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; } .btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
 .btn { background: var(--sheet); border-color: var(--accent); color: var(--accent); } .btn:hover { background: var(--accent-wash); }
 .btn.quiet { border-color: var(--rule); color: var(--graphite); }
+.hdrstop { justify-self: end; }
+.btn.stop { border-color: var(--red); color: var(--red); } .btn.stop:hover { background: var(--red-wash); }
 .phrases, .log { border-top-color: var(--ink); }
 .phrases q { color: var(--accent); }
 .say-this { border-left-color: var(--accent); background: var(--accent-wash); }
@@ -233,7 +235,7 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 <div class="shell">
   <header class="top">
     <h1>Scrub console</h1>
-    <span></span>
+    <span class="hdrstop"><button class="btn stop" id="stoparm">Stop arm</button></span>
     <div class="hdrmic" id="hdrmic" hidden><span class="dot on"></span>Listening</div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" id="t-live" aria-controls="tab-live" aria-selected="true">Live</button>
@@ -268,7 +270,7 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
     </div>
     <div class="talk" aria-live="polite">
       <p class="heard" id="heard"></p>
-      <p class="reply" id="reply">“Scrub, Castroviejo, backhand.”</p>
+      <p class="reply" id="reply">“Scrub, hand me the 10 blade.”</p>
       <p class="how" id="how"></p>
     </div>
   </section>
@@ -294,10 +296,10 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
     <aside class="side">
       <h2>What you can say</h2>
       <ul class="phrases">
-        <li><q>Scrub, Potts scissors</q><span>hand it over</span></li>
+        <li><q>Scrub, hand me the 10 blade</q><span>hand it over</span></li>
         <li><q>Got it</q><span>let go</span></li>
         <li><q>Stop</q><span>freeze, any time</span></li>
-        <li><q>Scrub, done with the Castro</q><span>mark used</span></li>
+        <li><q>Scrub, done with the tweezers</q><span>mark used</span></li>
         <li><q>Scrub, count</q><span>count check</span></li>
         <li><q>Scrub, what's next?</q><span>then “stage it”</span></li>
         <li><q>Scrub, write the case report</q><span>after the case</span></li>
@@ -401,6 +403,25 @@ for (const name of ["doctor", "robot"]) {
   $(`${name}-device`).onchange = () => connectCamera(name);
 }
 window.addEventListener("pagehide", () => Object.values(cameras).forEach(camera => camera.stop()));
+
+/* shortcut (test run): five LEFT fingers held up to the Doctor camera ask for the #20 scalpel; frames go to Claude
+   through the console while the Doctor camera is on. Remove once the phone camera works. */
+const gestureCanvas = document.createElement("canvas");
+async function watchGesture() {
+  const video = $("doctor-video");
+  if (!video.hidden && video.videoWidth) {
+    gestureCanvas.width = 640; gestureCanvas.height = Math.round(video.videoHeight * 640 / video.videoWidth);
+    gestureCanvas.getContext("2d").drawImage(video, 0, 0, gestureCanvas.width, gestureCanvas.height);  // unmirrored
+    try {
+      const r = await api("/api/gesture", { frame: gestureCanvas.toDataURL("image/jpeg", 0.7) });
+      if (!r.busy) $("doctor-note").textContent = r.acted ? "Five left fingers seen: asking for the #20 scalpel."
+        : r.five_left ? "Five left fingers seen. Lower your hand, then raise it again once the arm is idle."
+        : "Hold up five fingers on your left hand for the #20 scalpel. Frames are sent to Claude while this camera is on.";
+    } catch (e) { $("doctor-note").textContent = "Hand check failed: " + (e.say || e.message); }
+  }
+  setTimeout(watchGesture, 1500);
+}
+watchGesture();
 listCameras().catch(() => {});
 
 /* ── api ─────────────────────────────────────────────────────────────── */
@@ -698,6 +719,8 @@ function listenBrowser() {
 }
 
 /* Browsers only allow the mic and audio playback after a person interacts with the page: one tap, then hands-free. */
+$("stoparm").onclick = () => api("/api/stop", {}).catch(e => { $("reply").textContent = e.say || e.message; });
+
 $("start").onclick = async () => {
   $("start").hidden = true; $("mic").hidden = false; V.listening = true;
   setMic("busy", "Starting the microphone…");

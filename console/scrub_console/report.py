@@ -36,13 +36,21 @@ class BitdeerClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 data = json.loads(resp.read())
-            return data["choices"][0]["message"]["content"].strip()
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError) as e:
+            text = (data["choices"][0]["message"].get("content") or "").strip()
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError, AttributeError,
+                TypeError) as e:
             raise BitdeerError(f"bitdeer request failed: {e}") from e
+        if not text:            # a reasoning model that ran out of tokens returns content null
+            raise BitdeerError("bitdeer returned no text")
+        return text
 
     @property
     def label(self) -> str:
         return f"bitdeer:{self.model}"
+
+
+def _returned(job: dict) -> bool:
+    return (job.get("result") or "").startswith("returned")
 
 
 def build_facts(events: list[dict], counts: dict, audit: dict) -> dict:
@@ -53,7 +61,8 @@ def build_facts(events: list[dict], counts: dict, audit: dict) -> dict:
     return {
         "requests": sum(1 for e in events if e["kind"] == "utterance"),
         "instrument_jobs": len(handoffs),
-        "completed": sum(1 for j in handoffs if j["status"] == "done"),
+        "completed": sum(1 for j in handoffs if j["status"] == "done" and not _returned(j)),
+        "returned": sum(1 for j in handoffs if _returned(j)),
         "failed": [{"kind": j["kind"], "error": j.get("error")} for j in handoffs if j["status"] != "done"],
         "faults": [e["data"]["message"] for e in events if e["kind"] == "fault"],
         "proposals": [{"status": e["data"]["status"], "simulated": e["data"].get("simulated"),
@@ -69,6 +78,8 @@ def template_report(facts: dict) -> str:
     lines = ["End-of-case report (template; no model was used)"]
     lines.append(f"- {facts['requests']} spoken requests; {facts['completed']} of {facts['instrument_jobs']} "
                  "instrument jobs completed.")
+    if facts.get("returned"):
+        lines.append(f"- {facts['returned']} not taken in time and put back on the table.")
     for f in facts["failed"]:
         lines.append(f"- Failed {f['kind']}: {f['error']}")
     c = facts["last_count"]
