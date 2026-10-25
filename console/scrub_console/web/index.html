@@ -404,8 +404,9 @@ for (const name of ["doctor", "robot"]) {
 }
 window.addEventListener("pagehide", () => Object.values(cameras).forEach(camera => camera.stop()));
 
-/* shortcut (test run): five LEFT fingers held up to the Doctor camera ask for the #20 scalpel; frames go to Claude
-   through the console while the Doctor camera is on. Remove once the phone camera works. */
+/* shortcut (test run): LEFT-hand signals held up to the Doctor camera ask for a tool (five fingers: #20, index
+   finger: #10, V: tweezers); frames go to Claude through the console while the Doctor camera is on. */
+const SIGNAL_TOOL = { five_fingers: "#20 scalpel", index_finger: "#10 scalpel", v_sign: "tweezers" };
 const gestureCanvas = document.createElement("canvas");
 async function watchGesture() {
   const video = $("doctor-video");
@@ -414,9 +415,10 @@ async function watchGesture() {
     gestureCanvas.getContext("2d").drawImage(video, 0, 0, gestureCanvas.width, gestureCanvas.height);  // unmirrored
     try {
       const r = await api("/api/gesture", { frame: gestureCanvas.toDataURL("image/jpeg", 0.7) });
-      if (!r.busy) $("doctor-note").textContent = r.acted ? "Five left fingers seen: asking for the #20 scalpel."
-        : r.five_left ? "Five left fingers seen. Lower your hand, then raise it again once the arm is idle."
-        : "Hold up five fingers on your left hand for the #20 scalpel. Frames are sent to Claude while this camera is on.";
+      const tool = SIGNAL_TOOL[r.signal];
+      if (!r.busy) $("doctor-note").textContent = r.acted ? `Signal seen: asking for the ${tool}.`
+        : tool ? `Signal for the ${tool} seen. Lower your hand, then raise it again once the arm is idle.`
+        : "Left hand up: five fingers = #20, index finger = #10, V = tweezers. Frames go to Claude while this camera is on.";
     } catch (e) { $("doctor-note").textContent = "Hand check failed: " + (e.say || e.message); }
   }
   setTimeout(watchGesture, 1500);

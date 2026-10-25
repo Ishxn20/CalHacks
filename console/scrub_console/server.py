@@ -8,7 +8,7 @@
     POST /api/heard {text}        hands-free speech already transcribed in the browser (no Cartesia key), same gate
     POST /api/utterance {text}    a request with no wake word needed (CLI, tests, the Fetch.ai agent)
     POST /api/stop                the dashboard's Stop button: freezes the arm, never waits on Claude
-    POST /api/gesture {frame}     test run: five left fingers held up to the Doctor camera asks for the #20 scalpel
+    POST /api/gesture {frame}     test run: left-hand signals to the Doctor camera ask for a tool (gesture.py)
     POST /api/understand {text}   dry run: the intent and reply a request would get, without acting on it
     GET  /api/tts?text=...        the reply as speech (Cartesia)
     POST /api/count               count check               POST /api/used {instrument}
