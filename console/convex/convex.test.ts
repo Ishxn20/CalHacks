@@ -146,3 +146,64 @@ test("privacy or quality flags, or disagreeing with the robot, hold an episode f
   expect(await t.query(api.episodes.stats, {})).toMatchObject({ accepted: 0, needsReview: 3 });
   expect(await t.query(internal.episodes.exportManifest, {})).toHaveLength(0);
 });
+
+const reading = (t: number, lag = 0, tau = 0.1) => ({
+  t, q: [10, 0, 0, 0, 0, 0], q_cmd: [10 + lag, 0, 0, 0, 0, 0], tau: [tau, null, 0, 0, 0, 0], gripper: 5,
+  moving: lag > 0, enabled: true, phase: lag > 0 ? "picking" : "idle", job: lag > 0 ? 3 : null, fault: null,
+});
+const batch = (t0: number, n = 100, spikeAt = -1) => {
+  const samples = Array.from({ length: n }, (_, i) => reading(t0 + i * 0.05, i === spikeAt ? 12.5 : 0, i === spikeAt ? -4 : 0.1));
+  return { t0, t1: samples[n - 1].t, source: "sim", samples };
+};
+
+test("arm readings: writes are internal; reads are public", () => {
+  // @ts-expect-error metrics.record is internal
+  void api.metrics.record;
+  // @ts-expect-error metrics.prune is internal
+  void api.metrics.prune;
+  expect(typeof api.metrics.points).toBeDefined();
+});
+
+test("a batch is kept raw and rolled up to one point per second, keeping the worst spike", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(internal.metrics.record, batch(1000, 100, 30));        // 5 s at 20 Hz; spike at t=1001.5
+  const pts = await t.query(api.metrics.points, { from: 0 });
+  expect(pts.map((p) => p.t)).toEqual([1000, 1001, 1002, 1003, 1004]);
+  expect(pts[1]).toMatchObject({ lag: [12.5, 0, 0, 0, 0, 0], moving: true });
+  expect(pts[1].tau[0]).toBe(4);                                          // |torque|
+  expect(pts[1].tau[1]).toBeNull();                                       // no reading stays null
+  expect(pts[0].lag[0]).toBe(0);
+  expect(await t.query(api.metrics.latest, {})).toEqual(pts);
+  const raw = await t.query(api.metrics.raw, { from: 1001, to: 1002 });
+  expect(raw).toHaveLength(21);
+  expect(raw[10]).toMatchObject({ phase: "picking", job: 3 });
+  expect(await t.query(api.metrics.points, { from: 1003 })).toHaveLength(2);
+});
+
+test("raw reads are capped at 10 minutes", async () => {
+  const t = convexTest(schema, modules);
+  for (let i = 0; i < 3; i++) await t.mutation(internal.metrics.record, batch(1000 + i * 400, 2));
+  const raw = await t.query(api.metrics.raw, { from: 1000, to: 5000 });
+  expect(raw.map((s) => Math.round(s.t))).toEqual([1000, 1000, 1400, 1400]);
+});
+
+test("pruning removes only readings older than a day", async () => {
+  const t = convexTest(schema, modules);
+  const now = Date.now() / 1000;
+  await t.mutation(internal.metrics.record, batch(now - 2 * 86400, 2));
+  await t.mutation(internal.metrics.record, batch(now - 60, 2));
+  await t.mutation(internal.metrics.prune, {});
+  const pts = await t.query(api.metrics.points, { from: 0 });
+  expect(pts).toHaveLength(1);
+  expect(pts[0].t).toBe(Math.floor(now - 60));
+  expect(await t.query(api.metrics.raw, { from: now - 2 * 86400 - 1, to: now - 2 * 86400 + 60 })).toHaveLength(0);
+});
+
+test("the log view filters by kind, newest first", async () => {
+  const t = convexTest(schema, modules);
+  const kinds = ["utterance", "fault", "job", "fault", "arm_event"];
+  for (let i = 0; i < kinds.length; i++) await t.mutation(internal.events.add, { kind: kinds[i], data: { i }, seq: i + 1, t: i + 1 });
+  const rows = await t.query(api.events.byKind, { kinds: ["fault", "job"] });
+  expect(rows.map((r) => r.seq)).toEqual([4, 3, 2]);
+  expect(await t.query(api.events.byKind, { kinds: ["fault"], limit: 1 })).toHaveLength(1);
+});

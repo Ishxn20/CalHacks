@@ -1,6 +1,21 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const nums = v.array(v.union(v.number(), v.null()));
+
+// One arm reading as the arm's control loop takes it (20 Hz), stamped by the console with phase/job/fault.
+export const sample = v.object({
+  t: v.number(), q: nums, q_cmd: nums, tau: nums, gripper: v.union(v.number(), v.null()),
+  moving: v.boolean(), enabled: v.boolean(),
+  phase: v.string(), job: v.union(v.number(), v.null()), fault: v.union(v.string(), v.null()),
+});
+
+// One second of readings for charts: the worst lag and |torque| per joint keep short spikes visible.
+export const point = v.object({
+  t: v.number(), q: nums, lag: nums, tau: nums, gripper: v.union(v.number(), v.null()),
+  moving: v.boolean(), phase: v.string(), fault: v.union(v.string(), v.null()),
+});
+
 // What Claude writes for each recorded episode (labeling.ts).
 export const labels = v.object({
   task: v.string(),
@@ -51,7 +66,22 @@ export default defineSchema({
     data: v.any(),
     seq: v.number(),
     t: v.number(),
-  }),
+  }).index("by_kind", ["kind"]),
+
+  // Raw arm readings, one document per ~5 s batch (~100 samples). Kept for a day; see metrics.ts.
+  metrics: defineTable({
+    t0: v.number(),
+    t1: v.number(),
+    source: v.string(), // arm | sim
+    samples: v.array(sample),
+  }).index("by_t0", ["t0"]),
+
+  // The same batches rolled up to one point per second: what the dashboard charts read.
+  metricPoints: defineTable({
+    t0: v.number(),
+    source: v.string(),
+    points: v.array(point),
+  }).index("by_t0", ["t0"]),
 
   // One document per physical instrument: where it is right now.
   instruments: defineTable({

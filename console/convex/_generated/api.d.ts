@@ -15,6 +15,7 @@ import type * as events from "../events.js";
 import type * as http from "../http.js";
 import type * as instruments from "../instruments.js";
 import type * as labeling from "../labeling.js";
+import type * as metrics from "../metrics.js";
 import type * as proposals from "../proposals.js";
 
 import type {
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   instruments: typeof instruments;
   labeling: typeof labeling;
+  metrics: typeof metrics;
   proposals: typeof proposals;
 }>;
 

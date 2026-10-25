@@ -7,10 +7,12 @@ outage must never stop the arm, so ConvexSink writes from a background thread an
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import queue
 import threading
 import time
+import urllib.request
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +29,9 @@ class MemorySink(Sink):
         self._seq = 0
         self._cond = threading.Condition()
 
-    def publish(self, kind: str, data: dict) -> dict:
+    def publish(self, kind: str, data: dict) -> dict | None:
+        if kind == "metrics":                    # arm readings go to Convex only; they would flood the browser stream
+            return None
         with self._cond:
             self._seq += 1
             event = {"seq": self._seq, "t": round(time.time(), 3), "kind": kind, "data": data}
@@ -51,19 +55,35 @@ class MemorySink(Sink):
             return [e for e in self.events if e["kind"] in kinds]
 
 
-class ConvexSink(Sink):
-    """Mirrors events into Convex via the official Python client. The functions it calls live in console/convex/."""
+class ConvexHTTP:
+    """Runs Convex functions over its HTTP API. The official Python client holds the GIL for a whole round trip
+    (~110 ms to the cloud, measured), freezing every thread in the process, including the simulated arm's control
+    loop in the demo. urllib releases the GIL while it waits on the socket."""
 
-    ROUTES = {"ledger": "instruments:sync", "audit": "audit:anchor", "proposal": "proposals:upsert"}
+    def __init__(self, url: str, deploy_key: str | None = None, timeout_s: float = 10.0) -> None:
+        self.url, self.deploy_key, self.timeout_s = url.rstrip("/"), deploy_key, timeout_s
+
+    def mutation(self, name: str, args: dict):
+        req = urllib.request.Request(self.url + "/api/mutation", method="POST",
+                                     data=json.dumps({"path": name, "args": args, "format": "json"}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        if self.deploy_key:                      # admin auth: the only way to reach internal functions
+            req.add_header("Authorization", "Convex " + self.deploy_key)
+        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+            body = json.loads(resp.read())
+        if body.get("status") != "success":
+            raise RuntimeError(f"{name}: {body.get('errorMessage') or body}")
+        return body.get("value")
+
+
+class ConvexSink(Sink):
+    """Mirrors events into Convex over its HTTP API. The functions it calls live in console/convex/."""
+
+    ROUTES = {"ledger": "instruments:sync", "audit": "audit:anchor", "proposal": "proposals:upsert",
+              "metrics": "metrics:record"}
 
     def __init__(self, url: str, deploy_key: str | None = None, client=None) -> None:
-        if client is None:
-            from convex import ConvexClient
-
-            client = ConvexClient(url)
-            if deploy_key:
-                client.set_admin_auth(deploy_key)
-        self.client = client
+        self.client = client or ConvexHTTP(url, deploy_key)
         self.failures = 0
         self._q: queue.Queue = queue.Queue(maxsize=1000)
         self._counter = itertools.count(1)

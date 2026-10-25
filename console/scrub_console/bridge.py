@@ -24,6 +24,7 @@ from .wake import WakeGate
 
 log = logging.getLogger(__name__)
 
+METRICS_BATCH_S = 5.0                     # one Convex write per ~5 s of 20 Hz arm readings
 HOLDING_PHASES = ("verifying", "presenting", "staged")
 _STAGE_IT = re.compile(r"^(?:stage|get|hold|grab)\s+(?:it|that|that one)(?:\s+ready)?[.!]?$", re.I)
 
@@ -51,6 +52,8 @@ class Bridge:
         self._polls = 0
         self.telemetry: deque[dict] = deque(maxlen=150)   # ~1 min of joint readings: Droid's evidence on a fault
         self.observers: list[Callable[[dict], None]] = []  # see every arm status (the dataset recorder)
+        self._batch: list[dict] = []              # arm readings not yet sent as a "metrics" event
+        self._last_sample_t: float | None = None  # arm clock time of the newest reading seen
         self._emit_ledger()                       # so a fresh Convex board shows the starting tray, not stale data
 
     # ── plumbing ──────────────────────────────────────────────────────────
@@ -227,7 +230,7 @@ class Bridge:
 
     def poll(self) -> None:
         try:
-            st = self.arm.status()
+            st = self.arm.status(since=self._last_sample_t or 0.0)
         except ArmError as e:
             if self.online is not False:
                 self.online = False
@@ -247,6 +250,7 @@ class Bridge:
         arm = st.get("arm") or {}
         self.telemetry.append({"t": round(time.time(), 2), "phase": st.get("phase"), "q": arm.get("q_deg") or [],
                                "q_cmd": arm.get("q_cmd_deg") or [], "gripper": arm.get("gripper_deg")})
+        self._collect(st)
         for observe in self.observers:
             try:
                 observe(st)
@@ -282,6 +286,21 @@ class Bridge:
                 self.triage.trigger(fault, self.recent_context())
         elif not fault:
             self._fault_seen = None
+
+    def _collect(self, st: dict) -> None:
+        """Batch the arm's 20 Hz readings into one "metrics" event per ~5 s (stored in Convex, not streamed)."""
+        samples = st.get("samples")
+        if not samples:
+            return
+        if self._last_sample_t is not None:      # the first poll only learns where the arm's clock is
+            stamp = {"phase": st.get("phase") or "", "job": (st.get("job") or {}).get("id"),
+                     "fault": (st.get("arm") or {}).get("fault")}
+            self._batch += [{**s, **stamp} for s in samples]
+        self._last_sample_t = samples[-1]["t"]
+        if self._batch and self._batch[-1]["t"] - self._batch[0]["t"] >= METRICS_BATCH_S:
+            self.emit("metrics", t0=self._batch[0]["t"], t1=self._batch[-1]["t"], source="sim" if self.sim else "arm",
+                      samples=self._batch)
+            self._batch = []
 
     def _finish(self, job: dict, st: dict) -> None:
         p = self._pending.pop(job["id"], {})

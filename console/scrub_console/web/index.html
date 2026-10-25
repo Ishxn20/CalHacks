@@ -135,6 +135,43 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .episodes .meta { color: var(--ink-soft); font-size: 13px; }
 .episodes .meta.bad { color: var(--alert); } .episodes .meta.good { color: var(--ok); }
 
+/* arm readings: 20 Hz joint readings stored in Convex, charted one point per second (worst value kept) */
+.readings { margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4; --series-6: #008300; }
+.readings h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.rhead { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.rhead h2 { margin: 0; flex: 1; }
+.seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--sheet); padding: 6px 12px; color: var(--ink-soft); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-checked="true"], .kinds button[aria-pressed="true"] { background: var(--drape); color: #fff; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 12px 0; }
+.tile { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.tile .k { color: var(--ink-soft); font-size: 13px; }
+.tile .v { font: 400 30px/1.1 var(--serif); font-variant-numeric: tabular-nums lining-nums; }
+.tile .s { color: var(--ink-soft); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 6px; padding: 0; list-style: none; color: var(--ink-soft); font-size: 13px; }
+.legend i, .tip i { display: inline-block; width: 14px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 6px; }
+.chart { position: relative; margin: 0 0 14px; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 4px; }
+.chart:focus-visible { outline-offset: 0; }
+.chart figcaption { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px var(--sans); fill: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.chart .grid { stroke: var(--line-soft); stroke-width: 1; }
+.chart .guard { stroke: var(--alert); stroke-width: 1; stroke-dasharray: 4 3; }
+.chart .band { fill: var(--line-soft); } .chart .faultband { fill: var(--alert-wash); }
+.chart .hair { stroke: var(--ink); stroke-width: 1; }
+.chart path.s { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.tip { position: absolute; top: 28px; pointer-events: none; background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 2px 8px #12262b1f; white-space: nowrap; }
+.tip b { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+.tip div { color: var(--ink-soft); }
+.rtable { width: 100%; border-collapse: collapse; margin: 4px 0 22px; font-variant-numeric: tabular-nums; }
+.rtable th, .rtable td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); }
+.rtable th:first-child, .rtable td:first-child { text-align: left; }
+.rtable th { font-weight: 600; color: var(--ink-soft); font-size: 13px; }
+.kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+.kinds button { border: 1px solid var(--line); background: var(--sheet); border-radius: 99px; padding: 3px 12px; font-size: 13px; }
+
 /* presenter-only rehearsal tools (simulation / --demo): not part of the OR workflow */
 .rehearse { margin-top: 40px; border: 1.5px dashed var(--warn); border-radius: 10px; padding: 10px 16px; background: var(--sheet); }
 .rehearse summary { cursor: pointer; font-weight: 600; color: var(--warn); }
@@ -219,6 +256,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <h2>Training data</h2>
     <p class="note" id="datasetnote"></p>
     <ol class="episodes" id="episodes"></ol>
+  </section>
+
+  <section class="readings" aria-label="Arm readings">
+    <div class="rhead">
+      <h2>Arm readings</h2>
+      <div class="seg" role="radiogroup" aria-label="Time window" id="rwin">
+        <button role="radio" aria-checked="true" data-min="10">10 min</button><button role="radio" aria-checked="false" data-min="30">30 min</button><button role="radio" aria-checked="false" data-min="60">60 min</button>
+      </div>
+      <button class="btn quiet" id="rcsv" disabled>Download raw readings (last 10 min, CSV)</button>
+    </div>
+    <p class="note" id="rnote">Connect Convex to see stored readings.</p>
+    <div class="tiles" id="rtiles"></div>
+    <ul class="legend" id="rlegend" aria-label="Joints"></ul>
+    <figure class="chart" id="c-lag" tabindex="0"></figure>
+    <figure class="chart" id="c-tau" tabindex="0"></figure>
+    <figure class="chart" id="c-grip" tabindex="0"></figure>
+    <table class="rtable" id="rtable"></table>
+    <h2>Logs</h2>
+    <div class="kinds" id="rkinds" role="group" aria-label="Show these kinds"></div>
+    <ol class="log" id="rlog"></ol>
   </section>
 
   <details class="rehearse" id="rehearse" hidden>
@@ -378,6 +435,7 @@ async function pollJoints() {
   if (document.hidden) return;
   try {
     const j = await api("/api/arm"), guard = j.guard_deg || 25;
+    R.guard = guard;
     if (!j.q_deg.length) { $("joints").innerHTML = '<p class="empty">No joint readings yet.</p>'; return; }
     $("jointnote").textContent = `Bars show how far each joint lags where it was told to be. Past ${guard}° the collision guard freezes the arm. Gripper ${j.gripper_deg == null ? "?" : Math.round(j.gripper_deg)}°.`;
     $("joints").innerHTML = j.q_deg.map((q, i) => {
@@ -588,6 +646,150 @@ $("tamper").onclick = async () => {
   catch (e) { $("tamperout").textContent = e.message; }
 };
 
+/* ── arm readings: stored in Convex at 20 Hz, charted one point per second (each point keeps the worst value) ── */
+const R = { min: 10, pts: [], kinds: new Set(["fault", "job", "arm_event"]), logs: [], unsubLogs: null, guard: 25 };
+const JOINTS = [1, 2, 3, 4, 5, 6].map((i) => ({ name: "J" + i, color: `var(--series-${i})` }));
+const LOG_KINDS = ["fault", "job", "command", "arm_event", "arm", "utterance", "announce", "arm_offline", "error"];
+const fmtT = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const fmt = (x, d = 1) => (x == null ? "–" : x.toFixed(d));
+const nice = (x) => { const p = 10 ** Math.floor(Math.log10(x)); return [1, 2, 5, 10].map((m) => m * p).find((v) => v >= x); };
+const worst = (key) => {  // [joint index, value] of the largest reading of `key` in the window
+  let best = [null, null];
+  for (const p of R.pts) p[key].forEach((v, i) => { if (v != null && (best[1] == null || v > best[1])) best = [i, v]; });
+  return best;
+};
+
+function lineChart(el, title, unit, series, opts = {}) {
+  const pts = R.pts;
+  el.hidden = !pts.length;
+  if (!pts.length) return;
+  const W = 900, H = 150, L = 44, T = 8, B = 22, PW = W - L - 8, PH = H - T - B;
+  const t1 = Math.max(Date.now() / 1000, pts[pts.length - 1].t + 1), t0 = t1 - R.min * 60;
+  const vals = series.flatMap((s) => pts.map(s.get)).filter((v) => v != null);
+  let lo = opts.zero ? 0 : Math.min(...vals), hi = Math.max(...vals, opts.guard || 0, opts.zero ? 1 : -Infinity);
+  if (!vals.length) { lo = 0; hi = 1; }
+  if (opts.zero) hi = nice(hi); else if (hi - lo < 2) { lo -= 1; hi += 1; }
+  const x = (t) => L + ((t - t0) / (t1 - t0)) * PW, y = (v) => T + PH - ((v - lo) / (hi - lo)) * PH, sec = Math.max(x(1) - x(0), 1);
+  let svg = "";
+  let run = null;   // shaded runs of seconds: grey while moving, red wash while faulted
+  const flush = () => { if (run) svg += `<rect class="${run.c}" x="${x(run.a)}" y="${T}" width="${x(run.b) - x(run.a) + sec}" height="${PH}"/>`; run = null; };
+  for (const p of pts) {
+    const c = p.fault ? "faultband" : p.moving ? "band" : null;
+    if (run && (c !== run.c || p.t - run.b > 2)) flush();
+    if (c && run) run.b = p.t; else if (c) run = { c, a: p.t, b: p.t };
+  }
+  flush();
+  for (const v of [lo, (lo + hi) / 2, hi]) svg += `<line class="grid" x1="${L}" x2="${L + PW}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, hi - lo < 10 ? 1 : 0)}</text>`;
+  for (const t of [t0, (t0 + t1) / 2, t1]) svg += `<text x="${x(t)}" y="${H - 4}" text-anchor="${t === t0 ? "start" : t === t1 ? "end" : "middle"}">${fmtT(t)}</text>`;
+  if (opts.guard) svg += `<line class="guard" x1="${L}" x2="${L + PW}" y1="${y(opts.guard)}" y2="${y(opts.guard)}"/><text x="${L + PW}" y="${y(opts.guard) - 4}" text-anchor="end">collision guard ${opts.guard}°</text>`;
+  for (const s of series) {
+    let d = "", prev = null;
+    for (const p of pts) {
+      const v = s.get(p);
+      if (v == null) { prev = null; continue; }
+      d += `${prev == null || p.t - prev > 2.5 ? "M" : "L"}${x(p.t).toFixed(1)},${y(v).toFixed(1)}`;   // a gap breaks the line
+      prev = p.t;
+    }
+    svg += `<path class="s" d="${d}" style="stroke:${s.color}"/>`;
+  }
+  el.innerHTML = `<figcaption>${esc(title)}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}, last ${R.min} minutes. Values are in the table below.">${svg}<line class="hair" y1="${T}" y2="${T + PH}" hidden/><rect x="${L}" y="${T}" width="${PW}" height="${PH}" fill="transparent"/></svg><div class="tip" hidden></div>`;
+  const hair = el.querySelector(".hair"), tip = el.querySelector(".tip"), svgEl = el.querySelector("svg");
+  const show = (i) => {
+    el._i = i = Math.max(0, Math.min(pts.length - 1, i));
+    const p = pts[i], px = x(p.t) + sec / 2;
+    hair.setAttribute("x1", px); hair.setAttribute("x2", px); hair.hidden = false;
+    tip.innerHTML = `<div>${fmtT(p.t)} · ${esc(p.phase)}${p.fault ? " · fault" : ""}</div>` + series.map((s) => `<div><i style="background:${s.color}"></i><b>${fmt(s.get(p), 2)}${unit}</b> ${esc(s.name)}</div>`).join("");
+    tip.hidden = false;
+    const left = (px / W) * svgEl.clientWidth + 12;
+    tip.style.left = Math.min(left, el.clientWidth - tip.offsetWidth - 8) + "px";
+  };
+  const hide = () => { hair.hidden = tip.hidden = true; el._i = null; };
+  el.onpointermove = (e) => {
+    const r = svgEl.getBoundingClientRect(), t = t0 + (((e.clientX - r.left) / r.width) * W - L) / PW * (t1 - t0);
+    let a = 0, b = pts.length - 1;   // nearest point by time (pts are sorted)
+    while (a < b) { const m = (a + b) >> 1; if (pts[m].t < t) a = m + 1; else b = m; }
+    show(a > 0 && t - pts[a - 1].t < pts[a].t - t ? a - 1 : a);
+  };
+  el.onpointerleave = el.onblur = hide;
+  el.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    show(el._i == null ? pts.length - 1 : el._i + (e.key === "ArrowRight" ? 1 : -1));
+  };
+}
+
+function renderReadings() {
+  const pts = R.pts, live = !!S.client;
+  $("rnote").textContent = !live ? "Connect Convex to see stored readings."
+    : !pts.length ? `No readings stored in the last ${R.min} minutes. They arrive about every 5 seconds while the console is connected to the arm.`
+    : `${pts.length} seconds of readings. The arm records at 20 Hz; each point is the worst value in its second, so short spikes still show. Grey: arm moving. Red: faulted. Hover a chart or use the arrow keys for exact values.`;
+  const [lj, lv] = worst("lag"), [tj, tv] = worst("tau");
+  const faults = pts.filter((p, i) => p.fault && p.fault !== (pts[i - 1] || {}).fault).length;
+  const moving = pts.length ? Math.round((100 * pts.filter((p) => p.moving).length) / pts.length) : 0;
+  $("rtiles").innerHTML = !pts.length ? "" : [
+    ["Worst lag", lv == null ? "–" : `${fmt(lv)}°`, !lv ? `every joint on its setpoint; guard at ${R.guard}°` : `J${lj + 1}, collision guard at ${R.guard}°`],
+    ["Peak torque", tv == null ? "–" : `${fmt(tv, 2)} N·m`, tv == null ? "No torque feedback" : !tv ? "no load measured" : `J${tj + 1}`],
+    ["Faults", String(faults), faults ? "see the red bands and the fault log" : "none in this window"],
+    ["Moving", `${moving}%`, `of the last ${R.min} minutes with readings`],
+  ].map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${esc(sub)}</div></div>`).join("");
+  $("rlegend").innerHTML = pts.length ? JOINTS.map((j) => `<li><i style="background:${j.color}"></i>${j.name}</li>`).join("") : "";
+  lineChart($("c-lag"), "Lag from setpoint (°, worst per second)", "°", JOINTS.map((j, i) => ({ ...j, get: (p) => p.lag[i] })), { zero: true, guard: R.guard });
+  lineChart($("c-tau"), "Torque (N·m, largest |value| per second)", " N·m", JOINTS.map((j, i) => ({ ...j, get: (p) => p.tau[i] })), { zero: true });
+  lineChart($("c-grip"), "Gripper angle (°)", "°", [{ name: "Gripper", color: "var(--drape)", get: (p) => p.gripper }]);
+  const last = pts[pts.length - 1];
+  $("rtable").innerHTML = !pts.length ? "" : `<caption class="note" style="text-align:left">Per joint over the last ${R.min} minutes</caption><thead><tr><th scope="col">Joint</th><th scope="col">Angle now</th><th scope="col">Worst lag</th><th scope="col">Peak |torque|</th></tr></thead><tbody>`
+    + JOINTS.map((j, i) => {
+      const m = (k) => pts.reduce((a, p) => (p[k][i] == null ? a : Math.max(a ?? 0, p[k][i])), null);
+      return `<tr><th scope="row">${j.name}</th><td>${fmt(last.q[i])}°</td><td>${fmt(m("lag"))}°</td><td>${fmt(m("tau"), 2)} N·m</td></tr>`;
+    }).join("") + `<tr><th scope="row">Gripper</th><td>${fmt(last.gripper)}°</td><td>–</td><td>–</td></tr></tbody>`;
+}
+
+async function loadReadings() {
+  if (!S.client) return renderReadings();
+  try { R.pts = await S.client.query("metrics:points", { from: Math.floor(Date.now() / 1000 - R.min * 60) }); } catch (e) { R.pts = []; }
+  renderReadings();
+}
+function onLatestReadings(fresh) {  // each new ~5 s batch: append it and drop what fell out of the window
+  const after = R.pts.length ? R.pts[R.pts.length - 1].t : -Infinity, from = Date.now() / 1000 - R.min * 60;
+  R.pts = [...R.pts.filter((p) => p.t >= from), ...fresh.filter((p) => p.t > after)];
+  renderReadings();
+}
+
+function renderLogs() {
+  $("rkinds").innerHTML = LOG_KINDS.map((k) => `<button aria-pressed="${R.kinds.has(k)}" data-kind="${k}">${k.replace("_", " ")}</button>`).join("");
+  const rows = [];
+  for (const e of R.logs) {
+    const [tone, text] = describe(e);
+    if (text) rows.push(`<li class="${tone || ""}"><div>${esc(text)}<time>${new Date(e.t * 1000).toLocaleString()}</time></div></li>`);
+  }
+  $("rlog").innerHTML = rows.join("") || `<li><div class="note">${S.client ? "Nothing of these kinds stored yet." : "Connect Convex to see the stored log."}</div></li>`;
+}
+function watchLogs() {
+  if (R.unsubLogs) R.unsubLogs();
+  R.unsubLogs = null; R.logs = [];
+  if (S.client && R.kinds.size) R.unsubLogs = S.client.onUpdate("events:byKind", { kinds: [...R.kinds], limit: 200 }, (rows) => { R.logs = rows; renderLogs(); });
+  renderLogs();
+}
+
+$("rwin").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  for (const o of $("rwin").children) o.setAttribute("aria-checked", o === b);
+  R.min = +b.dataset.min; loadReadings();
+};
+$("rkinds").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  R.kinds.has(b.dataset.kind) ? R.kinds.delete(b.dataset.kind) : R.kinds.add(b.dataset.kind);
+  watchLogs();
+};
+$("rcsv").onclick = async () => {
+  const to = Date.now() / 1000, rows = await S.client.query("metrics:raw", { from: to - 600, to });
+  const n = [1, 2, 3, 4, 5, 6], q = (v) => (v == null ? "" : typeof v === "string" ? `"${v.replace(/"/g, '""')}"` : v);
+  const head = ["t", "phase", "job", "fault", "moving", "enabled", "gripper_deg", ...n.map((i) => `q${i}_deg`), ...n.map((i) => `q_cmd${i}_deg`), ...n.map((i) => `tau${i}_nm`)];
+  const lines = rows.map((r) => [r.t, r.phase, r.job, r.fault, r.moving, r.enabled, r.gripper, ...r.q, ...r.q_cmd, ...r.tau].map(q).join(","));
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv" })), download: `arm-readings-${new Date(to * 1000).toISOString().slice(0, 19)}.csv` });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
 /* ── Convex: live queries feed the board, the timeline and the anchored chain heads ── */
 function loadScript(src) {
   return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.append(s); });
@@ -602,10 +804,13 @@ async function connectConvex(url) {
     client.onUpdate("audit:alerts", {}, (a) => { S.alerts = a; renderAudit(); }, fail);
     client.onUpdate("episodes:list", {}, (rows) => { S.episodes = rows; renderDataset(); }, fail);
     client.onUpdate("episodes:stats", {}, (st) => { S.dstats = st; renderDataset(); }, fail);
+    S.client = client; $("rcsv").disabled = false;
+    loadReadings(); watchLogs();
+    client.onUpdate("metrics:latest", {}, onLatestReadings, fail);
   } catch (e) { S.convexLive = false; }
 }
 
-refresh().then(() => { connect(); if (S.caps.convex_url) connectConvex(S.caps.convex_url); });
+refresh().then(() => { connect(); renderReadings(); renderLogs(); if (S.caps.convex_url) connectConvex(S.caps.convex_url); });
 setInterval(refresh, 8000);
 setInterval(pollJoints, 500);
 </script>
