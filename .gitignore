@@ -16,3 +16,10 @@ sim/declutter_eval*.json
 sim/*.log
 perception/*.log
 sim/policy/checkpoints/*/replay_buffer.pkl
+
+# secrets, runtime logs, node
+.env
+.env.*
+logs/
+node_modules/
+console/convex/_generated/

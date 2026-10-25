@@ -5,12 +5,17 @@ import argparse
 import json
 import logging
 import math
+import os
 import signal
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from .app import build, check_poses
+
+
+DEFAULT_AUDIT_LOG = Path(__file__).resolve().parents[2] / "logs" / "audit.jsonl"
 
 
 def _raise_interrupt(*_) -> None:
@@ -18,6 +23,7 @@ def _raise_interrupt(*_) -> None:
 
 
 def cmd_serve(args) -> None:
+    from .audit import AuditLog
     from .server import serve
     from .teach import park_and_shutdown
 
@@ -27,14 +33,21 @@ def cmd_serve(args) -> None:
         print("Setup problems (fix with `python -m scrub_arm teach`):\n" + "\n".join(f"  - {p}" for p in problems))
         if not args.force:
             sys.exit(1)
+    host, port = args.host or app.cfg.server_host, args.port or app.cfg.server_port
+    token = args.token or os.environ.get("SCRUB_API_TOKEN")
+    if not token and host not in ("127.0.0.1", "localhost", "::1"):
+        sys.exit("refusing to listen on a non-loopback address without a token: set SCRUB_API_TOKEN or --token")
+    audit = None if args.no_audit else AuditLog(args.audit_log or DEFAULT_AUDIT_LOG)
     app.driver.start()
     app.driver.enable()
     if args.home:
         app.driver.move_pose("home")
-    host, port = args.host or app.cfg.server_host, args.port or app.cfg.server_port
-    httpd = serve(app.assistant, app.catalog, host, port)
+    if audit:
+        audit.append("server_start", host=host, port=port, sim=args.sim, auth=bool(token))
+    httpd = serve(app.assistant, app.catalog, host, port, token=token, allowed_origins=args.allow_origin, audit=audit)
     signal.signal(signal.SIGTERM, _raise_interrupt)  # treat `kill` like Ctrl-C so the arm gets parked
-    print(f"scrub_arm {'SIM ' if args.sim else ''}listening on http://{host}:{port}  (Ctrl-C to quit)", flush=True)
+    print(f"scrub_arm {'SIM ' if args.sim else ''}listening on http://{host}:{port}  "
+          f"({'token required' if token else 'NO TOKEN - set SCRUB_API_TOKEN'}; Ctrl-C to quit)", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -77,6 +90,8 @@ def cmd_send(args) -> None:
     else:
         body = {"text": " ".join(args.text)} if args.text else {}
         req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    if os.environ.get("SCRUB_API_TOKEN"):
+        req.add_header("Authorization", "Bearer " + os.environ["SCRUB_API_TOKEN"])
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             print(json.dumps(json.loads(resp.read()), indent=2))
@@ -100,6 +115,11 @@ def main(argv=None) -> None:
     s.add_argument("--port", type=int)
     s.add_argument("--home", action="store_true", help="move to the home pose on startup")
     s.add_argument("--force", action="store_true", help="start even if poses/gripper aren't set up")
+    s.add_argument("--token", help="require this bearer token on every request (default: $SCRUB_API_TOKEN)")
+    s.add_argument("--allow-origin", action="append", default=[], metavar="ORIGIN",
+                   help="browser origin allowed to call the API, e.g. http://localhost:5173 (repeatable; default none)")
+    s.add_argument("--audit-log", help=f"hash-chained audit log (default {DEFAULT_AUDIT_LOG})")
+    s.add_argument("--no-audit", action="store_true", help="don't write an audit log")
     s.set_defaults(fn=cmd_serve)
 
     t = sub.add_parser("teach", help="interactive pose teaching + manual tests")
