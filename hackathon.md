@@ -1,6 +1,6 @@
 # Hackathon log
 
-- **Project:** Scrub, a robotic surgical scrub assistant
+- **Project:** Surgio, a robotic surgical scrub assistant
 - **Event:** Cal Hacks 13.0
 - **What it does:** A robot arm picks surgical instruments by wrist camera and hands them over on voice or gesture requests, with a Convex-backed console that tracks instruments and logs every event.
 - **Live app:** not deployed
