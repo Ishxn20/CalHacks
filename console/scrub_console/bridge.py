@@ -10,17 +10,18 @@ import logging
 import re
 import threading
 import time
+import uuid
 from collections import deque
 from typing import Callable
 
 from scrub_arm.audit import AuditLog
 
 from .arm_client import ArmClient, ArmError
-from .intent import Intent
+from .intent import _SAY, Intent
 from .ledger import HELD, IN_FIELD, TRAY, USED, Ledger, UnknownInstrument
 from .report import build_facts, predict_next, summarize_case
 from .sinks import MemorySink, Sink
-from .wake import WakeGate
+from .wake import PRESENTING, RELEASE, STOP, WakeGate
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +43,8 @@ class Bridge:
         self.status: dict = {}
         self.online: bool | None = None
         self.audit_state: dict = {}
-        self._pending: dict[int, dict] = {}       # arm job id -> {"instrument", "kind"}
+        self._pending: dict[int, dict] = {}       # arm job id -> {"instrument", "kind", "request_id", "started"}
+        self._request_id: str | None = None       # the request being dispatched (set under _lock)
         self._holding_id: str | None = None       # instrument id the arm is carrying
         self._suggested: str | None = None        # name of the last suggested next instrument ("stage it")
         self._done_job = 0
@@ -94,7 +96,7 @@ class Bridge:
 
     # ── speech in ─────────────────────────────────────────────────────────
 
-    def handle_heard(self, text: str, via: str = "voice") -> dict:
+    def handle_heard(self, text: str, via: str = "voice", stt_ms: float | None = None) -> dict:
         """Hands-free entry point: everything the always-on mic transcribes comes here. Talk that isn't meant
         for the robot is dropped without a trace (see wake.py)."""
         request = self.gate.check(text, self.status.get("phase"))
@@ -103,39 +105,58 @@ class Bridge:
         if not request:
             self.gate.open()
             return {"say": "Yes?", "intent": "wake", "ok": True, "heard": text}
-        out = self.handle_text(request, via=via)
+        out = self.handle_text(request, via=via, stt_ms=stt_ms)
         self.gate.open()                          # a follow-up ("approve", "backhand") needs no wake word
         return out
 
-    def handle_text(self, text: str, via: str = "text") -> dict:
+    def handle_text(self, text: str, via: str = "text", stt_ms: float | None = None) -> dict:
+        rid, started = uuid.uuid4().hex[:12], time.perf_counter()
+        self.emit("trace", request_id=rid, stage="request", via=via, stt_ms=stt_ms)
         if self._suggested and _STAGE_IT.match(text.strip()):
             text = f"stage the {self._suggested}"
         self.emit("utterance", text=text, via=via)
         self._audit("utterance", text=text[:300], via=via)
-        intent = self.understand(text, self.context())          # may call Claude: keep it outside the lock
+        intent = self._urgent(text) or self.understand(text, self.context())   # may call Claude: outside the lock
+        self.emit("trace", request_id=rid, stage="intent", source=intent.source,
+                  duration_ms=round((time.perf_counter() - started) * 1000, 1))
         with self._lock:
             self.emit("intent", kind=intent.kind, fields=intent.fields, say=intent.say, source=intent.source)
             say, ok = intent.say, True
+            self._request_id = rid
             try:
                 say = self._dispatch(intent)
             except ArmError as e:
                 say, ok = e.say, False
                 self.emit("error", message=str(e), say=e.say)
+            self._request_id = None
             self._audit("command", kind=intent.kind, fields=intent.fields, source=intent.source, ok=ok)
             self.emit("say", text=say)
-            return {"say": say, "intent": intent.kind, "source": intent.source, "ok": ok, "heard": text}
+            return {"say": say, "intent": intent.kind, "source": intent.source, "ok": ok, "heard": text,
+                    "request_id": rid}
+
+    def _urgent(self, text: str) -> Intent | None:
+        """Stop, and "got it" while presenting, never wait on Claude."""
+        if STOP.search(text) and len(text.split()) <= 3:
+            return Intent("stop", _SAY["stop"])
+        if self.status.get("phase") in PRESENTING and RELEASE.search(text):
+            return Intent("release", _SAY["release"])
+        return None
+
+    def _track_job(self, job_id: int, kind: str, instrument: str | None) -> None:
+        self._pending[job_id] = {"instrument": instrument, "kind": kind, "request_id": self._request_id,
+                                 "started": time.time()}
 
     def _dispatch(self, i: Intent) -> str:
         if i.kind in ("handoff", "stage"):
             resp = (self.arm.handoff if i.kind == "handoff" else self.arm.stage)(i.fields)
-            self._pending[resp["job"]["id"]] = {"instrument": resp["instrument"], "kind": i.kind}
+            self._track_job(resp["job"]["id"], i.kind, resp["instrument"])
             self.emit("command", name=i.kind, instrument=resp["instrument"], slot=resp.get("slot"),
                       orientation=resp.get("orientation"), job=resp["job"]["id"])
             return i.say
         if i.kind in ("release", "stop", "home", "return", "reset"):
             r = self.arm.command(i.kind)
             if "job" in r:
-                self._pending[r["job"]["id"]] = {"instrument": self._holding_id, "kind": i.kind}
+                self._track_job(r["job"]["id"], i.kind, self._holding_id)
             self.emit("command", name=i.kind)
             return i.say
         if i.kind == "used":
@@ -258,6 +279,9 @@ class Bridge:
                 log.exception("status observer failed")
         key = lambda s: (s.get("phase"), s.get("holding"), (s.get("arm") or {}).get("fault"))  # noqa: E731
         if key(old) != key(st):
+            rid = self._pending.get((st.get("job") or {}).get("id"), {}).get("request_id")
+            if rid:
+                self.emit("trace", request_id=rid, stage=st.get("phase"))
             self.emit("arm", phase=st.get("phase"), holding=st.get("holding"), fault=arm.get("fault"),
                       enabled=arm.get("enabled"))
         for e in st.get("events") or []:
@@ -306,6 +330,9 @@ class Bridge:
         p = self._pending.pop(job["id"], {})
         inst, kind, ok = p.get("instrument") or self._holding_id, job["kind"], job["status"] == "done"
         result = job.get("result") or ""
+        if p.get("request_id"):
+            self.emit("trace", request_id=p["request_id"], stage="finished", status=job["status"],
+                      duration_ms=round(((job.get("finished") or time.time()) - p["started"]) * 1000, 1))
         self.emit("job", id=job["id"], kind=kind, status=job["status"], result=result, error=job.get("error"))
         self._audit("job", id=job["id"], kind=kind, status=job["status"], result=result[:200], error=job.get("error"))
         if kind in ("handoff", "stage") and ok:
@@ -314,6 +341,9 @@ class Bridge:
                 self._move(inst, HELD)
             if result.startswith("handed"):
                 self._hand_over()
+            elif result.startswith("returned"):            # not taken in time: the arm put it back on the table
+                self._move(inst, TRAY)
+                self._holding_id = None
         elif kind == "release" and ok:
             self._hand_over()
         elif kind in ("handoff", "stage", "return") and not st.get("holding"):
@@ -367,3 +397,11 @@ class Bridge:
             except Exception:  # noqa: BLE001 - keep watching the arm whatever happens
                 log.exception("poll failed")
             stop.wait(interval_s)
+
+    def flush_metrics(self) -> None:
+        """Send the last partial batch of arm readings (console shutdown)."""
+        with self._lock:
+            if self._batch:
+                batch, self._batch = self._batch, []
+                self.emit("metrics", t0=batch[0]["t"], t1=batch[-1]["t"], source="sim" if self.sim else "arm",
+                          samples=batch)

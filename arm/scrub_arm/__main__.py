@@ -38,6 +38,10 @@ def cmd_serve(args) -> None:
     if not token and host not in ("127.0.0.1", "localhost", "::1"):
         sys.exit("refusing to listen on a non-loopback address without a token: set SCRUB_API_TOKEN or --token")
     audit = None if args.no_audit else AuditLog(args.audit_log or DEFAULT_AUDIT_LOG)
+    camera = None
+    if not args.sim and app.cfg.pick.mode == "ik":      # the server owns the wrist camera: same pick as tools/pick.py
+        from .camera_pick import CameraPickup
+        camera = app.assistant.camera_pick = CameraPickup(app.assistant, args.camera)
     app.driver.start()
     app.driver.enable()
     if args.home:
@@ -60,6 +64,8 @@ def cmd_serve(args) -> None:
         except TimeoutError:
             pass
         park_and_shutdown(app)
+        if camera:
+            camera.close()
 
 
 def cmd_teach(args) -> None:
@@ -113,6 +119,7 @@ def main(argv=None) -> None:
     common(s)
     s.add_argument("--host")
     s.add_argument("--port", type=int)
+    s.add_argument("--camera", type=int, default=0, help="wrist camera index for the real camera pick")
     s.add_argument("--home", action="store_true", help="move to the home pose on startup")
     s.add_argument("--force", action="store_true", help="start even if poses/gripper aren't set up")
     s.add_argument("--token", help="require this bearer token on every request (default: $SCRUB_API_TOKEN)")

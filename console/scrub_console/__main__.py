@@ -54,6 +54,10 @@ def cmd_serve(args) -> None:
     finally:
         stop.set()
         httpd.server_close()
+        c.bridge.flush_metrics()             # the last partial batch of arm readings, then let Convex catch up
+        for sink in c.sinks:
+            if hasattr(sink, "flush"):
+                sink.flush()
 
 
 def cmd_demo(args) -> None:

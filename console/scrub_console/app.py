@@ -7,7 +7,7 @@ import os
 import shutil
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from scrub_arm.audit import AuditLog
@@ -107,13 +107,16 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
     ledger = Ledger.from_tray(tray, in_set=not sim)      # the real arm picks from in_set; the sim from tray slots
     audit = AuditLog(s.audit_dir / "console_audit.jsonl")
 
+    # The real arm only picks the in_set tools, so Claude and the rules only offer those.
+    words_tray = replace(tray, instruments={k: tray.instruments[k] for k in tray.in_set}) if tray.in_set and not sim \
+        else tray
     has_claude_credentials = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
-    parser = ClaudeParser(tray, model=s.claude_model) if has_claude_credentials else None
+    parser = ClaudeParser(words_tray, model=s.claude_model) if has_claude_credentials else None
     if parser is None:
         log.info("no Anthropic credentials: requests are understood by the rule-based parser")
 
     def understand_fn(text: str, context: str) -> Intent:
-        return understand(text, arm.resolve, parser, context, tray)
+        return understand(text, arm.resolve, parser, context, words_tray)
 
     sinks: list[Sink] = []
     if s.convex_url:

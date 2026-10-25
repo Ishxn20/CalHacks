@@ -19,8 +19,8 @@ try:
         P.a._present(P.a.holding)
         P.d.sleep(0.5)
         for _ in range(4):
-            P.cap.read()
-        ok, img = P.cap.read()
+            P.camera.cap.read()
+        ok, img = P.camera.cap.read()
         out = Path(P.R) / "hw_check/real/handoff_view.jpg"
         out.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(out), img)
@@ -32,5 +32,5 @@ try:
         P.a._let_go()
         P.d.move_pose("rest", speed=0.5)
 finally:
-    P.cap.release()
+    P.camera.cap.release()
     P.park_and_shutdown(P.app)

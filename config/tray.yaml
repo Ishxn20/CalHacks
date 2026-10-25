@@ -50,8 +50,10 @@ instruments:
 
 # The set we actually have (user photo 2026-10-24): camera picks (pick.mode ik) only take these. Everything else
 # the camera sees is something to move out of the way.
-in_set: [scalpel_10, scalpel_20, scalpel_11_long, forceps_fine_vascular, scissors_micro_forward,
-         scissors_micro_back, needle_holder_short, needle_holder_ryder]
+# Demo (2026-10-25): only the three tools on the paper. The full printed set was: scalpel_10, scalpel_20,
+# scalpel_11_long, forceps_fine_vascular, scissors_micro_forward, scissors_micro_back, needle_holder_short,
+# needle_holder_ryder.
+in_set: [scalpel_10, scalpel_20, forceps_fine_vascular]
 
 # Canonical suture names and what people may say instead.
 sutures:

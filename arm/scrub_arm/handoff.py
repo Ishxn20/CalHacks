@@ -64,6 +64,7 @@ class ScrubAssistant:
         # Optional closed-loop alignment at hover (pick.reach rl): (x_mm, y_mm, yaw_deg, thickness_mm) ->
         # corrected (x_mm, y_mm, yaw_deg) to descend at. Set by the launcher that owns the camera.
         self.refine = None
+        self.camera_pick = None  # CameraPickup: the real wrist-camera pick and hand-off, set by the server launcher
 
         self.phase = Phase.IDLE
         self.holding: Resolved | None = None
@@ -181,7 +182,16 @@ class ScrubAssistant:
     def _do_handoff(self, r: Resolved) -> str:
         self._acquire(r)
         self._present(r)
-        how = self._wait_for_take()
+        if self.camera_pick:
+            how = self.camera_pick.wait_until_taken(timeout_s=self.cfg.handoff.present_timeout_s)
+            if how == "timeout":
+                what = r.describe()
+                self._return_held()
+                self.driver.move_pose("home")
+                self.phase = Phase.IDLE
+                return f"returned {what}; not taken"
+        else:
+            how = self._wait_for_take()
         if how == "timeout":
             return f"presented {r.describe()}; not taken, still holding"
         self._release_and_retreat()
@@ -190,7 +200,8 @@ class ScrubAssistant:
     def _do_stage(self, r: Resolved) -> str:
         self._acquire(r)
         self.phase = Phase.MOVING
-        self.driver.move_to(self._oriented("staged", r.orientation, self._flipped and self.kin is not None))
+        pose = "handoff" if self.camera_pick else "staged"   # the real arm has no taught "staged" pose
+        self.driver.move_to(self._oriented(pose, r.orientation, self._flipped and self.kin is not None))
         self.phase = Phase.STAGED
         return f"staged {r.describe()}"
 
@@ -236,6 +247,11 @@ class ScrubAssistant:
     def _acquire_ik(self, r: Resolved) -> None:
         """Look at the pile and pick the requested instrument; if it's covered or out of reach, say so (nothing is
         moved out of the way: user decision 2026-10-24)."""
+        if self.camera_pick:
+            if not self.camera_pick.pick(r):
+                self.phase = Phase.IDLE
+                raise TaskFailed(f"I couldn't pick up the {r.instrument.name}")
+            return
         from .perception_client import PerceptionClient
 
         pk, d = self.cfg.pick, self.driver

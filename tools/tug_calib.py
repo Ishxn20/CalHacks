@@ -66,7 +66,7 @@ def main() -> None:
               "  pull didn't clearly beat the resting noise: pull harder, or use other joints")
         P.a._place_at(*P.a._picked_from)
     finally:
-        P.cap.release()
+        P.camera.cap.release()
         P.park_and_shutdown(P.app)
 
 

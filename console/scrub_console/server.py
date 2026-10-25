@@ -7,6 +7,8 @@
     POST /api/audio  (WAV body)   hands-free speech, transcribed by Cartesia, acted on only after the wake word
     POST /api/heard {text}        hands-free speech already transcribed in the browser (no Cartesia key), same gate
     POST /api/utterance {text}    a request with no wake word needed (CLI, tests, the Fetch.ai agent)
+    POST /api/stop                the dashboard's Stop button: freezes the arm, never waits on Claude
+    POST /api/gesture {frame}     test run: five left fingers held up to the Doctor camera asks for the #20 scalpel
     POST /api/understand {text}   dry run: the intent and reply a request would get, without acting on it
     GET  /api/tts?text=...        the reply as speech (Cartesia)
     POST /api/count               count check               POST /api/used {instrument}
@@ -25,6 +27,7 @@ import json
 import logging
 import shutil
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -34,6 +37,7 @@ from scrub_arm.audit import verify
 
 from .app import Console
 from .arm_client import ArmError
+from .gesture import GestureWatch
 from .speech import SpeechUnavailable
 
 log = logging.getLogger(__name__)
@@ -60,6 +64,7 @@ def _hostname(h: str) -> str:
 
 def make_handler(console: Console):
     bridge = console.bridge
+    gesture = GestureWatch(bridge, model=console.settings.claude_model)
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -143,7 +148,11 @@ def make_handler(console: Console):
             try:
                 if path == "/api/audio":
                     return self._json(200, self._voice(self._body()))
+                if path == "/api/stop":
+                    return self._json(200, bridge.handle_text("stop", via="button"))
                 a = self._args()
+                if path == "/api/gesture":
+                    return self._json(200, gesture.check(a.get("frame")))
                 if path == "/api/heard":            # hands-free: browser speech recognition, gated by the wake word
                     return self._json(200, bridge.handle_heard(str(a.get("text", ""))[:500], via="speech"))
                 if path == "/api/utterance":
@@ -210,7 +219,10 @@ def make_handler(console: Console):
         def _voice(self, wav: bytes) -> dict:
             if not wav:
                 raise ValueError("no audio received")
-            return bridge.handle_heard(console.speech.transcribe(wav), via="voice")   # silence/chatter -> ignored
+            started = time.perf_counter()
+            text = console.speech.transcribe(wav)
+            return bridge.handle_heard(text, via="voice",                       # silence/chatter -> ignored
+                                       stt_ms=round((time.perf_counter() - started) * 1000, 1))
 
         def _audit(self) -> dict:
             return bridge.anchor()
