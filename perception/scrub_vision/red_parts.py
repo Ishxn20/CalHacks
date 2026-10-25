@@ -16,6 +16,8 @@ Fitted and tested on real wrist-camera frames (hw_check/real/): see config/red_p
 """
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 
 import cv2
@@ -23,6 +25,8 @@ import numpy as np
 import yaml
 
 from .identify import Detection
+
+log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL_YAML = Path(__file__).resolve().parents[1] / "config" / "red_parts.yaml"
@@ -186,6 +190,22 @@ def _overlap(a: np.ndarray, b: np.ndarray, tol_mm: float = 6.0) -> float:
     return float((small & cv2.dilate(big.astype(np.uint8), k).astype(bool)).sum()) / max(1, small.sum())
 
 
+def _centre_from_free_end(comp: np.ndarray, border: np.ndarray, ax: np.ndarray, length_mm: float):
+    """A part cut off at one end only: its middle (canvas row, col) is half its known length in from the end the
+    camera sees whole. None if both ends (or neither) touch the unseen border."""
+    r, c = np.nonzero(comp)
+    P = np.column_stack([c, r]).astype(float)
+    u = (P - P.mean(0)) @ ax
+    near = cv2.dilate(border.astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool)[r, c]
+    span = 6.0 / MM_PX                                         # the last 6 mm at each end
+    cut_lo, cut_hi = near[u < u.min() + span].any(), near[u > u.max() - span].any()
+    if cut_lo == cut_hi:
+        return None
+    end = P[u > u.max() - span].mean(0) if cut_lo else P[u < u.min() + span].mean(0)
+    mid = end + (-ax if cut_lo else ax) * (length_mm / 2 / MM_PX)     # from the free end toward the cut one
+    return (mid[1], mid[0])
+
+
 def part_of(cls: str) -> str:
     return cls.split("@")[0]               # sub-modes, e.g. micro_scissors@flat
 
@@ -194,10 +214,22 @@ def part_of(cls: str) -> str:
 class RedPartsDetector:
     """detect(bgr, q) -> [Detection] in table mm (base frame), one per red blob, identity None if cut off/unknown."""
 
-    def __init__(self, model_yaml: Path = MODEL_YAML, cam: Camera | None = None) -> None:
+    def __init__(self, model_yaml: Path = MODEL_YAML, cam: Camera | None = None,
+                 metric_scale: float | None = None) -> None:
         self.model = yaml.safe_load(Path(model_yaml).read_text())
         self.cam = cam or Camera()
         self._canvas: tuple[tuple, _Canvas] | None = None
+        # metric_scale: sizes (length, widths) are multiplied by this before classification; positions are not.
+        # The classes were fitted before the camera got knocked (2026-10-25); since then every part measures ~6 %
+        # long at the scan pose, so the #10 lands between the two scalpel classes. The yaml value is a stop-gap
+        # for exactly that hand-eye (it is ignored, with a log line, once camera.yaml's hand-eye changes); None:
+        # take it from the yaml, 1.0: off (frames from before the knock).
+        self.metric_scale = 1.0 if metric_scale is None else float(metric_scale)
+        if metric_scale is None and "metric_scale" in self.model:
+            if np.allclose(self.model.get("metric_scale_handeye", []), self.cam.p_tc, atol=1e-6):
+                self.metric_scale = float(self.model["metric_scale"])
+            else:
+                log.info("red_parts.yaml metric_scale was measured for another hand-eye; ignoring it")
         from .templates import load_instruments
         self.instruments = load_instruments()
 
@@ -224,11 +256,16 @@ class RedPartsDetector:
             if st[i, cv2.CC_STAT_AREA] * MM_PX ** 2 < MIN_AREA_MM2:
                 continue
             comp = lab == i
-            dets.append(self._detection(comp, not (comp & border).any(), cv_))
+            dets.append(self._detection(comp, not (comp & border).any(), cv_, border))
         return dets
 
-    def _detection(self, comp: np.ndarray, complete: bool, cv_: _Canvas) -> Detection:
+    def _detection(self, comp: np.ndarray, complete: bool, cv_: _Canvas, border: np.ndarray | None = None) -> Detection:
         f = features(comp)
+        if self.metric_scale != 1.0:            # sizes only: the grab point stays where the arm was calibrated to aim
+            k = self.metric_scale
+            f["vec"] = [v * k for v in f["vec"][:4]] + f["vec"][4:]
+            for key in ("length", "medw", "tipw", "grip_w", "thin_w"):
+                f[key] *= k
         g_mm = cv_.to_mm(np.array([f["centre_rc"]]))[0] + self._offset
         ax_cr = f["axis_cr"]                                   # canvas (col, row) -> table: col = -y, row = -x
         axis_deg = float(np.degrees(np.arctan2(-ax_cr[0], -ax_cr[1])))
@@ -241,7 +278,7 @@ class RedPartsDetector:
         if len(us):
             det.centroid_px = (float(us.mean()), float(vs.mean()))
         if not complete:
-            return self._partial(det, f)
+            return self._partial(det, f, comp, border, cv_)
         ranked = classify(self.model, f)
         if not ranked or ranked[0][0] > REJECT_SIGMA:
             return det                                        # red, but not one of our parts
@@ -278,7 +315,8 @@ class RedPartsDetector:
             d.mask = cv_.back_to_image(d.table_mask)
         return out
 
-    def _partial(self, det: Detection, f: dict) -> Detection:
+    def _partial(self, det: Detection, f: dict, comp: np.ndarray | None = None, border: np.ndarray | None = None,
+                 cv_: _Canvas | None = None) -> Detection:
         """Cut off by a finger or the frame: never a sure identity. Candidates: parts long enough to be cut down to
         this, matching on width alone; exposure = visible length / that part's length (e.g. the #20 scalpel at the
         scan pose just touches the right finger: 173 of 171 mm visible -> exposure 1, 'I think this is ...')."""
@@ -293,6 +331,10 @@ class RedPartsDetector:
         det.candidates = sorted({i for p in near for i in SAME_PART.get(p, (p,))})
         mu_len = self.model["classes"][best]["mu"][0]
         det.exposure = float(min(1.0, x[0] / mu_len))
+        if comp is not None and border is not None and part_of(best) not in GRAB_THINNEST:
+            g = _centre_from_free_end(comp, border, f["axis_cr"], mu_len)
+            if g is not None:          # the middle of the visible piece is not the tool's middle (user: "too high")
+                det.grasp_mm = tuple(float(v) for v in cv_.to_mm(np.array([g]))[0] + self._offset)
         det.confidence = float(max(0.0, 1.0 - best_d / (2 * REJECT_SIGMA)))
         fid = SAME_PART.get(part_of(best), (part_of(best),))[0]
         det.coarse = self.instruments[fid].coarse if fid in self.instruments else part_of(best)

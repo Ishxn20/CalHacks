@@ -31,8 +31,8 @@ gripper:
   model: rs-00
   # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
   # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
-  open_deg: 179.81
-  closed_deg: -109.54
+  open_deg: -0.31
+  closed_deg: -209.58
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
@@ -47,8 +47,11 @@ gripper:
   # Jaw gap between the fingertips (mm) at each motor angle (deg): re-measured 2026-10-24 after the user recalibrated
   # closed_deg to where the tips really meet (-109.5): wrist-camera hand-eye projection of the fingers, ~0.33 mm/deg
   # (the camera can't resolve the last ~10 mm, so that step is the same slope).
-  width_mm_at_deg: [[-109.5, 0.0], [-80.4, 9.7], [-51.5, 18.5], [-22.4, 28.5], [6.6, 37.7], [35.5, 47.5],
-                    [64.3, 57.5], [93.3, 67.3], [122.5, 77.0], [151.2, 86.5], [179.6, 95.5]]
+  # 2026-10-25: the gripper was re-zeroed (gcal: closed -109.54 -> -215.03, open 179.81 -> 41.99). The table is
+  # the measured one above shifted by the closed change (-105.49 deg): same gearing, ~0.33 mm/deg. The span shrank
+  # 289 -> 257 deg, i.e. the taped fingertips now meet ~10.6 mm earlier, so full open is ~85 mm instead of 95.5.
+  width_mm_at_deg: [[-215.0, 0.0], [-185.9, 9.7], [-157.0, 18.5], [-127.9, 28.5], [-98.9, 37.7], [-70.0, 47.5],
+                    [-41.2, 57.5], [-12.2, 67.3], [17.0, 77.0], [42.0, 85.3]]
 
 motion:
   speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven
