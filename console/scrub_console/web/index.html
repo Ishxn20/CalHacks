@@ -80,8 +80,7 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 @media (max-width: 760px) { .feeds { grid-template-columns: 1fr; } }
 
 /* two-column main */
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0 48px; margin-top: 32px; align-items: start; }
-@media (max-width: 1020px) { .main { grid-template-columns: 1fr; gap: 36px; } }
+.main { margin-top: 32px; }
 
 /* the instrument board: the one loud thing on the page */
 .board { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1.2fr; border-bottom: 1px solid var(--rule); }
@@ -123,12 +122,7 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 .jrow .lag { color: var(--graphite); }
 
 /* side column */
-.side h2, .strip h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
-.side h2 + .log { margin-bottom: 0; }
-.phrases { margin: 0 0 30px; padding: 0; list-style: none; border-top: 1px solid var(--ink); }
-.phrases li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
-.phrases q { font-weight: 550; quotes: "“" "”"; }
-.phrases span { color: var(--graphite); font-size: 13px; text-align: right; }
+.strip h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
 .log { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; border-top: 1px solid var(--ink); }
 .log li { display: grid; grid-template-columns: 8px 1fr; gap: 0 12px; padding: 9px 0; border-bottom: 1px solid var(--rule); }
 .log li::before { content: ""; width: 6px; height: 6px; margin-top: 8px; border-radius: 50%; background: var(--rule); }
@@ -208,8 +202,7 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 .btn.quiet { border-color: var(--rule); color: var(--graphite); }
 .hdrstop { justify-self: end; }
 .btn.stop { border-color: var(--red); color: var(--red); } .btn.stop:hover { background: var(--red-wash); }
-.phrases, .log { border-top-color: var(--ink); }
-.phrases q { color: var(--accent); }
+.log { border-top-color: var(--ink); }
 .say-this { border-left-color: var(--accent); background: var(--accent-wash); }
 .count-line { border-left-color: var(--accent); }
 .seg { border-color: var(--accent); } .seg button { color: var(--accent); background: var(--sheet); } .seg button + button { border-left-color: var(--accent); }
@@ -293,21 +286,6 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
       </div>
     </section>
 
-    <aside class="side">
-      <h2>What you can say</h2>
-      <ul class="phrases">
-        <li><q>Scrub, hand me the 10 blade</q><span>hand it over</span></li>
-        <li><q>Got it</q><span>let go</span></li>
-        <li><q>Stop</q><span>freeze, any time</span></li>
-        <li><q>Scrub, done with the tweezers</q><span>mark used</span></li>
-        <li><q>Scrub, count</q><span>count check</span></li>
-        <li><q>Scrub, what's next?</q><span>then “stage it”</span></li>
-        <li><q>Scrub, write the case report</q><span>after the case</span></li>
-        <li><q>Scrub, approve</q><span>or “reject” a proposed fix</span></li>
-      </ul>
-      <h2>What happened</h2>
-      <ol class="log" id="log"></ol>
-    </aside>
   </div>
 
 
@@ -524,7 +502,7 @@ TABS.forEach((n, i) => {
 });
 showTab(location.hash.slice(1));
 
-function render() { renderHeader(); renderBoard(); renderCount(); renderLog(); }
+function render() { renderHeader(); renderBoard(); renderCount(); }
 
 /* ── joint gauges (polled from the console's cached arm status, ~2 Hz) ── */
 async function pollJoints() {
@@ -569,15 +547,6 @@ function describe(e) {
   }
 }
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-function renderLog() {
-  const rows = [];
-  for (const e of S.events.slice(-80).reverse()) {
-    const [tone, text] = describe(e);
-    if (!text) continue;
-    rows.push(`<li class="${tone || ""}"><div>${esc(text)}<time>${new Date(e.t * 1000).toLocaleTimeString()}</time></div></li>`);
-  }
-  $("log").innerHTML = rows.join("");
-}
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ── state in ────────────────────────────────────────────────────────── */
@@ -886,7 +855,7 @@ async function connectConvex(url) {
     await loadScript("/vendor/convex-browser.js");
     const client = new window.convex.ConvexClient(url), fail = () => { S.convexLive = false; };
     client.onUpdate("instruments:list", {}, (d) => { S.convexLive = true; S.items = d.items; S.counts = d.counts; render(); }, fail);
-    client.onUpdate("events:recent", {}, (rows) => { S.convexLive = true; S.events = rows; renderLog(); }, fail);
+    client.onUpdate("events:recent", {}, (rows) => { S.convexLive = true; S.events = rows; }, fail);
     S.client = client; $("rcsv").disabled = false;
     loadReadings(); watchLogs();
     client.onUpdate("metrics:latest", {}, onLatestReadings, fail);
