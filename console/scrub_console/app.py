@@ -104,7 +104,7 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
     s = settings or Settings.from_env()
     tray = load_tray_config()
     arm = ArmClient(s.arm_url, s.arm_token)
-    ledger = Ledger.from_tray(tray)
+    ledger = Ledger.from_tray(tray, in_set=not sim)      # the real arm picks from in_set; the sim from tray slots
     audit = AuditLog(s.audit_dir / "console_audit.jsonl")
 
     has_claude_credentials = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))

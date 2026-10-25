@@ -43,7 +43,6 @@ ALLOWED: dict[str, tuple[float, float]] = {
     "pick.contact_deviation_deg": (0.5, 5.0),
     "pick.descend_step_mm": (1.0, 6.0),
     "pick.hover_mm": (40.0, 150.0),
-    "gripper.grip_torque_nm": (0.3, 1.2),
 }
 SANDBOX_FILE = "arm.yaml"
 DRIVER_SOURCE = Path(importlib.util.find_spec("scrub_arm.driver").origin)
@@ -150,7 +149,7 @@ def build_prompt(fault: str) -> str:
         "collision guard lives) and arm.yaml (its tuning config). Read them and cite times and joints from the "
         "telemetry. If a tuning value in arm.yaml plausibly caused this fault or would have "
         "prevented it, make the SMALLEST edit to arm.yaml that addresses it, changing only values under "
-        "`motion:`, `pick:`, or `gripper.grip_torque_nm`. Never touch joint limits, gripper calibration, "
+        "`motion:` or `pick:`. Never touch joint limits, gripper calibration, "
         "motor ids, or anything else. If no config change is warranted (for example a real collision), "
         "change nothing. Finish with two or three plain sentences: what you found and why this change."
     )

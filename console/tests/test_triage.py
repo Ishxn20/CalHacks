@@ -42,7 +42,7 @@ def test_a_tuning_change_inside_bounds_is_accepted():
     ("tracking_error_limit_deg", 90.0),            # above the allowed range
     ("tracking_error_limit_deg", "null"),          # would switch the collision guard off
     ("tracking_error_limit_deg", "'25'"),          # not a number
-    ("grip_torque_nm", 3.0),                       # would crush the instrument
+    ("grip_kp", 60.0),                             # gripper stiffness: never tuned remotely (would crush)
     ("calibrated", "false"),                       # not on the list
     ("open_deg", 12.0),                            # gripper calibration
     ("channel", "can9"),

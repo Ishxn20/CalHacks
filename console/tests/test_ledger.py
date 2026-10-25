@@ -75,7 +75,15 @@ def test_a_failed_pick_returns_the_instrument_to_the_tray():
 def test_groups_come_from_the_perception_config():
     g = load_groups()
     assert g["scalpel_10"] == g["scalpel_20"] == "scalpel"
-    assert g["scissors_micro_forward"] == g["scissors_micro_back"]
+    assert "scissors_micro_forward" not in g                 # the two micro scissors are told apart now
+
+
+def test_the_real_arm_board_is_the_in_set():
+    from scrub_arm.config import load_tray_config
+
+    tray = load_tray_config()
+    assert [i["instrument"] for i in Ledger.from_tray(tray, in_set=True).snapshot()] == list(tray.in_set)
+    assert len(Ledger.from_tray(tray).snapshot()) == len(tray.slots)
 
 
 def test_from_tray_makes_one_item_per_slot():

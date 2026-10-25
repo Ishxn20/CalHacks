@@ -1,3 +1,4 @@
+import dataclasses
 from types import SimpleNamespace
 
 import anthropic
@@ -12,7 +13,8 @@ from scrub_console.intent import TOOLS, ClaudeParser, rules_parse, understand
 
 @pytest.fixture(scope="module")
 def tray():
-    return load_tray_config()
+    """The whole vocabulary, not just the parts the real arm has (tray.yaml in_set is tested on its own)."""
+    return dataclasses.replace(load_tray_config(), in_set=[])
 
 
 @pytest.fixture

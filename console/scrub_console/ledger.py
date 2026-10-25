@@ -71,10 +71,12 @@ class Ledger:
             self.items.append(Item(f"{iid}#{seen[iid]}", iid))
 
     @classmethod
-    def from_tray(cls, tray, groups: dict[str, str] | None = None) -> "Ledger":
-        """One physical instrument per tray slot."""
+    def from_tray(cls, tray, groups: dict[str, str] | None = None, in_set: bool = False) -> "Ledger":
+        """One physical instrument per tray slot, or with `in_set` one per instrument in the set the real arm picks
+        from (tray.yaml `in_set`; falls back to the slots when the set is empty)."""
         names = {i: v.name for i, v in tray.instruments.items()}
-        return cls([s.instrument for s in tray.slots], names, load_groups() if groups is None else groups)
+        ids = list(tray.in_set) if in_set and tray.in_set else [s.instrument for s in tray.slots]
+        return cls(ids, names, load_groups() if groups is None else groups)
 
     def name(self, instrument: str) -> str:
         return self.names.get(instrument, instrument.replace("_", " "))
