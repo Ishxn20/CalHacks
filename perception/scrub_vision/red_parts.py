@@ -37,9 +37,9 @@ NB = 24                                   # width profile bins along the part
 REJECT_SIGMA = 4.0                        # farther than this from every class: not one of our parts
 MARGIN_SIGMA = 0.5                        # runner-up closer than this: report both as candidates
 SAME_PART = {"micro_scissors": ("scissors_micro_forward", "scissors_micro_back")}
-# user: grab these at their thinnest point (in the middle the forceps slid out, and the jaws slid off the needle
-# holders' two shanks)
-GRAB_THINNEST = {"forceps_fine_vascular", "needle_holder_short", "needle_holder_ryder"}
+# user: grab these at their thinnest point (the jaws slid off the needle holders' two shanks; the micro scissors
+# too). The forceps are grabbed in the middle (user, 2026-10-24), like the scalpels.
+GRAB_THINNEST = {"micro_scissors", "needle_holder_short", "needle_holder_ryder"}
 
 
 # ── geometry ──────────────────────────────────────────────────────────────
@@ -148,6 +148,8 @@ def features(comp: np.ndarray) -> dict:
     L = float(u.max() - u.min())
     bins = np.clip(((u - u.min()) / L * NB).astype(int), 0, NB - 1)
     fill = np.bincount(bins, minlength=NB) * MM_PX ** 2 / (L / NB)    # material width per bin, mm
+    span = np.array([np.ptp(t[bins == b]) + MM_PX if (bins == b).any() else 0.0 for b in range(NB)])
+    solid = float(np.median(fill[1:-1] / np.maximum(span[1:-1], 1e-6)))   # ~1 solid bar, ~0.5 open loop (2 arms)
     cs, hier = cv2.findContours(comp.astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
     holes = sum(1 for i, h in enumerate(hier[0]) if h[3] >= 0 and cv2.contourArea(cs[i]) * MM_PX ** 2 > 30)
     area = float(comp.sum() * MM_PX ** 2)
@@ -164,7 +166,7 @@ def features(comp: np.ndarray) -> dict:
     thin = (mu + (u.min() + (b + 0.5) * L / NB) * ax + t[in_b].mean() * np.array([-ax[1], ax[0]])) / MM_PX
     thin_w = float(t[in_b].max() - t[in_b].min())                       # what the jaws must span there
     return {"length": L, "area": area, "holes": holes, "medw": medw, "tipw": tip, "fill": fill.tolist(),
-            "vec": [L, area / L, medw, tip, tip / medw], "grip_w": grip_w, "centre_rc": (centre[1], centre[0]), "thin_rc": (thin[1], thin[0]),
+            "vec": [L, area / L, medw, tip, tip / medw, solid], "grip_w": grip_w, "centre_rc": (centre[1], centre[0]), "thin_rc": (thin[1], thin[0]),
             "thin_w": thin_w, "axis_cr": ax}
 
 
@@ -173,6 +175,15 @@ def classify(model: dict, f: dict) -> list[tuple[float, str]]:
     x, ringed = np.array(f["vec"]), f["holes"] >= 2
     return sorted((float(np.sqrt(np.mean(((x - np.array(m["mu"])) / np.array(m["sd"])) ** 2))), lab)
                   for lab, m in model["classes"].items() if m["ringed"] == ringed)
+
+
+def _overlap(a: np.ndarray, b: np.ndarray, tol_mm: float = 6.0) -> float:
+    """Share of the smaller footprint within tol_mm of the other (a cut-off view of a part lies inside its complete
+    view; two camera poses disagree by a few mm, which on thin parts like the open micro scissors' loop would leave
+    little exact overlap)."""
+    small, big = (a, b) if a.sum() <= b.sum() else (b, a)
+    k = np.ones((2 * int(tol_mm / MM_PX) + 1,) * 2, np.uint8)
+    return float((small & cv2.dilate(big.astype(np.uint8), k).astype(bool)).sum()) / max(1, small.sum())
 
 
 def part_of(cls: str) -> str:
@@ -225,6 +236,7 @@ class RedPartsDetector:
                         width_mm=f["grip_w"], axis_deg=axis_deg, grasp_mm=(float(g_mm[0]), float(g_mm[1])),
                         yaw_deg=axis_deg + 90.0, exposure=1.0 if complete else 0.0)
         det.shape_features = f                                # for fitting (scripts/fit_red_parts.py)
+        det.table_mask = comp            # on the fixed table canvas (same grid from any arm pose): merging views
         vs, us = np.nonzero(det.mask)
         if len(us):
             det.centroid_px = (float(us.mean()), float(vs.mean()))
@@ -248,6 +260,23 @@ class RedPartsDetector:
             det.grasp_mm = tuple(float(v) for v in cv_.to_mm(np.array([f["thin_rc"]]))[0] + self._offset)
             det.width_mm = f["thin_w"]
         return det
+
+    def merge(self, seen: list[Detection], new: list[Detection], q_ref, shape) -> list[Detection]:
+        """Detections from several camera views -> one per part. The same part seen twice (footprints overlap on the
+        table canvas) keeps the better view: complete beats cut off, then the more of it seen, then confidence.
+        Image masks are re-drawn as seen from q_ref (the scan pose), so the planner's overlap checks line up."""
+        out = list(seen)
+        for n in new:
+            hit = next((i for i, o in enumerate(out) if _overlap(o.table_mask, n.table_mask) > 0.3), None)
+            if hit is None:
+                out.append(n)
+            elif (n.exposure, n.table_mask.sum(), n.confidence) > (out[hit].exposure, out[hit].table_mask.sum(),
+                                                                   out[hit].confidence):
+                out[hit] = n
+        cv_ = self.canvas(q_ref, shape)
+        for d in out:
+            d.mask = cv_.back_to_image(d.table_mask)
+        return out
 
     def _partial(self, det: Detection, f: dict) -> Detection:
         """Cut off by a finger or the frame: never a sure identity. Candidates: parts long enough to be cut down to

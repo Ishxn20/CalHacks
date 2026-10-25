@@ -1,74 +1,101 @@
-# Fitted by scripts/fit_red_parts.py on ../hw_check/real/views (233 parts, 51 views).
-# features: length, mean width, median width, narrow-end width (mm), narrow end / median width
+# Fitted 2026-10-24 (6 features: length, mean width, median width, narrow-end width (mm), narrow end / median
+# width, solidity) on real wrist-camera views of two layouts, robust stats (median, 1.4826 MAD), by
+# 8ebde141 scratchpad refit.py; includes the open micro scissors (blades spread into a loop).
 classes:
   forceps_fine_vascular:
     mu:
-    - 188.739
-    - 8.062
-    - 9.247
-    - 4.732
-    - 0.507
-    n: 32
+    - 187.24
+    - 7.861
+    - 9.022
+    - 4.743
+    - 0.512
+    - 0.933
+    n: 86
     ringed: false
     sd:
     - 3.0
-    - 0.78
-    - 0.6
-    - 1.058
-    - 0.08
+    - 0.961
+    - 0.804
+    - 1.573
+    - 0.13
+    - 0.05
   micro_scissors@flat:
     mu:
-    - 157.041
-    - 9.127
-    - 10.122
-    - 5.613
-    - 0.547
-    n: 33
+    - 156.263
+    - 8.942
+    - 9.906
+    - 5.473
+    - 0.551
+    - 0.939
+    n: 75
     ringed: false
     sd:
     - 3.0
-    - 1.544
-    - 1.56
-    - 1.353
+    - 1.689
+    - 1.742
+    - 1.42
+    - 0.056
     - 0.05
+  micro_scissors@open:
+    mu:
+    - 148.659
+    - 9.546
+    - 9.923
+    - 8.973
+    - 0.919
+    - 0.688
+    n: 16
+    ringed: false
+    sd:
+    - 3.601
+    - 0.956
+    - 1.13
+    - 0.8
+    - 0.076
+    - 0.067
   micro_scissors@side:
     mu:
-    - 157.124
-    - 7.896
-    - 8.733
-    - 4.688
-    - 0.533
-    n: 36
+    - 156.44
+    - 7.935
+    - 8.745
+    - 4.741
+    - 0.542
+    - 0.937
+    n: 72
     ringed: false
     sd:
     - 3.0
-    - 0.856
-    - 0.809
-    - 0.8
+    - 0.999
+    - 0.895
+    - 0.958
+    - 0.052
     - 0.05
   needle_holder_ryder:
     mu:
-    - 184.368
-    - 11.013
-    - 9.042
-    - 6.041
-    - 0.669
-    n: 17
+    - 185.114
+    - 10.951
+    - 8.995
+    - 6.06
+    - 0.665
+    - 0.519
+    n: 66
     ringed: true
     sd:
     - 3.0
     - 0.6
     - 0.6
     - 0.8
+    - 0.05
     - 0.05
   needle_holder_short:
     mu:
-    - 155.326
-    - 12.683
-    - 10.685
-    - 7.074
-    - 0.662
-    n: 31
+    - 154.808
+    - 12.49
+    - 10.553
+    - 6.993
+    - 0.665
+    - 0.695
+    n: 67
     ringed: true
     sd:
     - 3.0
@@ -76,55 +103,60 @@ classes:
     - 0.6
     - 0.8
     - 0.05
+    - 0.05
   scalpel_10:
     mu:
-    - 154.538
-    - 11.824
-    - 12.85
-    - 10.068
-    - 0.784
-    n: 36
+    - 153.134
+    - 11.631
+    - 12.597
+    - 10.051
+    - 0.785
+    - 0.959
+    n: 94
     ringed: false
     sd:
     - 3.0
     - 0.6
     - 0.6
     - 0.8
+    - 0.05
     - 0.05
   scalpel_11_long:
     mu:
-    - 237.939
-    - 12.565
-    - 13.266
-    - 11.795
-    - 0.889
-    n: 26
+    - 235.732
+    - 12.693
+    - 13.451
+    - 11.751
+    - 0.879
+    - 0.955
+    n: 71
     ringed: false
     sd:
-    - 3.0
+    - 4.397
     - 0.6
-    - 0.6
+    - 0.673
     - 0.8
+    - 0.05
     - 0.05
   scalpel_20:
     mu:
-    - 171.36
-    - 13.809
-    - 14.963
-    - 11.847
+    - 170.707
+    - 13.716
+    - 14.841
+    - 11.781
     - 0.792
-    n: 22
+    - 0.963
+    n: 83
     ringed: false
     sd:
     - 3.0
-    - 0.671
-    - 0.738
+    - 0.632
+    - 0.603
     - 0.8
+    - 0.05
     - 0.05
 # Measured joints (rad) at the scan pose with the gripper open: the camera pose the service assumes.
 scan_q: [0.06213, 1.60996, 1.88494, -1.15857, -0.00268, -0.05177]
-# Added to every grab point: where the closed fingertips actually meet at grasp height (photographed on bare table
-# with the real pick motion, 2026-10-24) is (+5.0, +3.4) mm from the arm's target. (The earlier (-1.4, -10.6) from a
-# 3 cm hover check put real grasps ~7 mm off-centre: the aim at 3 cm doesn't hold at the table.)
-# + (0, +7.5): on the real picks the jaws still came down 5-10 mm right of the tool in the camera view (-y; user).
+# Added to every grab point: where the closed fingertips meet at grasp height (-5.0, -3.4) mm, + (0, +7.5)
+# because the jaws still came down 5-10 mm right of the tool in the camera view (-y; user, kept 2026-10-24).
 grasp_offset_mm: [-5.0, 4.1]

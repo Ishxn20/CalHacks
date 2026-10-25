@@ -24,7 +24,7 @@ LAYOUT = {"scalpel_11_long": (470, 68), "needle_holder_ryder": (439, 23), "micro
           "needle_holder_short": (419, -50), "scalpel_10": (447, -81), "forceps_fine_vascular": (466, -108),
           "micro_scissors@flat": (451, -143), "scalpel_20": (440, -187)}
 MATCH_MM = 25.0
-FLOOR = [3.0, 0.6, 0.6, 0.8, 0.05]        # measurement noise floor per feature (mm, mm, mm, mm, ratio)
+FLOOR = [3.0, 0.6, 0.6, 0.8, 0.05, 0.05]  # measurement noise floor per feature (mm, mm, mm, mm, ratio, ratio)
 
 
 def views(d: Path):

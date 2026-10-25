@@ -19,9 +19,7 @@ def test_scan_frame_finds_all_eight_parts():
                        "scalpel_10", "forceps_fine_vascular", "scissors_micro_forward"], got
     # the #20 touched the old right finger in this photo; with the re-taped fingers' mask it may count as complete
     assert got[7] in ("scalpel_20", "maybe scalpel_11_long / scalpel_20"), got
-    thin = ("forceps_fine_vascular", "needle_holder_short", "needle_holder_ryder")   # grabbed at their thinnest point
+    thin = ("scissors_micro_forward", "needle_holder_short", "needle_holder_ryder")  # grabbed at their thinnest point
     assert all(380 < d.grasp_mm[0] < 520 for d in dets if d.fine_id not in thin)
     assert all(350 < d.grasp_mm[0] < 560 for d in dets)
     assert all(2 < d.width_mm < 25 for d in dets)  # across the jaws at the grab point: the arm closes a few mm past it
-    forceps = next(d for d in dets if d.fine_id == "forceps_fine_vascular")
-    assert 360 < forceps.grasp_mm[0] < 400        # user: at its thinnest point, near the tips (they point at the arm)

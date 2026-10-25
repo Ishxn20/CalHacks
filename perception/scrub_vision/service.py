@@ -4,6 +4,8 @@
 
     POST /plan {"instrument": id}            -> grasp plan, or why not (see planner.py)
     POST /verify {"expected": id, "slot": _} -> {"ok", "detected", "confidence"} (arm's verify hook)
+    POST /observe {"q": joints rad, "reset"} -> red parts: add this camera view; {"seen", "incomplete"} (the arm moves
+                                                the wrist camera until no part is cut off, then asks /plan)
     POST /reset_staging                      -> a new pile: forget what was learned about this one
     GET  /debug                              -> annotated JPEG of the last analysed frame
     GET  /status
@@ -72,12 +74,20 @@ class RedPartsSegmenter:
         from .red_parts import RedPartsDetector
         self.det = RedPartsDetector()
         self.q = np.array(self.det.model["scan_q"], float)
+        self.views: list[Detection] | None = None   # merged detections from /observe (None: use the scan frame)
 
     def H(self, shape) -> np.ndarray:
         return self.det.cam.H_px_to_mm(self.q, shape)
 
     def detect(self, bgr: np.ndarray) -> list[Detection]:
-        return self.det.detect(bgr, self.q)
+        return self.views if self.views is not None else self.det.detect(bgr, self.q)
+
+    def observe(self, bgr: np.ndarray, q, reset: bool) -> dict:
+        """One more camera view (taken at joints q); keeps each part's best view so far."""
+        dets = self.det.detect(bgr, np.asarray(q, float))
+        self.views = self.det.merge([] if reset or self.views is None else self.views, dets, self.q, bgr.shape)
+        parts = [d for d in self.views if d.candidates]
+        return {"seen": len(parts), "incomplete": sum(d.exposure < 1 for d in parts)}
 
 
 class VisionService:
@@ -98,6 +108,12 @@ class VisionService:
         if self.region is not None:
             segs = [s for s in segs if (s[0] & self.region).sum() >= 0.8 * s[0].sum()]
         return [identify(m, c, self.H, self.templates, self.instruments, seg_conf=p) for m, c, p in segs]
+
+    def observe(self, q, reset: bool = False) -> dict:
+        with self.lock:
+            if not isinstance(self.segmenter, RedPartsSegmenter):
+                return {"seen": 0, "incomplete": 0}
+            return self.segmenter.observe(self.frame_source(), q, reset)
 
     def plan(self, target_id: str) -> dict:
         with self.lock:
@@ -176,6 +192,8 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
                     return self._json(200, svc.plan(str(body.get("instrument", ""))))
                 if self.path.startswith("/verify"):
                     return self._json(200, svc.verify(str(body.get("expected", ""))))
+                if self.path.startswith("/observe"):
+                    return self._json(200, svc.observe(body["q"], bool(body.get("reset"))))
                 if self.path.startswith("/reset_staging"):
                     return self._json(200, {"ok": True})
                 self._json(404, {"error": "not found"})
