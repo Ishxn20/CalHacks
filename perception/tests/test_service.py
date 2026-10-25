@@ -96,3 +96,19 @@ def test_detections_off_the_work_mat_are_dropped(tmp_path):
     assert "forceps_resano" in ids and "scissors_potts" not in ids
     no_mat = VisionService(lambda: img, H, gm, TrueInstances(world), log_dir=tmp_path)
     assert len(no_mat.detect(img)) == 2
+
+
+def test_an_identity_marked_up_close_overrides_the_scan(tmp_path):
+    """The two micro scissors look the same from the scan; once the hover check has said which one lies where
+    (VisionService.mark), the planner sees it as that one and asks for the other one elsewhere."""
+    world = {}
+    img, world["masks"] = frame([("scissors_micro_forward", -60, -40, 0.0), ("scissors_micro_back", 80, 30, 0.5)])
+    gm = np.zeros(img.shape[:2], bool)
+    svc = VisionService(lambda: img, H, gm, TrueInstances(world), log_dir=tmp_path)
+    first = svc.plan("scissors_micro_forward")["target"]
+    svc.mark(first["x_mm"], first["y_mm"], "scissors_micro_back")             # the hover saw a curled hook there
+    second = svc.plan("scissors_micro_forward")
+    assert second["action"] == "grasp_target"
+    assert np.hypot(second["target"]["x_mm"] - first["x_mm"], second["target"]["y_mm"] - first["y_mm"]) > 60
+    marked = min(svc.detect(img), key=lambda d: np.hypot(d.grasp_mm[0] - first["x_mm"], d.grasp_mm[1] - first["y_mm"]))
+    assert marked.fine_id == "scissors_micro_back" and marked.candidates == ["scissors_micro_back"]

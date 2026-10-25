@@ -32,6 +32,7 @@ from .templates import build_templates, load_instruments
 
 log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
+KNOWN_RADIUS_MM = 40.0   # a marked identity applies to the detection whose grasp point is this close
 TEMPLATE_MM_PER_PX = 0.5
 
 
@@ -95,6 +96,7 @@ class VisionService:
                  segmenter, log_dir: Path | None = None, region: np.ndarray | None = None) -> None:
         self.frame_source, self.H, self.gripper_mask, self.segmenter = frame_source, H, gripper_mask, segmenter
         self.region = region          # work mat in pixels; detections mostly off it are ignored
+        self.known: list[tuple[float, float, str]] = []   # (x_mm, y_mm, fine_id) confirmed close up (mark)
         self.log_dir = log_dir
         self.instruments = load_instruments()
         self.templates = build_templates(self.instruments, TEMPLATE_MM_PER_PX)
@@ -107,7 +109,19 @@ class VisionService:
         segs = self.segmenter(bgr, self.gripper_mask if mask_gripper else None)
         if self.region is not None:
             segs = [s for s in segs if (s[0] & self.region).sum() >= 0.8 * s[0].sum()]
-        return [identify(m, c, self.H, self.templates, self.instruments, seg_conf=p) for m, c, p in segs]
+        dets = [identify(m, c, self.H, self.templates, self.instruments, seg_conf=p) for m, c, p in segs]
+        for d in dets:                # what the arm saw up close beats what the scan could tell (e.g. the scissors' hook)
+            for x, y, fid in self.known:
+                if np.hypot(d.grasp_mm[0] - x, d.grasp_mm[1] - y) < KNOWN_RADIUS_MM \
+                        and d.coarse == self.instruments[fid].coarse:
+                    d.fine_id, d.alt_ids, d.candidates = fid, [], [fid]
+        return dets
+
+    def mark(self, x_mm: float, y_mm: float, fine_id: str) -> None:
+        """The instrument at (x, y) is fine_id (seen from the hover); later plans treat it as that."""
+        with self.lock:
+            self.known = [k for k in self.known if np.hypot(k[0] - x_mm, k[1] - y_mm) >= KNOWN_RADIUS_MM]
+            self.known.append((float(x_mm), float(y_mm), fine_id))
 
     def observe(self, q, reset: bool = False) -> dict:
         with self.lock:
@@ -195,6 +209,9 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
                 if self.path.startswith("/observe"):
                     return self._json(200, svc.observe(body["q"], bool(body.get("reset"))))
                 if self.path.startswith("/reset_staging"):
+                    svc.known.clear()                 # a new pile: forget what was seen up close
+                    if isinstance(svc.segmenter, RedPartsSegmenter):
+                        svc.segmenter.views = None
                     return self._json(200, {"ok": True})
                 self._json(404, {"error": "not found"})
             except Exception as e:  # noqa: BLE001 - always answer; the arm turns errors into speech

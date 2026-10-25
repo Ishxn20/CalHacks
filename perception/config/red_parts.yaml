@@ -1,6 +1,6 @@
 # Fitted 2026-10-24 (6 features: length, mean width, median width, narrow-end width (mm), narrow end / median
 # width, solidity) on real wrist-camera views of two layouts, robust stats (median, 1.4826 MAD), by
-# 8ebde141 scratchpad refit.py; includes the open micro scissors (blades spread into a loop).
+# tools/refit_red_parts.py; includes the open micro scissors (blades spread into a loop).
 classes:
   forceps_fine_vascular:
     mu:
