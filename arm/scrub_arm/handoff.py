@@ -28,6 +28,7 @@ from .driver import ArmDriver, ArmFault, MotionAborted
 from .verify import Verifier
 
 log = logging.getLogger(__name__)
+JOINT_ROOM_DEG = 10.0   # hover must leave every joint this far from its limit, or come in from the other side
 
 
 class Phase(str, Enum):
@@ -330,6 +331,31 @@ class ScrubAssistant:
             raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm")
         return q
 
+    def _pick_side(self, x_mm: float, y_mm: float, yaw_deg: float, z_lo: float, z_hi: float,
+                   allow_flip: bool = True) -> tuple[float, bool]:
+        """Which way round to come in: the planned jaw yaw, or from the other side (yaw + 180; the pinch is
+        symmetric) when the planned way leaves a joint within JOINT_ROOM_DEG of its limit at the hover. Real run
+        20261024-194649: joint 4 at -88.5 of -89 deg at x 495, so the centring's 1 mm / 3 deg corrections were
+        unsolvable. Neither side with that room: the one with the most. Returns (yaw_deg, tilt); TaskFailed if
+        neither side reaches (fails before anything moves)."""
+        best = None
+        for yaw in (yaw_deg, yaw_deg + 180.0) if allow_flip else (yaw_deg,):
+            tilt = self._tilt_for(x_mm, y_mm, yaw, z_lo, z_hi, allow_flip=False)
+            try:
+                q = self._solve(x_mm, y_mm, z_hi, yaw, False, tilt)
+                self._solve(x_mm, y_mm, z_lo, yaw, False, tilt)
+            except TaskFailed:
+                continue
+            room = float(np.degrees(np.minimum(q - self.cfg.lower, self.cfg.upper - q).min()))
+            if room >= JOINT_ROOM_DEG:
+                return yaw, tilt
+            if best is None or room > best[0]:
+                best = (room, yaw, tilt)
+        if best is None:
+            raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_hi * 1000:.0f} mm")
+        self._log(f"tight reach at ({x_mm:.0f}, {y_mm:.0f}): a joint is {best[0]:.0f} deg from its limit either way")
+        return best[1], best[2]
+
     def _tilt_for(self, x_mm: float, y_mm: float, yaw_deg: float, z_lo: float, z_hi: float,
                   allow_flip: bool = True) -> bool:
         """One orientation for a whole hover -> table -> lift: the pick tilt if it reaches both ends here, else
@@ -415,8 +441,8 @@ class ScrubAssistant:
         plan_yaw = yaw_deg
         z_hover = pk.table_z + pk.hover
         z_grasp = pk.table_z + thickness_mm / 2000.0              # jaws close on the instrument's mid-height
-        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_grasp, z_hover, allow_flip)
-        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip, tilt)   # fail before moving if unreachable
+        yaw_deg, tilt = self._pick_side(x_mm, y_mm, yaw_deg, z_grasp, z_hover, allow_flip)
+        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, False, tilt)
         self.phase = Phase.PICKING
         d.move_to(q_hover, exact=True)            # an IK target: cancel gravity sag (the RL alignment starts here)
         d.gripper_open()
