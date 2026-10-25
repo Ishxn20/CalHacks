@@ -112,3 +112,15 @@ def test_an_identity_marked_up_close_overrides_the_scan(tmp_path):
     assert np.hypot(second["target"]["x_mm"] - first["x_mm"], second["target"]["y_mm"] - first["y_mm"]) > 60
     marked = min(svc.detect(img), key=lambda d: np.hypot(d.grasp_mm[0] - first["x_mm"], d.grasp_mm[1] - first["y_mm"]))
     assert marked.fine_id == "scissors_micro_back" and marked.candidates == ["scissors_micro_back"]
+
+
+def test_count_lists_the_instruments_in_view(server):
+    url, svc, _ = server
+    img, svc.world["masks"] = frame([("forceps_resano", -110, -90, 0.0), ("scissors_potts", 130, -60, 1.0),
+                                     ("scalpel_11", -100, 60, 0.0)])         # clear of each other: nothing hides anything
+    svc.frame_source = lambda: img
+    c = post(url + "/count", {})
+    ids = sorted(i["id"] for i in c["instruments"])
+    assert "forceps_resano" in ids and "scissors_potts" in ids and len(ids) == 3
+    assert c["unrecognised"] == 0
+    assert all("confident" in i for i in c["instruments"])

@@ -7,6 +7,7 @@
     POST /observe {"q": joints rad, "reset"} -> red parts: add this camera view; {"seen", "incomplete"} (the arm moves
                                                 the wrist camera until no part is cut off, then asks /plan)
     POST /reset_staging                      -> a new pile: forget what was learned about this one
+    POST /count                              -> {"instruments": [{"id", "confident"}], "unrecognised": n}: what the camera sees
     GET  /debug                              -> annotated JPEG of the last analysed frame
     GET  /status
 Reads repo-root config/camera.yaml (calibration).
@@ -148,6 +149,20 @@ class VisionService:
                                             "confidence": d.confidence, "length_mm": d.length_mm} for d in dets]})
             return p
 
+    def count(self) -> dict:
+        """Which instruments are in view, for the console's end-of-case count check.
+
+        An instrument counts as `confident` when its identity was settled; one that could be several look-alikes
+        (all scalpels, both micro scissors) is reported as its first candidate and the console treats the group as
+        interchangeable. Blobs no template explains are only tallied as `unrecognised`."""
+        with self.lock:
+            bgr = self.frame_source()
+            dets = self.detect(bgr)
+            self.last_debug = annotate(bgr, dets, None)
+            seen = [{"id": d.fine_id or d.candidates[0], "confident": d.fine_id is not None, "exposure": round(d.exposure, 3)}
+                    for d in dets if d.candidates]
+            return {"instruments": seen, "unrecognised": sum(1 for d in dets if not d.candidates)}
+
     def verify(self, expected: str) -> dict:
         """Classify the instrument hanging in the gripper (the blob that reaches into the gripper zone)."""
         with self.lock:
@@ -208,6 +223,8 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
                     return self._json(200, svc.verify(str(body.get("expected", ""))))
                 if self.path.startswith("/observe"):
                     return self._json(200, svc.observe(body["q"], bool(body.get("reset"))))
+                if self.path.startswith("/count"):
+                    return self._json(200, svc.count())
                 if self.path.startswith("/reset_staging"):
                     svc.known.clear()                 # a new pile: forget what was seen up close
                     if isinstance(svc.segmenter, RedPartsSegmenter):
