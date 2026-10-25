@@ -81,7 +81,7 @@ def main() -> None:
         d.gripper_open()
         d.move_pose("rest", speed=0.5)
     finally:
-        P.cap.release()
+        P.camera.cap.release()
         P.park_and_shutdown(P.app)
 
 
