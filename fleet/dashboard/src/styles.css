@@ -1,0 +1,210 @@
+/* Palette from the OR: drape green ground, instrument-steel ink, scrub teal for normal state,
+   Prolene blue-violet for Claude/dataset work, arterial red only when something has stopped. */
+:root {
+  --drape: #e3ecea;
+  --drape-deep: #d2e0dd;
+  --paper: #f6faf9;
+  --steel: #23302f;
+  --steel-soft: #5d6e6c;
+  --scrub: #1d6b64;
+  --prolene: #3d3fa0;
+  --artery: #b3261e;
+  --amber: #a5670a;
+  --line: #b9cbc8;
+  color-scheme: light;
+  font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--steel);
+  background: var(--drape);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--drape); }
+code { font-size: 0.9em; background: var(--drape-deep); padding: 0 0.3em; border-radius: 3px; }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+h1 { font-size: 1.25rem; }
+h2 { font-size: 1.6rem; }
+h3 { font-size: 1rem; margin-bottom: 0.6rem; }
+p { margin: 0.2rem 0; }
+.quiet { color: var(--steel-soft); }
+.small { font-size: 0.85rem; }
+.err { color: var(--artery); font-size: 0.85rem; }
+.setup { padding: 2rem; }
+
+button {
+  font: inherit;
+  font-size: 0.9rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--steel);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--scrub); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--prolene); outline-offset: 2px; }
+input {
+  font: inherit;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+  color: var(--steel);
+  min-width: 0;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  padding: 0 clamp(16px, 3vw, 40px) 40px;
+  column-gap: clamp(20px, 3vw, 48px);
+}
+.top {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.key { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: var(--steel-soft); }
+.key input { width: min(320px, 60vw); }
+
+/* Fleet list: one row per arm, status lamp first. */
+.fleet ul { list-style: none; margin: 0 0 32px; padding: 0; }
+.arm-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  grid-template-areas: "lamp name badge" ". site badge" ". state state";
+  text-align: left;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.6rem 0.7rem;
+  column-gap: 0.6rem;
+}
+.arm-row.on { background: var(--paper); box-shadow: inset 3px 0 0 var(--scrub); }
+.arm-row:hover { border: none; background: var(--paper); }
+.lamp { grid-area: lamp; width: 10px; height: 10px; border-radius: 50%; margin-top: 0.4rem; }
+.lamp.ok { background: var(--scrub); }
+.lamp.off { background: var(--line); }
+.lamp.fault { background: var(--artery); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .lamp.fault { animation: none; } }
+.arm-name { grid-area: name; font-weight: 600; }
+.arm-site { grid-area: site; font-size: 0.82rem; color: var(--steel-soft); }
+.arm-state { grid-area: state; font-size: 0.85rem; }
+.badge {
+  grid-area: badge;
+  align-self: start;
+  background: var(--artery);
+  color: white;
+  font-size: 0.75rem;
+  border-radius: 10px;
+  padding: 0 0.45rem;
+}
+
+.dataset { border-top: 1px solid var(--line); padding-top: 18px; }
+.dataset h3 { color: var(--prolene); }
+.big { font-size: 2.6rem; font-weight: 600; line-height: 1; color: var(--prolene); font-variant-numeric: tabular-nums; }
+
+/* Arm detail */
+.detail > section { margin-bottom: 30px; max-width: 900px; }
+.arm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.fault-line {
+  color: white;
+  background: var(--artery);
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  margin: -12px 0 24px;
+  max-width: 900px;
+}
+.rec { border-color: var(--line); }
+.rec.on { border-color: var(--prolene); color: var(--prolene); }
+.recording .err { display: block; margin-top: 0.3rem; }
+
+/* The signature element: joint lag against the collision guard. */
+.joints { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+.joints li {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 4.5rem 4.5rem;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.3rem 0;
+}
+.jn { font-weight: 600; color: var(--steel-soft); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.num.dim { color: var(--steel-soft); font-size: 0.85rem; }
+.track { position: relative; height: 14px; background: var(--paper); border-radius: 7px; }
+.track::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 1px; background: var(--line); }
+.lag { position: absolute; top: 3px; bottom: 3px; background: var(--drape-deep); border-radius: 4px; min-width: 2px; }
+.warm .lag { background: #e9c88f; }
+.hot .lag { background: #e7a39e; }
+.hot .num.dim { color: var(--artery); font-weight: 600; }
+.cmd, .meas { position: absolute; top: -3px; width: 3px; height: 20px; border-radius: 2px; transform: translateX(-50%); }
+.cmd { background: var(--line); box-shadow: 0 0 0 1px var(--steel-soft); }
+.meas { background: var(--scrub); }
+.hot .meas { background: var(--artery); }
+
+.ask { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.ask input { flex: 1 1 260px; }
+.ask button[type="submit"] { background: var(--scrub); color: white; border-color: var(--scrub); }
+.row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.stop { margin-left: auto; color: var(--artery); border-color: var(--artery); font-weight: 600; }
+.log { list-style: none; padding: 0; margin: 0.8rem 0 0; font-size: 0.85rem; }
+.log li { padding: 0.15rem 0; }
+.st { display: inline-block; min-width: 3.6rem; font-weight: 600; }
+.st.done { color: var(--scrub); }
+.st.failed { color: var(--artery); }
+.st.queued, .st.sent { color: var(--amber); }
+
+.incident { border-left: 3px solid var(--line); padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; }
+.incident.open, .incident.diagnosing { border-color: var(--amber); }
+.incident.proposed { border-color: var(--prolene); }
+.incident.resolved, .incident.approved { border-color: var(--scrub); }
+.incident.failed, .incident.rejected { border-color: var(--artery); }
+.inc-fault { font-weight: 600; }
+details { margin: 0.4rem 0; }
+summary { cursor: pointer; color: var(--prolene); font-size: 0.9rem; }
+.steps { font-size: 0.82rem; padding-left: 1.2rem; max-height: 260px; overflow-y: auto; margin: 0.4rem 0; }
+.steps li { margin-bottom: 0.25rem; }
+.sk { color: var(--steel-soft); display: inline-block; min-width: 4.5rem; }
+.steps .tool_error .sk, .steps .error .sk { color: var(--artery); }
+.diag { max-width: 70ch; }
+.change { background: var(--paper); padding: 0.5rem 0.8rem; border-radius: 6px; max-width: 70ch; }
+.approve { background: var(--prolene); color: white; border-color: var(--prolene); }
+
+.episodes { list-style: none; padding: 0; margin: 0; }
+.episodes li { display: grid; grid-template-columns: 128px 1fr; gap: 1rem; padding: 0.7rem 0; border-top: 1px solid var(--line); }
+.episodes img, .nothumb {
+  width: 128px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--drape-deep);
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--steel-soft);
+}
+.caption { max-width: 70ch; }
+.ok { color: var(--scrub); font-weight: 600; }
+.bad { color: var(--artery); font-weight: 600; }
+.flags { color: var(--amber); }
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; }
+  .fleet ul { margin-bottom: 16px; }
+  .joints li { grid-template-columns: 2rem 1fr 4rem; }
+  .joints .num.dim { display: none; }
+  .episodes li { grid-template-columns: 96px 1fr; }
+  .episodes img, .nothumb { width: 96px; }
+}
