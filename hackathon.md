@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** claude-opus-5-5, claude-sonnet-5-5, gpt-6.1-sol, gpt-6-luna, Whisper base.en / small.en, yolo11n-seg
 - **Started:** 2026-10-24T03:15:29Z
-- **Last updated:** 2026-10-25T13:16:04Z
+- **Last updated:** 2026-10-25T16:09:03Z
 
 ## How we use Convex
 
@@ -20,17 +20,16 @@
 - **Event timeline and logs:** every utterance, command, job and fault is saved by a mutation and read by indexed queries. Proof: `console/convex/events.ts`.
 - **Live arm charts:** 20 Hz readings are stored in batches, rolled up per second, and pruned by an hourly cron. Proof: `console/convex/metrics.ts`, `console/convex/crons.ts`.
 - **Training episodes:** blurred wrist video goes to file storage. A scheduled action has Claude label each episode, and a cron retries failures. Proof: `console/convex/episodes.ts`, `console/convex/labeling.ts`.
-- **Tamper-evident audit:** the arm and the console publish their audit-log chain heads, and a mutation records rollback or fork alerts. Proof: `console/convex/audit.ts`.
+- **Tamper-evident audit:** arm and console audit-log heads are anchored; a mutation records rollback or fork alerts. Proof: `console/convex/audit.ts`.
 - **Dataset export:** the `/export/manifest` HTTP action returns accepted episodes with storage URLs behind an export key. Proof: `console/convex/http.ts`.
 
-**Updates live without a refresh:** on the **Live** tab, the instrument board, event timeline and latest arm readings. On the **Robot data** tab, the log view. All four use `onUpdate` subscriptions in `console/scrub_console/web/index.html`.
+**Updates live without a refresh:** on the **Live** tab, the instrument board, event timeline and latest arm readings. On the **Robot data** tab, the log view. All use `onUpdate` in `console/scrub_console/web/index.html`.
 
 ## Log
 
 All dates are UTC.
 
-- 10-24 `f202adb2` initial commit (README.md)
-- 10-24 `fcd2681a` arm control for reBot B601-RS (arm/)
+- 10-24 `fcd2681a` reBot B601-RS arm control (arm/)
 - 10-24 `9388e9a1` Whisper voice agent (voice/)
 - 10-24 `3d53257b` FK/IK and top-down grasp solver (arm/scrub_arm)
 - 10-24 `f60bace3` IK pick with contact-sensing descent (arm/scrub_arm)
@@ -55,3 +54,5 @@ All dates are UTC.
 - 10-25 `63bcbe1d` server picks and hands off by wrist camera (arm/, tools/)
 - 10-25 `4c42a221` integration tests (console/scrub_console, tools/demo.py)
 - 10-25 `63f38c9f` better error messages (arm/scrub_arm)
+- 10-25 `4c246931` hackathon log (hackathon.md, README.md)
+- 10-25 `18e63204` full technical README (README.md)
