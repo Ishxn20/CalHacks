@@ -13,6 +13,7 @@ import logging
 import math
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,6 +21,8 @@ import numpy as np
 from .config import ArmConfig, PoseLibrary
 
 log = logging.getLogger(__name__)
+
+SAMPLE_HZ = 20
 
 
 class ArmFault(RuntimeError):
@@ -104,6 +107,8 @@ class ArmDriver:
         self._fault: str | None = None
         self._bus_errors = 0
         self._guard_from = 0.0              # collision guard ignores feedback before this time
+        # 20 Hz readings for the console to drain via /status?since= (its 0.4 s poll would miss contact spikes).
+        self._samples: deque[dict] = deque(maxlen=400)
 
     # ── lifecycle ─────────────────────────────────────────────────────────
 
@@ -160,7 +165,9 @@ class ArmDriver:
 
     def _loop(self) -> None:
         period = 1.0 / self.cfg.control_rate_hz
+        sample_every = max(1, round(self.cfg.control_rate_hz / SAMPLE_HZ))
         next_t = time.perf_counter()
+        tick = 0
         while self._running:
             now = time.perf_counter()
             with self._lock:
@@ -190,6 +197,9 @@ class ArmDriver:
                     self._pos, self._tau = pos, tau
                 if enabled:
                     self._check_tracking(q, pos)
+            tick += 1
+            if tick % sample_every == 0:
+                self._sample()
 
             next_t += period
             sleep = next_t - time.perf_counter()
@@ -266,7 +276,26 @@ class ArmDriver:
                 "q_cmd_deg": _deg_list(self._q_cmd),
                 "gripper_deg": _deg_list(self._pos[-1:])[0],
                 "gripper_cmd_deg": round(float(np.degrees(self._g_cmd[0])), 2),
+                "tau_nm": _nm_list(self._tau[:-1]),
+                "gripper_tau_nm": _nm_list(self._tau[-1:])[0],
             }
+
+    def _sample(self) -> None:
+        with self._lock:
+            self._samples.append({
+                "t": round(time.time(), 3),
+                "q": _deg_list(self._pos[:-1]),
+                "q_cmd": _deg_list(self._q_cmd),
+                "tau": _nm_list(self._tau[:-1]),
+                "gripper": _deg_list(self._pos[-1:])[0],
+                "moving": self._traj is not None,
+                "enabled": self._enabled,
+            })
+
+    def samples(self, since: float) -> list[dict]:
+        """The 20 Hz readings taken after `since` (unix seconds), oldest first; the last ~20 s are kept."""
+        with self._lock:
+            return [s for s in self._samples if s["t"] > since]
 
     # ── motion ────────────────────────────────────────────────────────────
 
@@ -456,3 +485,7 @@ class ArmDriver:
 
 def _deg_list(a: np.ndarray) -> list[float | None]:
     return [None if np.isnan(x) else round(float(np.degrees(x)), 2) for x in a]
+
+
+def _nm_list(a: np.ndarray) -> list[float | None]:
+    return [None if np.isnan(x) else round(float(x), 3) for x in a]

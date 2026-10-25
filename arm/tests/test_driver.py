@@ -129,3 +129,16 @@ def test_exact_move_does_not_dip_by_the_sag_first(app):
     done.set()
     th.join()
     assert max(seen) < q2[1] + math.radians(1.0)      # never ran 4 deg past the target before correcting
+
+
+def test_samples_are_taken_at_about_20_hz_and_drained_by_time(app):
+    d = app.driver
+    t0 = time.time()
+    time.sleep(1.0)
+    got = d.samples(t0)
+    assert 10 <= len(got) <= 40                  # ~20 Hz, generous for a loaded CI box
+    s = got[-1]
+    assert len(s["q"]) == len(s["q_cmd"]) == len(s["tau"]) == 6 and "gripper" in s and "moving" in s
+    assert all(x is None or isinstance(x, float) for x in s["tau"])
+    assert d.samples(got[-1]["t"]) == [] or d.samples(got[-1]["t"])[0]["t"] > got[-1]["t"]
+    assert "tau_nm" in d.snapshot() and "gripper_tau_nm" in d.snapshot()

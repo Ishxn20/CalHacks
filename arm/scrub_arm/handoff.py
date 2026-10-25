@@ -120,11 +120,12 @@ class ScrubAssistant:
         self._log("stop requested")
         self.driver.stop()
 
-    def status(self) -> dict:
+    def status(self, since: float | None = None) -> dict:
         with self._lock:
             job = dict(self._job) if self._job else None
             last = dict(self._last_job) if self._last_job else None
-        return {
+        extra = {} if since is None else {"samples": self.driver.samples(since)}
+        return {**extra, 
             "phase": self.phase.value,
             "holding": self.holding.describe() if self.holding else None,
             "holding_slot": self.holding.slot.id if self.holding and self.holding.slot else None,
