@@ -4,6 +4,7 @@
 
     POST /plan {"instrument": id}            -> declutter plan (see planner.py)
     POST /verify {"expected": id, "slot": _} -> {"ok", "detected", "confidence"} (arm's verify hook)
+    POST /count                              -> {"instruments": [{"id", "confident"}], "unrecognised": n}: what the camera sees
     POST /reset_staging                      -> forget which staging spots are used
     GET  /debug                              -> annotated JPEG of the last analysed frame
     GET  /status
@@ -103,6 +104,20 @@ class VisionService:
                                             "confidence": d.confidence, "length_mm": d.length_mm} for d in dets]})
             return p
 
+    def count(self) -> dict:
+        """Which instruments are in view, for the console's end-of-case count check.
+
+        An instrument counts as `confident` when its identity was settled; one that could be several look-alikes
+        (all scalpels, both micro scissors) is reported as its first candidate and the console treats the group as
+        interchangeable. Blobs no template explains are only tallied as `unrecognised`."""
+        with self.lock:
+            bgr = self.frame_source()
+            dets = self.detect(bgr)
+            self.last_debug = annotate(bgr, dets, None)
+            seen = [{"id": d.fine_id or d.candidates[0], "confident": d.fine_id is not None, "exposure": round(d.exposure, 3)}
+                    for d in dets if d.candidates]
+            return {"instruments": seen, "unrecognised": sum(1 for d in dets if not d.candidates)}
+
     def verify(self, expected: str) -> dict:
         """Classify the instrument hanging in the gripper (the blob that reaches into the gripper zone)."""
         with self.lock:
@@ -163,6 +178,8 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
                     return self._json(200, svc.plan(str(body.get("instrument", ""))))
                 if self.path.startswith("/verify"):
                     return self._json(200, svc.verify(str(body.get("expected", ""))))
+                if self.path.startswith("/count"):
+                    return self._json(200, svc.count())
                 if self.path.startswith("/reset_staging"):
                     svc.used_staging.clear()
                     return self._json(200, {"ok": True})

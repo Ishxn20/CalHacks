@@ -91,3 +91,15 @@ def test_debug_returns_jpeg(server):
     post(url + "/plan", {"instrument": "forceps_resano"})
     with urllib.request.urlopen(url + "/debug", timeout=10) as r:
         assert r.headers["Content-Type"] == "image/jpeg" and r.read(2) == b"\xff\xd8"
+
+
+def test_count_lists_the_instruments_in_view(server):
+    url, svc, _ = server
+    img, svc.world["masks"] = frame([("forceps_resano", -110, -90, 0.0), ("scissors_potts", 130, -60, 1.0),
+                                     ("scalpel_11", -100, 60, 0.0)])         # clear of each other: nothing hides anything
+    svc.frame_source = lambda: img
+    c = post(url + "/count", {})
+    ids = sorted(i["id"] for i in c["instruments"])
+    assert "forceps_resano" in ids and "scissors_potts" in ids and len(ids) == 3
+    assert c["unrecognised"] == 0
+    assert all("confident" in i for i in c["instruments"])
