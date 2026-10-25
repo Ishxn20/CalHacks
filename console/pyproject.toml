@@ -1,0 +1,25 @@
+[project]
+name = "scrub-console"
+version = "0.1.0"
+description = "Operating-room console for the robotic scrub assistant: voice, Claude intent parsing, live instrument counts, audit, fault triage"
+requires-python = ">=3.10"
+# scrub-arm provides the shared instrument vocabulary, the catalog and the audit log; install it from ../arm.
+dependencies = ["scrub-arm", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+claude = ["anthropic>=2.3"]
+voice = ["cartesia>=4.2"]
+convex = ["convex>=0.8"]
+droid = ["droid-sdk>=0.5"]
+agents = ["uagents>=0.26"]
+dev = ["pytest>=8"]
+all = ["anthropic>=2.3", "cartesia>=4.2", "convex>=0.8", "droid-sdk>=0.5", "uagents>=0.26"]
+
+[tool.setuptools]
+packages = ["scrub_console"]
+
+[tool.setuptools.package-data]
+scrub_console = ["web/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
