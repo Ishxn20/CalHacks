@@ -1,7 +1,7 @@
 # Real-arm runbook: camera picks + hand-off
 
 How to set up, run, calibrate and recover the scrub-nurse arm with the wrist-camera tool recognition.
-State as of 2026-10-25 (branch `cv-model-test` = `main` at 6f8a38cc).
+State as of 2026-10-25 (branch `cv-model-test`). Current calibration numbers: `docs/AGENT_HANDOFF.md` section 4.
 
 ---
 
@@ -120,12 +120,12 @@ a hand-off, or on a camera-confirmed miss (the tool is still on the table, so th
 | Value | Where | Now | Redo with |
 |---|---|---|---|
 | Camera intrinsics K, distortion | `config/camera.yaml` | rms 0.21 px | `python -m scrub_arm.calibrate charuco` |
-| Hand-eye (camera on the gripper) | `config/camera.yaml` `handeye` | 7 views, 1.7 px | `python -m scrub_arm.calibrate handeye` |
-| Gripper open / closed angles | `arm/config/arm.yaml` `open_deg` / `closed_deg` | 179.81 / **-109.54** | teach tool: `g <deg>` until the tips just touch, then `gcal closed` |
-| Jaw gap (mm) per gripper angle | `arm.yaml` `width_mm_at_deg` | 0-95.5 mm, ~0.33 mm/deg | `tools/grip_sweep.py` (camera measures the fingers) |
+| Hand-eye (camera on the gripper) | `config/camera.yaml` `handeye` | 9 views, 1.4 px (redone 2026-10-25 after the knock) | `python -m scrub_arm.calibrate handeye` |
+| Gripper open / closed angles | `arm/config/arm.yaml` `open_deg` / `closed_deg` | **-0.31 / -209.58** (re-zeroed 2026-10-25; was 179.81 / -109.54) | teach tool: `g <deg>` until the tips just touch, then `gcal closed` |
+| Jaw gap (mm) per gripper angle | `arm.yaml` `width_mm_at_deg` | 0-85 mm, ~0.33 mm/deg, still on the -215.03 closed zero: re-shift or re-measure | `tools/grip_sweep.py` (camera measures the fingers) |
 | Fingertip drop when tilted | `arm.yaml` `pick.tilt_tip_drop_mm` | 7.0 | `tools/touch_table.py X Y YAW` (contact at a 9.2 mm tool-point height) |
-| **Grab-point correction** | `perception/config/red_parts.yaml` `grasp_offset_mm` | **[-20.3, 5.6]** | `tools/grasp_calib.py X Y YAW` (see below) |
-| Finger mask | `perception/config/finger_mask.png` | white-tape fingers | 30 views from `tools/capture_views.py`, pixels that never change |
+| **Grab-point correction** | `perception/config/red_parts.yaml` `grasp_offset_mm` | **[-20.3, 2.5]** | `tools/grasp_calib.py X Y YAW` (see below) |
+| Finger mask | `perception/config/finger_mask.png` | white-tape fingers, 14.4 % of the frame | `tools/capture_views.py OUT 12 24` then `tools/build_finger_mask.py OUT` |
 | Scan pose joints | `red_parts.yaml` `scan_q` | measured at scan | `tools/snap_scan.py` saves the joints |
 | Hand-off "taken" threshold | `tools/handoff_calib.json` | below 30 % of held (93k px held) | `tools/handoff_calib.py` |
 | Per-tool open width | `config/tray.yaml` `jaw_open_mm` | 30-35 mm | width at the grab point + 20 mm |
@@ -140,10 +140,11 @@ If picks start landing a consistent distance off the tools, the camera has proba
    fingertips open and closed (`hw_check/real/gcal/`).
 3. Read the pixel where the closed fingertips meet. Convert it with `Camera().px_to_mm([[u, v]], q, 2)` (q from the
    saved json); `meet - target` is the error.
-4. `grasp_offset_mm = -(meet - target) + [0, 7.5]` (the +7.5 mm in y is a user-measured nudge, kept on purpose).
+4. `grasp_offset_mm = -(meet - target)`, then check with `tools/pick_test.py` grasp photos and nudge by hand.
 
 History: (-1.4, -10.6) from a 3 cm hover check (wrong at the table), then (-5.0, 4.1) from grasp height, then
-(-20.3, 5.6) after the camera got knocked (the fingers sat ~125 px higher in the image).
+(-20.3, 5.6) after the camera got knocked (the fingers sat ~125 px higher in the image), then hand-tuned from grasp
+photos to (-20.3, 2.5) after the hand-eye was redone (2026-10-25).
 
 ---
 
