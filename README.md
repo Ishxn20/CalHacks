@@ -1,6 +1,6 @@
-# Scrub: a robotic surgical scrub assistant
+# Surgio: a robotic surgical scrub assistant
 
-Scrub is a robot arm that acts as a scrub nurse. You ask for an instrument by voice, by a hand signal or by typing.
+Surgio is a robot arm that acts as a scrub nurse. You ask for an instrument by voice, by a hand signal or by typing.
 The arm finds the instrument on the table with its wrist camera, picks it up and hands it to you. It lets go once
 the camera sees that you have taken it. A web console tracks where every instrument is, runs the end-of-case count
 and keeps a tamper-evident record of what happened. The console runs on Convex.
