@@ -95,9 +95,12 @@ REMAINING = {"scalpel_11": "#11 scalpel", "forceps_resano": "Resano forceps"}
 
 
 def test_prediction_must_name_an_instrument_that_is_on_the_tray(bitdeer):
-    _, ok = bitdeer(reply='Sure! {"instrument": "forceps_resano", "reason": "Forceps usually follow the scalpel."}')
+    server, ok = bitdeer(reply='Sure! {"instrument": "forceps_resano", "reason": "Forceps usually follow the scalpel."}')
     p = predict_next(["scalpel_11"], REMAINING, ok)
     assert p["instrument"] == "forceps_resano" and p["name"] == "Resano forceps" and p["generated_by"] == "bitdeer:some/model"
+    request = server.requests[0][2]
+    assert request["response_format"]["json_schema"]["strict"] is True
+    assert request["response_format"]["json_schema"]["schema"]["properties"]["instrument"]["enum"] == list(REMAINING)
     _, bad = bitdeer(reply='{"instrument": "hammer", "reason": "x"}')
     assert predict_next([], REMAINING, bad) is None
     _, junk = bitdeer(reply="no idea")
