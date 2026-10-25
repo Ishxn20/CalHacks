@@ -159,6 +159,8 @@ classes:
 scan_q: [0.06213, 1.60996, 1.88494, -1.15857, -0.00268, -0.05177]
 # Added to every grab point: where the closed fingertips meet at grasp height, measured with the camera on bare
 # paper, is (+20.3, +1.9) mm from the arm's target (2026-10-25, after the CAN faults / tug test knocked the wrist
-# camera: the fingers moved ~125 px up in the image; before it was (+5.0, +3.4)). + (0, +7.5) kept from the user's
-# "jaws come down 5-10 mm right of the tool". Re-measure with tools/grasp_calib.py if the camera mount moves again.
-grasp_offset_mm: [-20.3, 5.6]
+# camera: the fingers moved ~125 px up in the image; before it was (+5.0, +3.4)). The extra (0, +7.5) for "jaws come
+# down 5-10 mm right of the tool" was removed (user, 2026-10-25; it was [-20.3, 5.6]), then +20 mm to the left
+# (+y, left in the scan image) added in two 10 mm steps, then 25 after grasp photos, then 15 + 7.5 mm back to the right (user, 2026-10-25). Re-measure with tools/grasp_calib.py if
+# the camera mount moves again.
+grasp_offset_mm: [-20.3, 2.5]
