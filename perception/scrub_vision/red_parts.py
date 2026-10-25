@@ -37,6 +37,9 @@ NB = 24                                   # width profile bins along the part
 REJECT_SIGMA = 4.0                        # farther than this from every class: not one of our parts
 MARGIN_SIGMA = 0.5                        # runner-up closer than this: report both as candidates
 SAME_PART = {"micro_scissors": ("scissors_micro_forward", "scissors_micro_back")}
+# user: grab these at their thinnest point (in the middle the forceps slid out, and the jaws slid off the needle
+# holders' two shanks)
+GRAB_THINNEST = {"forceps_fine_vascular", "needle_holder_short", "needle_holder_ryder"}
 
 
 # ── geometry ──────────────────────────────────────────────────────────────
@@ -155,8 +158,14 @@ def features(comp: np.ndarray) -> dict:
     centre = (mu + mid_u * ax + mid_t * np.array([-ax[1], ax[0]])) / MM_PX
     jaw = np.abs(u - mid_u) < 6.0                                       # under the ~12 mm wide jaws
     grip_w = float(t[jaw].max() - t[jaw].min()) if jaw.any() else medw  # what the jaws must span there
+    # thinnest cross-section, at least one bin (~8 mm, > half the jaw width) in from either end
+    b = int(np.argmin(fill[1:NB - 1])) + 1
+    in_b = bins == b
+    thin = (mu + (u.min() + (b + 0.5) * L / NB) * ax + t[in_b].mean() * np.array([-ax[1], ax[0]])) / MM_PX
+    thin_w = float(t[in_b].max() - t[in_b].min())                       # what the jaws must span there
     return {"length": L, "area": area, "holes": holes, "medw": medw, "tipw": tip, "fill": fill.tolist(),
-            "vec": [L, area / L, medw, tip, tip / medw], "grip_w": grip_w, "centre_rc": (centre[1], centre[0]), "axis_cr": ax}
+            "vec": [L, area / L, medw, tip, tip / medw], "grip_w": grip_w, "centre_rc": (centre[1], centre[0]), "thin_rc": (thin[1], thin[0]),
+            "thin_w": thin_w, "axis_cr": ax}
 
 
 def classify(model: dict, f: dict) -> list[tuple[float, str]]:
@@ -187,7 +196,9 @@ class RedPartsDetector:
             self._canvas = (key, _Canvas(self.cam, q, shape))
         return self._canvas[1]
 
-    def detect(self, bgr: np.ndarray, q) -> list[Detection]:
+    def detect(self, bgr: np.ndarray, q, grasp_offset: bool = True) -> list[Detection]:
+        """grasp_offset=False: raw grab points (e.g. comparing against the fingertip aim pixel at the hover)."""
+        self._offset = np.array(self.model.get("grasp_offset_mm", (0.0, 0.0))) if grasp_offset else np.zeros(2)
         cv_ = self.canvas(q, bgr.shape)
         seen = np.ones(bgr.shape[:2], np.uint8)
         seen[load_fingers(bgr.shape)] = 0
@@ -207,11 +218,11 @@ class RedPartsDetector:
 
     def _detection(self, comp: np.ndarray, complete: bool, cv_: _Canvas) -> Detection:
         f = features(comp)
-        g_mm = cv_.to_mm(np.array([f["centre_rc"]]))[0] + np.array(self.model.get("grasp_offset_mm", (0.0, 0.0)))
+        g_mm = cv_.to_mm(np.array([f["centre_rc"]]))[0] + self._offset
         ax_cr = f["axis_cr"]                                   # canvas (col, row) -> table: col = -y, row = -x
         axis_deg = float(np.degrees(np.arctan2(-ax_cr[0], -ax_cr[1])))
         det = Detection(mask=cv_.back_to_image(comp), coarse=None, fine_id=None, length_mm=f["length"],
-                        width_mm=f["medw"], axis_deg=axis_deg, grasp_mm=(float(g_mm[0]), float(g_mm[1])),
+                        width_mm=f["grip_w"], axis_deg=axis_deg, grasp_mm=(float(g_mm[0]), float(g_mm[1])),
                         yaw_deg=axis_deg + 90.0, exposure=1.0 if complete else 0.0)
         det.shape_features = f                                # for fitting (scripts/fit_red_parts.py)
         vs, us = np.nonzero(det.mask)
@@ -233,6 +244,9 @@ class RedPartsDetector:
             det.fine_id, det.alt_ids = None, []
         det.confidence = float(max(0.0, 1.0 - best_d / (2 * REJECT_SIGMA)))
         det.thickness_mm = self.instruments[ids[0]].thickness_mm if ids[0] in self.instruments else 5.0
+        if part in GRAB_THINNEST:
+            det.grasp_mm = tuple(float(v) for v in cv_.to_mm(np.array([f["thin_rc"]]))[0] + self._offset)
+            det.width_mm = f["thin_w"]
         return det
 
     def _partial(self, det: Detection, f: dict) -> Detection:

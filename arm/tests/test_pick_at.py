@@ -252,3 +252,16 @@ def test_tilted_pick_keeps_its_tilt_to_the_table(ik_app):
     assert a._tilt_for(440, 0, 90, 0.003, 0.10) and not a._tilt_for(200, 0, 90, 0.003, 0.10)
     _, R = k.fk(a._solve(200, 0, ik_app.cfg.pick.table_z + 0.10, 90, tilt=False))   # where the tilt cannot reach
     assert (R @ k.tool_axis_local)[2] < -0.999
+
+
+def test_gripper_is_never_commanded_past_closed(ik_app):
+    """closed_deg is a hard mechanical limit: commanding ~9 deg past it at kp 20 broke the real gripper."""
+    d, g = ik_app.driver, ik_app.driver.cfg.gripper
+    lo, hi = min(g.open, g.closed), max(g.open, g.closed)
+    for cmd in (g.closed - 0.3, g.closed + 0.3 * np.sign(g.closed - g.open), g.open + 1.0):
+        d.set_gripper(cmd)
+        assert lo - 1e-9 <= d._g_cmd[0] <= hi + 1e-9
+    d.gripper_grasp(10.0)                       # closes to width - squeeze_mm, never past closed
+    assert lo - 1e-9 <= d._g_cmd[0] <= hi + 1e-9
+    if g.width_table:
+        assert abs(d._g_cmd[0] - g.angle_for(10.0 - g.squeeze_mm)) < 1e-6 or d._g_cmd[0] in (lo, hi)

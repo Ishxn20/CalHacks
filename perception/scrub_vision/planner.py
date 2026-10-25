@@ -37,6 +37,7 @@ def matches(d: Detection, target_id: str) -> bool:
 def _target_json(d: Detection, fid: str | None, ambiguous: bool = False) -> dict:
     return {"id": fid, "x_mm": round(d.grasp_mm[0], 1), "y_mm": round(d.grasp_mm[1], 1),
             "yaw_deg": round(d.yaw_deg, 1), "thickness_mm": d.thickness_mm,
+            "width_mm": round(d.width_mm, 1),        # across the jaws at the grab point: the arm closes a few mm past it
             "confidence": round(d.confidence, 3), "exposure": round(d.exposure, 3), "ambiguous": ambiguous}
 
 

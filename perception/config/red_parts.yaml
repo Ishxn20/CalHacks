@@ -126,4 +126,5 @@ scan_q: [0.06213, 1.60996, 1.88494, -1.15857, -0.00268, -0.05177]
 # Added to every grab point: where the closed fingertips actually meet at grasp height (photographed on bare table
 # with the real pick motion, 2026-10-24) is (+5.0, +3.4) mm from the arm's target. (The earlier (-1.4, -10.6) from a
 # 3 cm hover check put real grasps ~7 mm off-centre: the aim at 3 cm doesn't hold at the table.)
-grasp_offset_mm: [-5.0, -3.4]
+# + (0, +7.5): on the real picks the jaws still came down 5-10 mm right of the tool in the camera view (-y; user).
+grasp_offset_mm: [-5.0, 4.1]

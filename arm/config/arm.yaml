@@ -32,7 +32,7 @@ gripper:
   # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
   # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
   open_deg: 179.81
-  closed_deg: -79.52
+  closed_deg: -109.54
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
@@ -41,12 +41,14 @@ gripper:
   settle_s: 0.6          # time to let the jaws close before checking the grasp
   # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
   holding_min_gap_deg: 2.5   # the tapered tips stall only ~5 deg short of closed on a 13.5 mm scalpel
-  # Jaw gap between the fingertips (mm) at each motor angle (deg), measured 2026-10-24 with the wrist camera at the
-  # scan pose (hand-eye projection of the fingers, fully closed = 0). ~0.33 mm/deg; flattens at the open stop.
-  squeeze_mm: 3.0        # after the jaws stall on a tool, close this much further so it's held under pressure (user)
-  squeeze_kp: 20.0       # firm enough that 3 mm (~9 deg) presses (~3 N m); grip_kp 6 for the soft first close
-  width_mm_at_deg: [[-79.6, 0.0], [-53.7, 8.2], [-27.1, 16.8], [-1.3, 25.2], [24.6, 34.0], [50.6, 42.8],
-                    [76.4, 51.5], [102.2, 60.5], [128.1, 69.0], [154.1, 78.0], [179.6, 82.0]]
+  squeeze_mm: 3.0        # grasp: close to this much narrower than the part's width at the grab point (user), never
+                         # past closed_deg (a hard limit: commanding past it broke the gripper)
+  squeeze_kp: 20.0       # stiffness for that close (a soft kp 6 close stalled short of a thin needle-holder neck)
+  # Jaw gap between the fingertips (mm) at each motor angle (deg): re-measured 2026-10-24 after the user recalibrated
+  # closed_deg to where the tips really meet (-109.5): wrist-camera hand-eye projection of the fingers, ~0.33 mm/deg
+  # (the camera can't resolve the last ~10 mm, so that step is the same slope).
+  width_mm_at_deg: [[-109.5, 0.0], [-80.4, 9.7], [-51.5, 18.5], [-22.4, 28.5], [6.6, 37.7], [35.5, 47.5],
+                    [64.3, 57.5], [93.3, 67.3], [122.5, 77.0], [151.2, 86.5], [179.6, 95.5]]
 
 motion:
   speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven

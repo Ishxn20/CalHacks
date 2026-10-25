@@ -12,16 +12,16 @@
 # the jaws at the grab point, measured on 400+ real wrist-camera views (perception/scrub_vision/red_parts.py, grip_w),
 # + 2 x 10 mm (aim error ~2 mm + yaw error + room), so the open jaws come down without sweeping into the neighbours:
 # scalpels #10 12.9 / #20 15.2 / long #11 13.5, forceps 9.4, micro scissors 9.6 (on its side) - 10.7 (flat), needle
-# holders 21 (both shanks). Closing: the jaws close until they stall on the tool, then squeeze gripper.squeeze_mm
+# holders 21 across both shanks, but they're grabbed at their thin neck by the tip (red_parts GRAB_THINNEST): 30. Closing: the jaws close until they stall on the tool, then squeeze gripper.squeeze_mm
 # further (arm.yaml).
 instruments:
   needle_holder_castroviejo: {name: Castroviejo needle holder, category: needle_holder, orientable: true,
                               aliases: [castroviejo, castro, fine needle holder]}
-  needle_holder_ryder:       {jaw_open_mm: 41, name: Ryder needle holder, category: needle_holder, orientable: true,
+  needle_holder_ryder:       {jaw_open_mm: 30, name: Ryder needle holder, category: needle_holder, orientable: true,
                               aliases: [ryder, rider]}
   needle_holder_long:        {name: Long needle holder, category: needle_holder, orientable: true,
                               aliases: [long needle holder, long driver]}
-  needle_holder_short:       {jaw_open_mm: 41, name: Short needle holder, category: needle_holder, orientable: true,
+  needle_holder_short:       {jaw_open_mm: 30, name: Short needle holder, category: needle_holder, orientable: true,
                               aliases: [short needle holder, short driver]}
   forceps_debakey:           {name: DeBakey forceps, category: forceps,
                               aliases: [debakey, de bakey, debakeys, pickups]}

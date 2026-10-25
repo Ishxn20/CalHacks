@@ -254,7 +254,7 @@ class ScrubAssistant:
                 # base (yaw 48 was unreachable at (445, 18), yaw -132 fine). A flipped requested instrument is
                 # presented with the wrist turned 180 deg (_flipped), still handle-first.
                 self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"),
-                              jaw_open_mm=r.instrument.jaw_open_mm)
+                              jaw_open_mm=r.instrument.jaw_open_mm, width_mm=t.get("width_mm"))
             except TaskFailed:
                 if attempt:
                     raise
@@ -423,10 +423,12 @@ class ScrubAssistant:
         return z
 
     def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
-                 allow_flip: bool = True, fid: str | None = None, jaw_open_mm: float | None = None) -> None:
+                 allow_flip: bool = True, fid: str | None = None, jaw_open_mm: float | None = None,
+                 width_mm: float | None = None) -> None:
         """hover -> open -> centre (refine) -> jaws to the tool's open width -> straight down to grasp height ->
         close until the jaws stall on it, squeeze a few mm more -> straight up. TaskFailed on a miss (caller decides).
-        jaw_open_mm: this tool's open width (tray.yaml); None: fully open.
+        jaw_open_mm: this tool's open width (tray.yaml); None: fully open. width_mm: the part's width across the jaws at
+        the grab point (vision); the jaws close to a few mm less than that, never past fully closed.
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         plan_yaw = yaw_deg
@@ -450,7 +452,7 @@ class ScrubAssistant:
             d.gripper_width(jaw_open_mm)    # so they come down without sweeping into the neighbours
         z_now = self.kin.fk(d.q_measured())[0][2]
         self.move_line(0, 0, (z_grasp - z_now) * 1000, speed=slow, exact=False)
-        got_it = d.gripper_grasp()
+        got_it = d.gripper_grasp(width_mm)
         # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
         self.move_line(0, 0, (z_hover - z_grasp) * 1000, speed=slow)
         if not got_it:
