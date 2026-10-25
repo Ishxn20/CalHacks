@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay · Camera cues</title>
+<style>
+:root { color-scheme:light; --ink:#193d39; --muted:#637873; --line:#d9e2dc; --green:#255e4c; --paper:#f3f5ef; --red:#b53030 }
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,select,input{font:inherit}button,select,.file{border:1px solid var(--line);border-radius:8px;padding:9px 14px;background:#fff;color:var(--ink)}button,.file{cursor:pointer}button:disabled{opacity:.45;cursor:default}button.primary{background:var(--green);color:white;border-color:var(--green)}button.danger{color:var(--red);border-color:#d1aaaa}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #84ac9c;outline-offset:3px}
+.shell{max-width:1380px;margin:auto;padding:30px 36px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:25px}.eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:700;margin:0;color:var(--muted)}h1{font:400 37px/1.2 Georgia,serif;margin:6px 0}h2{font:400 24px Georgia,serif;margin:0}.muted{color:var(--muted)}.badge{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:99px;padding:5px 12px;background:white}.badge.real{color:var(--red);border-color:var(--red)}
+.feeds{display:grid;grid-template-columns:1fr 1fr;gap:22px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}.panel-head{padding:17px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}.panel-head p{margin:3px 0 0;font-size:13px;color:var(--muted)}.viewport{position:relative;aspect-ratio:16/10;background:#112622;display:flex;align-items:center;justify-content:center;overflow:hidden}.viewport video,.viewport img{width:100%;height:100%;object-fit:contain}.viewport video.mirror{transform:scaleX(-1)}[hidden]{display:none!important}.placeholder{position:absolute;padding:25px;text-align:center;color:#b7cec4;max-width:350px}.feed-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:13px 18px}.feed-actions select{max-width:100%;flex:1;min-width:130px}.feed-note{margin:0;padding:0 18px 14px;font-size:12px;color:var(--muted)}
+.below{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;margin-top:22px}.body{padding:22px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.toggle{display:flex;align-items:flex-start;gap:9px;margin:14px 0;font-size:14px}.toggle input{margin-top:4px;accent-color:var(--green)}.prediction{font:400 32px Georgia,serif;margin:15px 0 8px}.status{font-size:14px;min-height:23px}.error{color:var(--red)}.mapping{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:9px}.mapping li{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:12px 14px;background:#f6f8f3;border:1px solid transparent;border-radius:8px}.mapping li.active{border-color:#85ab96;background:#eaf3e8}.mapping b{font-size:14px}.mapping span{color:var(--muted);font-size:13px}.history{padding:0;list-style:none;font-size:12px;max-height:105px;overflow:auto;color:var(--muted)}.history li{padding:4px 0;border-top:1px solid var(--line)}.bar{display:flex;justify-content:space-between;gap:12px;align-items:center}.note{font-size:12px;color:var(--muted)}footer{font-size:12px;color:var(--muted);padding:20px 0}.file input{display:none}.file{font-size:13px}.screen-reader{position:absolute;left:-9999px}
+@media(max-width:760px){.shell{padding:20px 15px}.feeds,.below{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:30px}.panel-head{padding:14px} .viewport{aspect-ratio:4/3}}
+</style>
+</head>
+<body><main class="shell">
+<header><div><p class="eyebrow">Relay / preset camera-cue demo</p><h1>A tool, before you ask.</h1><span class="muted">Left hand on brown table → Claude → tool → arm</span></div><span class="badge" id="mode">Connecting…</span></header>
+<div class="feeds">
+  <section class="panel" aria-label="Doctor camera">
+    <div class="panel-head"><div><h2>Doctor view</h2><p>Camera · left hand and brown table in view</p></div><span class="badge" id="doctor-live">Camera off</span></div>
+    <div class="viewport"><video id="doctor" autoplay playsinline muted class="mirror" hidden></video><p class="placeholder" id="doctor-empty">Rest your left hand on the brown table. Show five fingers, tuck the thumb, or spread it about 90° from the index.</p></div>
+    <div class="feed-actions"><label class="screen-reader" for="doctor-device">Doctor camera</label><select id="doctor-device"><option value="">FaceTime / default camera</option></select><button id="camera">Start camera</button><label class="file">Use recorded clip<input id="clip" type="file" accept="video/*"></label></div>
+    <p class="feed-note" id="doctor-note">Preview stays on this Mac. Start recognition to send small frames to Claude.</p>
+  </section>
+  <section class="panel" aria-label="Robot camera">
+    <div class="panel-head"><div><h2>Robot view</h2><p>Wrist camera · tool tray and pickup</p></div><span class="badge" id="robot-live">Camera off</span></div>
+    <div class="viewport"><img id="robot-image" alt="Live robot wrist camera" hidden><video id="robot-video" autoplay playsinline muted hidden></video><p class="placeholder" id="robot-empty">Connect the wrist camera and choose it below. With the physical arm, the server shares one camera feed with the picker.</p></div>
+    <div class="feed-actions"><label class="screen-reader" for="robot-device">Robot camera</label><select id="robot-device"><option value="">Server wrist camera</option></select><button id="robot-camera">Connect preview</button></div>
+    <p class="feed-note" id="robot-note">A browser preview is for display. Physical picking uses the server wrist camera.</p>
+  </section>
+</div>
+<div class="below">
+  <section class="panel body" aria-label="Gesture recognition">
+    <div class="bar"><h2>Next tool</h2><span class="badge" id="recognition">Paused</span></div>
+    <p class="prediction" id="tool">Left hand on the brown table</p>
+    <p class="status" id="observation" aria-live="polite">Recognition has not started.</p>
+    <p class="note" id="confidence">A clear left-hand pose at 90% confidence or higher selects a tool.</p>
+    <label class="toggle"><input id="auto" type="checkbox"><span>Pick and present automatically when the next tool is recognized</span></label>
+    <div class="actions"><button class="primary" id="watch" disabled>Start recognition</button><button id="pause" disabled>Pause recognition</button><button id="pick" disabled>Pick selected tool</button></div>
+    <p class="status error" id="error" role="alert"></p>
+    <ol class="history" id="history" aria-label="Recent recognition results"></ol>
+  </section>
+  <section class="panel body" aria-label="Fixed cue mapping">
+    <h2>One left hand. Three poses.</h2>
+    <p class="note">Rest the left hand palm-down on the brown table. Your right hand is not needed. These assignments are preset for the demo.</p>
+    <ul class="mapping"><li data-gesture="five_fingers"><b>Five fingers resting normally</b><span>#10 scalpel</span></li><li data-gesture="four_fingers"><b>Four fingers; thumb tucked</b><span>#20 scalpel</span></li><li data-gesture="thumb_right_angle"><b>Five fingers; thumb spread ~90°</b><span>Fine vascular forceps</span></li></ul>
+    <p class="note">For #10, keep the thumb closer to the index. For forceps, spread the thumb into a clear L shape. The brown table must be visible; lift your hand briefly before repeating the same pose.</p>
+    <p id="arm-status" class="status" aria-live="polite">Connecting to the arm…</p>
+    <div class="actions"><button id="release" disabled>Release tool</button><button class="danger" id="stop">Stop arm & recognition</button><button id="reset">Reset</button></div>
+  </section>
+</div>
+<footer>Preset hand-cue demo. Claude reads the visible cue; Python maps it to a tool. Frames are not recorded by this app.</footer>
+</main>
+<script src="/camera.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const view = { state:null, doctorStream:null, robotStream:null, clipURL:null, frames:[], analyzing:false, generation:null, active:false, sourceVersion:0, logs:[], serverPreview:false, lastAnalysis:0, cameraError:"" };
+const doctorSource = new DemoCameraSource(navigator.mediaDevices);
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data = await r.json(); if (!r.ok) throw new Error(data.error || "Request failed."); return data;
+}
+function error(e) { $("error").textContent = e.message || String(e); }
+function stopTracks(stream) { if (stream) stream.getTracks().forEach(t => t.stop()); }
+function render(s) {
+  view.state = s;
+  $("mode").textContent = s.robot.simulated ? "Simulated arm" : "Physical arm";
+  $("mode").classList.toggle("real", !s.robot.simulated);
+  $("recognition").textContent = s.enabled ? (view.analyzing ? "Claude is looking…" : "Watching") : "Paused";
+  $("watch").disabled = s.enabled || !$("doctor").srcObject && !view.clipURL || !s.claude_available || s.robot.stopped;
+  $("pause").disabled = !s.enabled; $("auto").disabled = s.enabled;
+  const p = s.prediction;
+  $("pick").disabled = !s.enabled || !p || !p.confirmed || p.picked || s.robot.busy || s.robot.stopped;
+  $("release").disabled = s.robot.phase !== "presenting";
+  $("reset").disabled = s.robot.busy;
+  $("arm-status").textContent = `${s.robot.simulated ? "Simulated arm" : "Arm"} · ${s.robot.phase}. ${s.robot.message}`;
+  $("error").textContent = s.error || view.cameraError;
+  if (!s.claude_available) $("error").textContent = "Claude key missing. Set ANTHROPIC_API_KEY and restart the server.";
+  if (p) {
+    $("tool").textContent = p.tool || "Waiting for a left-hand pose";
+    $("observation").textContent = p.observation;
+    const timing = p.latency_ms == null ? "" : `${(p.latency_ms/1000).toFixed(1)}s Claude · `;
+    $("confidence").textContent = `${timing}${Math.round(p.confidence * 100)}% model confidence · ${p.message}`;
+  } else {
+    $("tool").textContent = "Left hand on the brown table";
+    $("observation").textContent = "Five fingers → #10. Thumb tucked → #20. Thumb spread ~90° → forceps.";
+    $("confidence").textContent = `${s.confirmations === 1 ? "One clear cue" : "Two matching cues"} at ${Math.round(s.threshold*100)}% confidence selects a tool.`;
+  }
+  document.querySelectorAll("[data-gesture]").forEach(el => el.classList.toggle("active", !!p && el.dataset.gesture === p.gesture));
+}
+async function pause() {
+  view.active = false; view.generation = null; view.frames = [];
+  render(await api("/api/configure", {enabled:false,auto_pick:false}));
+}
+async function devices() {
+  const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  for (const id of ["doctor-device","robot-device"]) {
+    const select = $(id), old = select.value;
+    select.replaceChildren(new Option(id === "doctor-device" ? "FaceTime / default camera" : "Server wrist camera", ""));
+    cams.forEach((d,i) => select.add(new Option(d.label || `Camera ${i+1}`, d.deviceId)));
+    if (cams.some(d => d.deviceId === old)) select.value = old;
+    else if (id === "doctor-device") {
+      try { const saved = cams.find(d => d.label && d.label === localStorage.getItem("doctor-camera-label")); if(saved) select.value = saved.deviceId; } catch(e) { /* storage may be unavailable */ }
+    }
+  }
+  return cams;
+}
+async function doctorCamera(version, opening) {
+  const [stream] = await Promise.all([opening, pause()]);
+  if (!stream || version !== view.sourceVersion) return;
+  const cams = await devices();
+  if (version !== view.sourceVersion || stream !== doctorSource.stream) return;
+  const video = $("doctor"), track = stream.getVideoTracks()[0];
+  view.doctorStream = stream; video.srcObject = stream; video.classList.add("mirror");
+  try { await video.play(); } catch(e) { e.previewFailure=true; throw e; }
+  if (version !== view.sourceVersion) return;
+  video.hidden = false; $("doctor-empty").hidden = true;
+  $("doctor-live").textContent = "Live camera"; $("camera").textContent = "Restart camera";
+  $("doctor-note").textContent = track.label + " · camera only, no microphone";
+  $("doctor-device").value = track.getSettings().deviceId || (cams.find(d => d.label === track.label) || {}).deviceId || "";
+  try { localStorage.setItem("doctor-camera-label", track.label); } catch(e) { /* optional preference */ }
+  track.onended = () => {
+    if (view.doctorStream !== stream) return;
+    view.sourceVersion++; doctorSource.stop(); view.doctorStream=null; video.srcObject=null;
+    video.hidden=true; $("doctor-empty").hidden=false;
+    view.cameraError="The selected camera disconnected. Reconnect the iPhone and start the camera again.";
+    $("doctor-live").textContent="Camera disconnected"; $("doctor-note").textContent=view.cameraError;
+    pause().catch(error);
+  };
+  view.cameraError="";
+  render(view.state); $("error").textContent = "";
+}
+function cameraMessage(e) {
+  const detail = `${e.name || "CameraError"}: ${e.message || "Could not start the selected camera."}`;
+  if (e.previewFailure) return "Camera connected, but Safari could not play the preview. " + detail;
+  if (e.name === "NotAllowedError") return "Safari denied camera access for this page. " + detail;
+  if (["NotReadableError","AbortError"].includes(e.name)) return "Safari could not start this camera; it may be busy or reconnecting. " + detail;
+  if (["NotFoundError","OverconstrainedError"].includes(e.name)) return "The selected camera is no longer available. Reconnect the iPhone and select it again. " + detail;
+  return detail;
+}
+async function startDoctorCamera() {
+  const version=++view.sourceVersion;
+  const selected=$("doctor-device"), id=selected.value, label=selected.options[selected.selectedIndex]?.text || "";
+  view.cameraError=""; view.frames=[]; view.doctorStream=null;
+  if (view.clipURL) URL.revokeObjectURL(view.clipURL); view.clipURL=null;
+  const video=$("doctor"); video.pause(); video.srcObject=null; video.removeAttribute("src"); video.controls=false; video.hidden=true;
+  $("doctor-empty").hidden=false; $("doctor-live").textContent="Connecting…";
+  $("camera").disabled = true; $("camera").textContent = "Waiting for camera…";
+  $("doctor-note").textContent = "Allow camera access in Safari if prompted.";
+  // Start capture before awaiting network I/O, preserving Safari's click activation.
+  const opening=doctorSource.open(id,label);
+  try { await doctorCamera(version,opening); }
+  catch(e) {
+    if(version !== view.sourceVersion) return;
+    doctorSource.stop(); view.doctorStream=null; video.srcObject=null;
+    view.cameraError=cameraMessage(e); error(new Error(view.cameraError));
+    $("doctor-note").textContent=view.cameraError; $("doctor-live").textContent="Camera off";
+  }
+  finally { if(version === view.sourceVersion) { $("camera").disabled=false; $("camera").textContent=view.doctorStream ? "Restart camera" : "Start camera"; } }
+}
+$("camera").onclick = startDoctorCamera;
+$("doctor-device").onchange = startDoctorCamera;
+$("clip").onchange = async e => {
+  try {
+    const file = e.target.files[0]; if (!file) return;
+    await pause(); view.sourceVersion++; doctorSource.stop(); view.doctorStream = null; view.cameraError="";
+    if (view.clipURL) URL.revokeObjectURL(view.clipURL);
+    const v = $("doctor"); v.srcObject = null; view.clipURL = URL.createObjectURL(file); v.src = view.clipURL;
+    v.classList.remove("mirror"); v.controls = true; v.loop = false;
+    await v.play(); v.hidden = false; $("doctor-empty").hidden = true;
+    $("doctor-live").textContent = "Recorded clip"; $("doctor-note").textContent = file.name + " · played locally";
+    render(view.state);
+  } catch(e) { error(e); }
+};
+$("doctor").onended = () => { if (view.active) pause().catch(error); };
+$("doctor").onseeking = () => { view.frames = []; if (view.active) pause().catch(error); };
+$("robot-camera").onclick = async () => {
+  try {
+    stopTracks(view.robotStream); view.robotStream = null;
+    const id = $("robot-device").value;
+    view.serverPreview = !id;
+    if (id) {
+      if (view.doctorStream && view.doctorStream.getVideoTracks()[0].getSettings().deviceId === id) throw new Error("Choose a different camera for the robot view.");
+      if (!view.state.robot.simulated) throw new Error("With the physical arm, choose Server wrist camera so the picker owns that camera.");
+      view.robotStream = await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:id}},audio:false});
+      $("robot-video").srcObject = view.robotStream; await $("robot-video").play();
+      $("robot-video").hidden = false; $("robot-image").hidden = true; $("robot-empty").hidden = true;
+      $("robot-live").textContent = "Live preview";
+    } else {
+      $("robot-video").hidden = true;
+      if (view.state.robot.camera_error) throw new Error(view.state.robot.camera_error);
+      $("robot-image").hidden = false; $("robot-empty").hidden = true; $("robot-live").textContent = "Server camera";
+    }
+  } catch(e) { error(e); }
+};
+$("robot-image").onerror = () => { $("robot-image").hidden = true; $("robot-empty").hidden = false; $("robot-live").textContent = "No camera frames"; };
+$("robot-image").onload = () => { $("robot-image").hidden = false; $("robot-empty").hidden = true; $("robot-live").textContent = "Server camera"; };
+$("watch").onclick = async () => {
+  try {
+    $("error").textContent = ""; view.frames = [];
+    const s = await api("/api/configure", {enabled:true,auto_pick:$("auto").checked});
+    view.generation = s.generation; view.active = true; render(s);
+  } catch(e) { error(e); }
+};
+$("pause").onclick = () => pause().catch(error);
+$("pick").onclick = async () => { try { render(await api("/api/pick", {generation:view.generation})); } catch(e) { error(e); } };
+for (const action of ["release","stop","reset"]) $(action).onclick = async () => {
+  try {
+    if (action !== "release") { view.active=false; view.frames=[]; view.generation=null; }
+    render(await api("/api/control", {action}));
+  } catch(e) { error(e); }
+};
+function sample() {
+  const v = $("doctor");
+  if (!view.active || document.hidden || v.readyState < 2 || v.paused || v.ended) return;
+  const canvas = document.createElement("canvas"), scale = Math.min(1,512/v.videoWidth);
+  canvas.width = Math.round(v.videoWidth*scale); canvas.height = Math.round(v.videoHeight*scale);
+  canvas.getContext("2d").drawImage(v,0,0,canvas.width,canvas.height);
+  view.frames.push(canvas.toDataURL("image/jpeg",.65)); view.frames = view.frames.slice(-3);
+}
+async function analyze() {
+  if (!view.active || view.analyzing || document.hidden || view.frames.length < 3 || $("doctor").paused || performance.now()-view.lastAnalysis < 900) return;
+  const generation = view.generation, version = view.sourceVersion;
+  view.analyzing = true; view.lastAnalysis = performance.now(); $("recognition").textContent = "Claude is looking…";
+  try {
+    const s = await api("/api/analyze", {frames:[...view.frames],generation});
+    if (view.active && generation === view.generation && version === view.sourceVersion && !s.ignored) {
+      render(s);
+      if (s.prediction) {
+        const p = s.prediction; view.logs.unshift(`${new Date().toLocaleTimeString()} · ${p.tool || "No clear cue"} · ${Math.round(p.confidence*100)}% · ${p.message}`);
+        view.logs = view.logs.slice(0,8); $("history").replaceChildren(...view.logs.map(t => { const li = document.createElement("li"); li.textContent=t; return li; }));
+      }
+    }
+  } catch(e) { if (generation === view.generation) error(e); }
+  finally { view.analyzing=false; if (view.state) $("recognition").textContent = view.active ? "Watching" : "Paused"; }
+}
+setInterval(sample,350); setInterval(analyze,250);
+setInterval(async () => { try { const s=await api("/api/state"); if(view.active && s.generation !== view.generation) {view.active=false;view.frames=[];} render(s); } catch(e) { error(new Error("Demo server disconnected.")); } },1000);
+setInterval(() => { if (view.serverPreview && !document.hidden) $("robot-image").src = "/api/robot.jpg?t="+Date.now(); },250);
+document.addEventListener("visibilitychange", () => { if(document.hidden && view.active) pause().catch(error); });
+window.addEventListener("pagehide", () => { navigator.sendBeacon("/api/configure",new Blob([JSON.stringify({enabled:false,auto_pick:false})],{type:"application/json"})); doctorSource.stop(); stopTracks(view.robotStream); });
+api("/api/state").then(render).catch(error);
+if (navigator.mediaDevices) devices().catch(() => {}); else error(new Error("Use localhost in a browser with camera support."));
+</script></body></html>
