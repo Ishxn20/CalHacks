@@ -59,6 +59,7 @@ class Console:
     sim: bool = False
     demo: bool = False
     agents: object = None            # AgentNetwork when running with --agents
+    dataset: object = None           # DatasetRecorder when running with --record
 
     def capabilities(self) -> dict:
         runner = self.triage.runner
@@ -67,7 +68,8 @@ class Console:
                 "convex_url": self.settings.convex_url,
                 "agents": self.agents.addresses if self.agents else None,
                 "bitdeer": self.bitdeer is not None,
-                "droid": None if runner is None else ("rehearsal" if getattr(runner, "simulated", False) else "sdk")}
+                "droid": None if runner is None else ("rehearsal" if getattr(runner, "simulated", False) else "sdk"),
+                "recording": None if self.dataset is None else ("simulated" if self.dataset.simulated else "camera")}
 
 
 def _droid_runner(rehearse: bool):
@@ -81,8 +83,24 @@ def _droid_runner(rehearse: bool):
     return RehearsalRunner() if rehearse else None
 
 
+def _dataset(record: str, sinks: list, bridge: Bridge, sim: bool):
+    """Record every arm job for the training set (`record` = a camera index, or "sim" for placeholder frames)."""
+    convex = next((s for s in sinks if isinstance(s, ConvexSink)), None)
+    if convex is None:
+        log.warning("--record needs Convex (CONVEX_URL + CONVEX_DEPLOY_KEY) to store episodes; not recording")
+        return None
+    from .dataset import DatasetRecorder
+    from .recorder import Recorder, open_camera, synthetic_camera
+
+    camera = synthetic_camera() if record == "sim" else open_camera(int(record))
+    ds = DatasetRecorder(Recorder(camera), convex.client, bridge.emit, simulated=record == "sim")
+    bridge.observers.append(ds.observe)
+    return ds
+
+
 def build_console(settings: Settings | None = None, sim: bool = False, demo: bool = False,
-                  rehearse_droid: bool = False, arm_config: Path | None = None, agents: bool = False) -> Console:
+                  rehearse_droid: bool = False, arm_config: Path | None = None, agents: bool = False,
+                  record: str | None = None) -> Console:
     s = settings or Settings.from_env()
     tray = load_tray_config()
     arm = ArmClient(s.arm_url, s.arm_token)
@@ -103,12 +121,13 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
 
     triage = Triage(arm_config or DEFAULT_CONFIG_DIR / "arm.yaml", _droid_runner(rehearse_droid), s.audit_dir / "triage",
                     audit=audit)
-    bridge = Bridge(arm, ledger, understand_fn, sinks=sinks, audit=audit, sim=sim, triage=triage,
+    bitdeer = BitdeerClient(s.bitdeer_key, s.bitdeer_base_url, s.bitdeer_model) if s.bitdeer_key else None
+    bridge = Bridge(arm, ledger, understand_fn, sinks=sinks, audit=audit, sim=sim, triage=triage, bitdeer=bitdeer,
                     observe=None if sim else PerceptionCounter(s.perception_url))
     triage.emit = bridge.emit
+    dataset = _dataset(record, sinks, bridge, sim) if record else None
     speech = CartesiaSpeech(api_key=os.environ.get("CARTESIA_API_KEY"), voice_id=s.cartesia_voice,
                             tts_model=s.cartesia_tts_model, stt_model=s.cartesia_stt_model)
-    bitdeer = BitdeerClient(s.bitdeer_key, s.bitdeer_base_url, s.bitdeer_model) if s.bitdeer_key else None
     net = None
     if agents:
         from .agents import AgentArm, AgentNetwork
@@ -117,4 +136,4 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
         net = AgentNetwork(understand_fn, arm, look=look,
                            on_hop=lambda src, dst, what: bridge.emit("agent_hop", source=src, target=dst, what=what)).start()
         bridge.arm, bridge.understand, bridge.observe = AgentArm(net, arm), net.understand, net.look
-    return Console(s, tray, arm, ledger, bridge, speech, audit, triage, bitdeer, sinks, parser, sim, demo, net)
+    return Console(s, tray, arm, ledger, bridge, speech, audit, triage, bitdeer, sinks, parser, sim, demo, net, dataset)

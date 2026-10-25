@@ -121,6 +121,8 @@ def test_an_unknown_command_from_claude_is_a_question(tray, resolve):
 @pytest.mark.parametrize("text,kind", [
     ("stop", "stop"), ("please halt", "stop"), ("go home", "home"), ("put it back", "return"),
     ("I've got it", "release"), ("count check", "count"), ("reset", "reset"),
+    ("approve", "approve"), ("approve the change", "approve"), ("reject it", "reject"), ("don't apply that", "reject"),
+    ("write the case report", "report"), ("what's next", "suggest"),
 ])
 def test_rules_controls(text, kind):
     assert rules_parse(text)[0] == kind
@@ -141,12 +143,22 @@ def test_nothing_heard_and_unknown_words(resolve):
 
 def test_tool_schemas_are_wellformed():
     names = [t["name"] for t in TOOLS]
-    assert names == ["request_instrument", "control", "report_used", "count_check", "ask"]
+    assert names == ["request_instrument", "control", "report_used", "count_check", "decide_fix", "after_case", "ask"]
     for t in TOOLS:
         props = set(t["input_schema"]["properties"])
         assert set(t["input_schema"]["required"]) <= props
         if t["name"] != "count_check":
             assert set(t["input_schema"]["required"]) == props      # strict mode: optional means nullable
+
+
+@pytest.mark.parametrize("tool, inp, kind", [
+    ("decide_fix", {"decision": "approve"}, "approve"), ("decide_fix", {"decision": "reject"}, "reject"),
+    ("after_case", {"action": "report"}, "report"), ("after_case", {"action": "suggest_next"}, "suggest"),
+])
+def test_claude_can_decide_a_fix_and_run_the_after_case_tools(resolve, tool, inp, kind):
+    p = ClaudeParser.__new__(ClaudeParser)
+    p.call = lambda text, context: (tool, inp)
+    assert understand("anything", resolve, p).kind == kind
 
 
 def test_rules_keep_suture_size_and_orientation_from_a_plain_sentence(tray, resolve):

@@ -16,10 +16,10 @@
   --serif: "Newsreader", Georgia, "Times New Roman", serif;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { background: var(--paper); }
 body { margin: 0; font: 15px/1.45 var(--sans); color: var(--ink); background: var(--paper); }
-button, input { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 3px solid var(--drape); outline-offset: 2px; }
 .shell { max-width: 1320px; margin: 0 auto; padding: 0 24px 56px; }
 
@@ -37,25 +37,28 @@ button { cursor: pointer; }
 .caps li.on { color: var(--ink); } .caps li.on::before { background: var(--ok); }
 .caps li.partial::before { background: var(--warn); }
 
-/* command bar */
-.ask { display: flex; gap: 10px; background: var(--sheet); border: 1.5px solid var(--drape); border-radius: 10px; padding: 8px; }
-.ask input { flex: 1; min-width: 0; border: 0; background: none; padding: 8px 10px; font: italic 400 20px/1.3 var(--serif); }
-.ask input::placeholder { color: #7d9298; }
-.ask input:focus-visible { outline: none; }
-.ask:focus-within { box-shadow: 0 0 0 3px var(--drape-wash); }
+/* the voice bar: replaces every button */
+.listen { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; background: var(--sheet); border: 1.5px solid var(--drape); border-radius: 10px; padding: 14px 18px; }
+.mic { display: flex; align-items: center; gap: 10px; font-weight: 600; min-width: 260px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--line); flex: none; }
+.dot.on { background: var(--ok); box-shadow: 0 0 0 4px #2b8a6626; }
+.dot.hearing { background: var(--drape); box-shadow: 0 0 0 6px var(--drape-wash); animation: pulse 0.9s ease-in-out infinite; }
+.dot.busy { background: var(--warn); }
+.dot.off { background: var(--alert); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 10px var(--drape-wash); } }
+.cue { margin: 0; flex: 1; min-width: 260px; font: italic 400 20px/1.3 var(--serif); color: var(--ink-soft); }
+.cue b { font-style: normal; color: var(--ink); }
 .btn { border: 1.5px solid var(--drape); background: var(--sheet); color: var(--drape); border-radius: 8px; padding: 8px 16px; font-weight: 500; }
 .btn:hover { background: var(--drape-wash); }
 .btn.primary { background: var(--drape); color: #fff; } .btn.primary:hover { background: var(--drape-deep); }
-.btn.rec { background: var(--alert); border-color: var(--alert); color: #fff; }
-.btn.danger { border-color: var(--alert); color: var(--alert); } .btn.danger:hover { background: var(--alert-wash); }
-.btn[disabled] { opacity: .45; cursor: default; }
+.btn.big { padding: 12px 22px; font-size: 17px; }
 .btn.quiet { border-color: var(--line); color: var(--ink-soft); }
 
 /* two-column main */
 .main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 36px; margin-top: 26px; align-items: start; }
 @media (max-width: 1020px) { .main { grid-template-columns: 1fr; } }
 
-/* instrument flow board: the one memorable thing */
+/* instrument flow board */
 .board { display: grid; grid-template-columns: 2.3fr 1fr 1fr 1.3fr; background: var(--sheet); border: 1.5px solid var(--ink); border-radius: 12px; overflow: hidden; }
 @media (max-width: 760px) { .board { grid-template-columns: 1fr 1fr; } }
 .zone { padding: 14px 16px 18px; border-left: 1px solid var(--line); min-height: 220px; }
@@ -74,18 +77,32 @@ button { cursor: pointer; }
 .chip.ghost { border: 1.5px dashed var(--alert); background: var(--alert-wash); color: var(--alert); }
 .chip.ghost svg { color: var(--alert); }
 .empty { color: var(--ink-soft); font: italic 400 15px var(--serif); }
-
 .count-line { margin: 16px 0 0; padding: 12px 16px; border-left: 4px solid var(--line); background: var(--sheet); font: 400 19px/1.35 var(--serif); }
 .count-line.ok { border-color: var(--ok); } .count-line.bad { border-color: var(--alert); background: var(--alert-wash); }
 .count-line small { display: block; font: 13px var(--sans); color: var(--ink-soft); margin-top: 2px; }
-.board-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
-/* side column: what was said + what happened */
+/* joint gauges: lag between where each joint is and where it was told to be, against the collision guard */
+.joints { margin-top: 22px; }
+.joints h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.joints .note { margin: 0 0 10px; }
+.jrow { display: grid; grid-template-columns: 28px 1fr 64px 64px; gap: 12px; align-items: center; padding: 4px 0; font-variant-numeric: tabular-nums; }
+.jrow .lbl { font-weight: 600; color: var(--ink-soft); }
+.track { position: relative; height: 10px; background: var(--line-soft); border-radius: 99px; overflow: hidden; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ok); border-radius: 99px; transition: width .3s; }
+.track i.warn { background: var(--warn); } .track i.bad { background: var(--alert); }
+.jrow .deg, .jrow .lag { text-align: right; }
+.jrow .lag { color: var(--ink-soft); }
+
+/* side column */
 .say-block { margin: 0 0 22px; }
-.say-block .heard { margin: 0; color: var(--ink-soft); }
+.say-block .heard { margin: 0; color: var(--ink-soft); min-height: 1.45em; }
 .say-block .reply { margin: 4px 0 0; font: 400 24px/1.25 var(--serif); }
 .say-block .how { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; }
 .side h2, .strip h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.phrases { margin: 0 0 22px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.phrases li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+.phrases q { font: italic 400 16px var(--serif); quotes: "“" "”"; }
+.phrases span { color: var(--ink-soft); font-size: 13px; text-align: right; }
 .log { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
 .log li { display: grid; grid-template-columns: 10px 1fr; gap: 0 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .log li::before { content: ""; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--line); }
@@ -93,11 +110,12 @@ button { cursor: pointer; }
 .log li.you::before { background: var(--drape); }
 .log time { color: var(--ink-soft); font-size: 12px; display: block; }
 
-/* lower strip: three ruled columns */
+/* lower strip */
 .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 36px; margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px; }
 @media (max-width: 1020px) { .strip { grid-template-columns: 1fr; gap: 32px; } }
 .strip p { margin: 0 0 10px; }
-.strip .note { color: var(--ink-soft); font-size: 13px; }
+.note { color: var(--ink-soft); font-size: 13px; }
+.say-this { margin: 10px 0 0; padding: 10px 12px; border-left: 4px solid var(--drape); background: var(--drape-wash); font: italic 400 17px/1.35 var(--serif); }
 .row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .row .k { flex: 1; } .row .v { font-weight: 500; text-align: right; }
 .good { color: var(--ok); } .bad { color: var(--alert); } .warnc { color: var(--warn); }
@@ -106,7 +124,21 @@ button { cursor: pointer; }
 .steps { margin: 8px 0; padding-left: 18px; color: var(--ink-soft); font-size: 13px; max-height: 140px; overflow: auto; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--warn-wash); color: var(--warn); margin-left: 6px; }
 .prose { font: 400 17px/1.5 var(--serif); white-space: pre-wrap; }
-.voice-note { color: var(--ink-soft); font-size: 13px; margin-top: 8px; }
+
+/* training data: every handover becomes a face-blurred, Claude-labelled clip */
+.dataset { margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px; }
+.dataset h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.episodes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.episodes li { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.episodes .req { font: italic 400 17px/1.3 var(--serif); margin: 0 0 6px; }
+.episodes .cap { margin: 6px 0; }
+.episodes .meta { color: var(--ink-soft); font-size: 13px; }
+.episodes .meta.bad { color: var(--alert); } .episodes .meta.good { color: var(--ok); }
+
+/* presenter-only rehearsal tools (simulation / --demo): not part of the OR workflow */
+.rehearse { margin-top: 40px; border: 1.5px dashed var(--warn); border-radius: 10px; padding: 10px 16px; background: var(--sheet); }
+.rehearse summary { cursor: pointer; font-weight: 600; color: var(--warn); }
+.rehearse .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -123,12 +155,11 @@ button { cursor: pointer; }
     </div>
   </header>
 
-  <form class="ask" id="askform" autocomplete="off">
-    <input id="ask" type="text" aria-label="Ask for an instrument" placeholder="Ask for an instrument: “Castroviejo, backhand”">
-    <button class="btn" type="button" id="mic">Speak</button>
-    <button class="btn primary" type="submit">Send</button>
-  </form>
-  <p class="voice-note" id="voicenote"></p>
+  <section class="listen" aria-label="Voice">
+    <button class="btn primary big" id="start">Start listening</button>
+    <div class="mic" id="mic" hidden aria-live="polite"><span class="dot" id="micdot"></span><span id="micstate"></span></div>
+    <p class="cue">Say <b>“Scrub”</b>, then what you need: “Scrub, Castroviejo, backhand.”</p>
+  </section>
 
   <div class="main">
     <section aria-label="Instruments">
@@ -139,20 +170,30 @@ button { cursor: pointer; }
         <div class="zone used"><header><h2>Used</h2><span class="n" id="n-used">0</span></header><div class="chips" id="z-used"></div></div>
       </div>
       <p class="count-line" id="countline" hidden></p>
-      <div class="board-actions">
-        <button class="btn primary" id="countbtn">Count check</button>
-        <button class="btn quiet" id="simremove" hidden>Remove an instrument (simulation)</button>
-        <button class="btn quiet" id="simrestore" hidden>Put it back</button>
-        <button class="btn quiet" id="stopbtn">Stop the arm</button>
+      <div class="joints" aria-label="Arm joints">
+        <h2>Arm joints</h2>
+        <p class="note" id="jointnote">Bars show how far each joint lags where it was told to be. Past the collision guard the arm freezes itself.</p>
+        <div id="joints"></div>
       </div>
     </section>
 
     <aside class="side">
       <div class="say-block" aria-live="polite">
         <p class="heard" id="heard"></p>
-        <p class="reply" id="reply">Ready when you are.</p>
+        <p class="reply" id="reply">Tap “Start listening”, then talk.</p>
         <p class="how" id="how"></p>
       </div>
+      <h2>What you can say</h2>
+      <ul class="phrases">
+        <li><q>Scrub, Potts scissors</q><span>hand it over</span></li>
+        <li><q>Got it</q><span>let go</span></li>
+        <li><q>Stop</q><span>freeze, any time</span></li>
+        <li><q>Scrub, done with the Castro</q><span>mark used</span></li>
+        <li><q>Scrub, count</q><span>count check</span></li>
+        <li><q>Scrub, what's next?</q><span>then “stage it”</span></li>
+        <li><q>Scrub, write the case report</q><span>after the case</span></li>
+        <li><q>Scrub, approve</q><span>or “reject” a proposed fix</span></li>
+      </ul>
       <h2>What happened</h2>
       <ol class="log" id="log"></ol>
     </aside>
@@ -163,31 +204,39 @@ button { cursor: pointer; }
       <h2>Safety record</h2>
       <div id="audit"></div>
       <p class="note" id="auditnote"></p>
-      <button class="btn quiet" id="tamper" hidden>Tamper with a copy of the log</button>
-      <p class="note" id="tamperout"></p>
     </section>
     <section aria-label="Fault triage">
       <h2>Fault triage</h2>
-      <div id="triage"><p class="empty">No faults. If the arm freezes, Droid reads what happened and proposes a fix here for you to approve.</p></div>
-      <button class="btn quiet" id="fault" hidden>Simulate a fault</button>
+      <div id="triage"></div>
     </section>
     <section aria-label="After the case">
       <h2>After the case</h2>
-      <div class="board-actions" style="margin-top:0">
-        <button class="btn" id="reportbtn">Write the case report</button>
-        <button class="btn" id="predictbtn">Suggest the next instrument</button>
-      </div>
-      <div id="after"></div>
+      <div id="after"><p class="say-this">“Scrub, write the case report” or “Scrub, what's next?”</p></div>
     </section>
   </div>
+
+  <section class="dataset" aria-label="Training data">
+    <h2>Training data</h2>
+    <p class="note" id="datasetnote"></p>
+    <ol class="episodes" id="episodes"></ol>
+  </section>
+
+  <details class="rehearse" id="rehearse" hidden>
+    <summary>Presenter controls (rehearsal only, not part of the OR workflow)</summary>
+    <div class="acts">
+      <button class="btn quiet" id="simremove" hidden>Someone takes an instrument off the table</button>
+      <button class="btn quiet" id="simrestore" hidden>Put it back</button>
+      <button class="btn quiet" id="fault">Simulate a fault</button>
+      <button class="btn quiet" id="tamper">Tamper with a copy of the log</button>
+    </div>
+    <p class="note" id="tamperout"></p>
+  </details>
 </div>
 
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
 const S = { arm: {}, items: [], counts: {}, caps: {}, sim: false, online: null, audit: {}, triage: [], events: [], ghosts: [], lastCount: null, seq: 0, convexLive: false, anchors: {}, alerts: [] };
-const NAMES = { claude: "Claude", voice: "Cartesia", convex: "Convex", bitdeer: "Bitdeer", droid: "Droid" };
-let speakReplies = true;
 
 /* ── api ─────────────────────────────────────────────────────────────── */
 async function api(path, body) {
@@ -197,7 +246,7 @@ async function api(path, body) {
   return data;
 }
 
-/* ── glyphs: a few outlines so a chip says what kind of instrument it is ─ */
+/* ── glyphs ──────────────────────────────────────────────────────────── */
 const RINGS = '<circle cx="6" cy="3.6" r="2.8"/><circle cx="6" cy="10.4" r="2.8"/>';
 const GLYPH = {
   scalpel: '<path d="M2 7h38M40 7l14-4.2v8.4z"/>',
@@ -261,10 +310,9 @@ function renderHeader() {
     ["droid", c.droid === "sdk" ? "on" : c.droid === "rehearsal" ? "partial" : "off", c.droid === "rehearsal" ? "Droid (rehearsal)" : "Droid"],
   ];
   $("caps").innerHTML = items.map(([, st, label]) => `<li class="${st}">${label}</li>`).join("");
+  $("rehearse").hidden = !(S.sim || c.demo);
   $("simremove").hidden = $("simrestore").hidden = !S.sim;
   $("tamper").hidden = $("fault").hidden = !c.demo;
-  $("mic").disabled = !c.voice;
-  $("voicenote").textContent = c.voice ? "" : "Voice is off: set CARTESIA_API_KEY to talk to the console. Typing works either way.";
 }
 
 function renderCount() {
@@ -286,7 +334,7 @@ function renderAudit() {
 
 function renderTriage() {
   const p = S.triage[0];
-  if (!p) { $("triage").innerHTML = '<p class="empty">No faults. If the arm freezes, Droid reads what happened and proposes a fix here for you to approve.</p>'; return; }
+  if (!p) { $("triage").innerHTML = '<p class="empty">No faults. If the arm freezes, Droid reads what happened and proposes a fix here, and you approve or reject it out loud.</p>'; return; }
   const tone = { pending: "warnc", approved: "good", rejected: "", invalid: "bad", error: "bad", stale: "bad" }[p.status] || "";
   const diff = (p.diff || "").split("\n").map((l) => `<span class="${l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : "ctx"}">${esc(l)}</span>`).join("");
   $("triage").innerHTML = `<p><b>${esc(p.fault)}</b></p>
@@ -295,18 +343,56 @@ function renderTriage() {
     ${p.steps && p.steps.length ? `<ol class="steps">${p.steps.filter((s) => s.type !== "result").slice(-8).map((s) => `<li>${s.type === "tool" ? "Ran " + esc(s.name) : esc((s.text || "").slice(0, 140))}</li>`).join("")}</ol>` : ""}
     ${p.diff ? `<div class="diff">${diff}</div>` : ""}
     ${p.errors && p.errors.length ? `<p class="bad">Refused: ${p.errors.map(esc).join("; ")}</p>` : ""}
-    ${p.status === "pending" ? `<div class="board-actions"><button class="btn primary" data-act="approve" data-id="${p.id}">Approve change</button><button class="btn danger" data-act="reject" data-id="${p.id}">Reject</button></div>` : ""}
+    ${p.status === "pending" ? '<p class="say-this">Say “Scrub, approve” or “Scrub, reject”.</p>' : ""}
     ${p.needs_restart ? '<p class="note">Applied to arm.yaml. Restart the arm server for it to take effect.</p>' : ""}`;
   function statusWord(s) { return `<span class="${tone}">${{ running: "Droid is working…", pending: "Waiting for your decision", approved: "Approved", rejected: "Rejected", no_change: "Droid found no change worth making", invalid: "Proposal refused by the safety check", unavailable: "Droid isn't set up", error: "Triage failed", stale: "Out of date" }[s] || s}</span>`; }
 }
 
-function render() { renderHeader(); renderBoard(); renderCount(); renderAudit(); renderTriage(); renderLog(); }
+function renderAfter(e) {
+  const d = e.data;
+  if (e.kind === "report") $("after").innerHTML = `<p class="prose">${esc(d.text)}</p><p class="note">Written by ${esc(d.generated_by)}.</p>`;
+  else if (e.kind === "prediction") $("after").innerHTML = `<p class="prose">Next, probably the ${esc(d.name)}. ${esc(d.reason || "")}</p><p class="note">Suggested by ${esc(d.generated_by || "")}.</p><p class="say-this">Say “stage it” to get it ready.</p>`;
+}
+
+function renderDataset() {
+  const rec = S.caps.recording, st = S.dstats;
+  $("datasetnote").textContent = !rec ? "Recording is off. Start the console with --record to turn every handover into a face-blurred, Claude-labelled training clip."
+    : !S.convexLive ? "Recording is on; clips appear here once this page is connected to Convex."
+    : `${rec === "simulated" ? "Simulated arm: placeholder frames, so Claude will flag them and they won't be accepted. " : ""}`
+      + (st ? `${st.accepted} accepted of ${st.total} recorded (${st.minutes.toFixed(1)} min of training video), ${st.needsReview} waiting for a person. Faces are blurred on the robot before anything is stored.` : "");
+  const word = { pending: "Waiting for Claude…", labeling: "Claude is labelling…", failed: "Labelling failed (retries every 10 min)", skipped: "Not labelled (no consent or no footage)" };
+  $("episodes").innerHTML = (S.episodes || []).map((e) => {
+    const flags = [...e.privacyFlags.map((f) => "privacy: " + f), ...e.qualityFlags, ...(e.agreesWithRobot === false ? ["disagrees with the robot"] : [])];
+    return `<li><p class="req">“${esc(e.request || e.kind)}”</p>
+      <p class="meta">${esc(cap(e.kind))} ${esc(e.outcome)} · ${e.frameCount} frames · ${e.facesBlurred} faces blurred${e.simulated ? " · simulated" : ""}</p>
+      ${e.caption ? `<p class="cap">${esc(e.caption)}</p>` : `<p class="meta">${esc(word[e.labelStatus] || e.labelStatus)}${e.labelError ? ": " + esc(e.labelError) : ""}</p>`}
+      ${flags.length ? `<p class="meta bad">${flags.map(esc).join(", ")}</p>` : ""}
+      <p class="meta ${e.review === "accepted" ? "good" : ""}">${e.review === "accepted" ? "In the training set" : e.labelStatus === "done" ? "Held for a person" : ""}</p></li>`;
+  }).join("");
+}
+
+function render() { renderHeader(); renderBoard(); renderCount(); renderAudit(); renderTriage(); renderLog(); renderDataset(); }
+
+/* ── joint gauges (polled from the console's cached arm status, ~2 Hz) ── */
+async function pollJoints() {
+  if (document.hidden) return;
+  try {
+    const j = await api("/api/arm"), guard = j.guard_deg || 25;
+    if (!j.q_deg.length) { $("joints").innerHTML = '<p class="empty">No joint readings yet.</p>'; return; }
+    $("jointnote").textContent = `Bars show how far each joint lags where it was told to be. Past ${guard}° the collision guard freezes the arm. Gripper ${j.gripper_deg == null ? "?" : Math.round(j.gripper_deg)}°.`;
+    $("joints").innerHTML = j.q_deg.map((q, i) => {
+      const lag = q == null || j.q_cmd_deg[i] == null ? 0 : Math.abs(q - j.q_cmd_deg[i]), f = Math.min(lag / guard, 1);
+      return `<div class="jrow" role="img" aria-label="Joint ${i + 1}: ${q == null ? "unknown" : q.toFixed(1)} degrees, lag ${lag.toFixed(1)}"><span class="lbl">J${i + 1}</span><span class="track"><i class="${f > 0.8 ? "bad" : f > 0.5 ? "warn" : ""}" style="width:${(f * 100).toFixed(1)}%"></i></span><span class="deg">${q == null ? "–" : q.toFixed(1) + "°"}</span><span class="lag">Δ${lag.toFixed(1)}°</span></div>`;
+    }).join("");
+  } catch (e) { /* keep the last reading */ }
+}
 
 /* ── timeline ────────────────────────────────────────────────────────── */
 function describe(e) {
   const d = e.data;
   switch (e.kind) {
-    case "utterance": return ["you", `You: “${d.text}”`];
+    case "utterance": return ["you", `${d.via === "voice" || d.via === "speech" ? "Heard" : "You"}: “${d.text}”`];
+    case "announce": return ["warn", `Said: “${d.text}”`];
     case "command": return ["ok", d.name === "handoff" || d.name === "stage" ? `Sent to the arm: ${d.name} ${d.instrument}${d.slot ? " from slot " + d.slot : ""}` : `Sent to the arm: ${d.name}${d.instrument ? " " + d.instrument : ""}`];
     case "job": return [d.status === "done" ? "ok" : "bad", `${cap(d.kind)} ${d.status}${d.result ? ": " + d.result : ""}${d.error ? ": " + d.error : ""}`];
     case "arm_event": return ["", d.message];
@@ -319,6 +405,7 @@ function describe(e) {
     case "prediction": return ["", `Suggestion: ${d.name}`];
     case "tamper_demo": return [d.ok ? "bad" : "ok", d.ok ? "Tampering was NOT detected" : `Tampering detected on line ${d.line}`];
     case "sim": return ["warn", `Simulation: instrument ${d.action}`];
+    case "episode": return [d.status === "uploaded" ? "ok" : "warn", d.status === "uploaded" ? `Training clip saved: ${d.frames} frames, ${d.faces} faces blurred` : `Training clip ${d.status.replace("_", " ")}: ${d.reason || ""}`];
     case "agent_hop": return ["", `Agent message: ${d.source} to ${d.target} (${d.what})`];
     case "arm_offline": return ["bad", "Lost contact with the arm"];
     case "arm_online": return ["ok", "Arm connected"];
@@ -363,11 +450,13 @@ function onEvent(e) {
   S.seq = e.seq;
   if (!S.convexLive) { S.events.push(e); if (S.events.length > 300) S.events.shift(); }
   const d = e.data;
-  if (e.kind === "ledger") { if (S.convexLive) return; S.items = d.items; S.counts = d.counts; if (S.lastCount && !S.lastCount.ok) { /* keep the ghosts until the next count */ } }
+  if (e.kind === "ledger") { if (S.convexLive) return; S.items = d.items; S.counts = d.counts; }
   else if (e.kind === "count") setCount(d);
   else if (e.kind === "sim" && d.action === "restored") { S.ghosts = []; }
   else if (e.kind === "audit") S.audit[d.source] = { ok: d.ok, entries: d.seq, head: d.head };
   else if (e.kind === "proposal") { S.triage = [d, ...S.triage.filter((p) => p.id !== d.id)]; }
+  else if (e.kind === "announce") { showReply({ say: d.text }); speak(d.text); }
+  else if (e.kind === "report" || e.kind === "prediction") renderAfter(e);
   else if (e.kind === "arm" || e.kind === "arm_online" || e.kind === "arm_offline") { refresh(); return; }
   render();
 }
@@ -380,69 +469,70 @@ function connect() {
   es.onerror = () => { es.close(); setTimeout(() => { refresh().then(connect); }, 1500); };
 }
 
-/* ── actions ─────────────────────────────────────────────────────────── */
+/* ── speaking: Cartesia Sonic when configured, else the browser's own voice. The mic is deaf while we talk. ── */
+const V = { listening: false, talking: 0, quietUntil: 0, voiceQ: Promise.resolve(), sendQ: Promise.resolve() };
+const deaf = () => V.talking > 0 || performance.now() < V.quietUntil;
+function speak(text) {
+  if (!V.listening || !text) return;
+  V.voiceQ = V.voiceQ.then(() => new Promise((done) => {
+    V.talking++;
+    const end = () => { V.talking--; V.quietUntil = performance.now() + 500; done(); };
+    if (S.caps.voice) {
+      const a = new Audio("/api/tts?text=" + encodeURIComponent(text));
+      a.onended = a.onerror = end; a.play().catch(end);
+    } else if ("speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(text); u.onend = u.onerror = end; speechSynthesis.speak(u);
+    } else end();
+  }));
+}
 function showReply(r) {
   $("heard").textContent = r.heard ? `“${r.heard}”` : "";
   $("reply").textContent = r.say || "";
   $("how").textContent = r.source ? (r.source === "claude" ? "Understood by Claude" : "Understood by the rule-based parser (Claude is off or unavailable)") : "";
-  if (speakReplies && S.caps.voice && r.say) { const a = new Audio("/api/tts?text=" + encodeURIComponent(r.say)); a.play().catch(() => {}); }
 }
-async function send(text) {
-  if (!text.trim()) return;
-  try { showReply(await api("/api/utterance", { text })); } catch (e) { showReply({ say: e.say || e.message }); }
+function handle(r) {
+  if (!r || r.ignored) { setMic("on", listeningLabel()); return; }
+  showReply(r); speak(r.say); setMic("on", listeningLabel());
 }
-$("askform").addEventListener("submit", (ev) => { ev.preventDefault(); const v = $("ask").value; $("ask").value = ""; send(v); });
-$("countbtn").onclick = async () => { try { showReply(await api("/api/count", {})); } catch (e) { showReply({ say: e.message }); } };
-$("stopbtn").onclick = () => send("stop");
-$("simremove").onclick = async () => {
-  const candidates = S.items.filter((i) => i.status === "tray");
-  if (!candidates.length) return;
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
-  await api("/api/sim/remove", { instrument: pick.instrument }); showReply({ say: `${pick.name} was taken off the table. Run a count check.` });
-};
-$("simrestore").onclick = async () => { await api("/api/sim/restore", {}); S.ghosts = []; render(); };
-$("fault").onclick = () => api("/api/triage/trigger", {}).catch((e) => showReply({ say: e.message }));
-$("tamper").onclick = async () => {
-  try { const r = await api("/api/demo/tamper", {}); $("tamperout").textContent = r.detected ? `A copy of the log was edited on line ${r.edited_line}. Verification caught it: ${r.error}. The real log is still ${r.original_intact ? "intact" : "NOT intact"}.` : "Tampering was not detected."; }
-  catch (e) { $("tamperout").textContent = e.message; }
-};
-$("triage").addEventListener("click", async (ev) => {
-  const b = ev.target.closest("button[data-act]"); if (!b) return;
-  try { const p = await api("/api/triage/" + b.dataset.act, { id: b.dataset.id }); S.triage = [p, ...S.triage.filter((x) => x.id !== p.id)]; renderTriage(); } catch (e) { showReply({ say: e.message }); }
-});
-$("reportbtn").onclick = async () => {
-  $("after").innerHTML = '<p class="empty">Writing…</p>';
-  try { const r = await api("/api/report", {}); $("after").innerHTML = `<p class="prose">${esc(r.text)}</p><p class="note">Written by ${esc(r.generated_by)}.</p>`; } catch (e) { $("after").textContent = e.message; }
-};
-$("predictbtn").onclick = async () => {
-  try {
-    const r = await api("/api/predict", {});
-    $("after").innerHTML = r.prediction ? `<p class="prose">Next, probably the ${esc(r.prediction.name)}. ${esc(r.prediction.reason)}</p><p class="note">Suggested by ${esc(r.prediction.generated_by)}.</p><button class="btn" id="stagebtn">Stage it</button>`
-      : `<p class="empty">${r.available ? "No confident suggestion yet." : "Suggestions need a Bitdeer key (BITDEER_API_KEY)."}</p>`;
-    if (r.prediction) $("stagebtn").onclick = () => send("stage " + r.prediction.name);
-  } catch (e) { $("after").textContent = e.message; }
-};
+function setMic(state, text) { $("micdot").className = "dot " + state; $("micstate").textContent = text; }
+const listeningLabel = () => S.caps.voice ? "Listening for “Scrub” (Cartesia)" : "Listening for “Scrub” (browser speech)";
 
-/* ── microphone: record, encode a 16 kHz WAV, send it ────────────────── */
-let rec = null;
-async function toggleMic() {
-  const b = $("mic");
-  if (!rec) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const ctx = new AudioContext(), src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [];
-      proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-      src.connect(proc); proc.connect(ctx.destination);
-      rec = { stream, ctx, proc, src, chunks }; b.textContent = "Stop"; b.classList.add("rec");
-    } catch (e) { showReply({ say: "The microphone isn't available. Allow it for this page, or type instead." }); }
-    return;
-  }
-  const { stream, ctx, proc, src, chunks } = rec; rec = null;
-  b.textContent = "Speak"; b.classList.remove("rec");
-  proc.disconnect(); src.disconnect(); stream.getTracks().forEach((t) => t.stop());
-  const wav = encodeWav(chunks, ctx.sampleRate, 16000); ctx.close();
-  try { showReply(await fetch("/api/audio", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav }).then(async (r) => { const d = await r.json(); if (!r.ok) throw Object.assign(new Error(d.error), { say: d.say }); return d; })); }
-  catch (e) { showReply({ say: e.say || e.message }); }
+/* ── listening, engine 1: Cartesia Ink. The mic runs continuously; a simple voice-activity detector cuts each
+      spoken phrase into a 16 kHz WAV that the console transcribes. The wake word is checked on the console. ── */
+async function listenCartesia() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch (e) { setMic("off", "Microphone blocked: allow it for this page, then reload."); return false; }
+  const ctx = new AudioContext(), src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(2048, 1, 1);
+  const chunkS = 2048 / ctx.sampleRate, preRoll = Math.ceil(0.3 / chunkS);
+  let floor = 0.01, loudRun = 0, quietRun = 0, inPhrase = false, buf = [], pre = [];
+  proc.onaudioprocess = (ev) => {
+    const x = ev.inputBuffer.getChannelData(0); let sum = 0;
+    for (let i = 0; i < x.length; i++) sum += x[i] * x[i];
+    const rms = Math.sqrt(sum / x.length), chunk = new Float32Array(x);
+    if (deaf()) { inPhrase = false; buf = []; pre = []; loudRun = 0; return; }        // never transcribe our own voice
+    const loud = rms > Math.max(0.012, floor * 3);
+    floor = loud ? floor * 0.998 + rms * 0.002 : floor * 0.95 + rms * 0.05;           // follows steady room noise
+    if (!inPhrase) {
+      pre.push(chunk); if (pre.length > preRoll) pre.shift();
+      loudRun = loud ? loudRun + 1 : 0;
+      if (loudRun >= 2) { inPhrase = true; buf = pre; pre = []; quietRun = 0; setMic("hearing", "Hearing…"); }
+      return;
+    }
+    buf.push(chunk); quietRun = loud ? 0 : quietRun + 1;
+    const secs = buf.length * chunkS;
+    if (quietRun * chunkS > 0.8 || secs > 10) {
+      inPhrase = false; loudRun = 0;
+      const phrase = buf; buf = [];
+      if (secs < 0.5) { setMic("on", listeningLabel()); return; }
+      setMic("busy", "Transcribing…");
+      const wav = encodeWav(phrase, ctx.sampleRate, 16000);
+      V.sendQ = V.sendQ.then(() => fetch("/api/audio", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav })
+        .then((r) => r.json()).then(handle).catch(() => setMic("on", listeningLabel())));
+    }
+  };
+  src.connect(proc); proc.connect(ctx.destination);
+  return true;
 }
 function encodeWav(chunks, inRate, outRate) {
   const len = chunks.reduce((n, c) => n + c.length, 0), all = new Float32Array(len); let o = 0;
@@ -454,7 +544,49 @@ function encodeWav(chunks, inRate, outRate) {
   for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, all[Math.floor(i * ratio)])); pcm.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
   return pcm.buffer;
 }
-$("mic").onclick = toggleMic;
+
+/* ── listening, engine 2 (no Cartesia key): the browser's speech recognition (Chrome sends audio to Google). ── */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function listenBrowser() {
+  if (!SR) { setMic("off", "This browser can't listen. Use Chrome, or set CARTESIA_API_KEY."); return false; }
+  const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+  rec.onresult = (ev) => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const res = ev.results[i], text = res[0].transcript.trim();
+      if (deaf() || !text) continue;
+      if (!res.isFinal) { if (/^\W*((hey|ok|okay)\W+)?scrub/i.test(text)) setMic("hearing", `“${text}”`); continue; }
+      V.sendQ = V.sendQ.then(() => api("/api/heard", { text }).then(handle).catch(() => setMic("on", listeningLabel())));
+    }
+  };
+  rec.onerror = (ev) => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { V.listening = false; setMic("off", "Microphone blocked: allow it for this page, then reload."); } };
+  rec.onend = () => { if (V.listening) try { rec.start(); } catch (e) { /* already running */ } };   // Chrome stops every so often
+  rec.start();
+  return true;
+}
+
+/* Browsers only allow the mic and audio playback after a person interacts with the page: one tap, then hands-free. */
+$("start").onclick = async () => {
+  $("start").hidden = true; $("mic").hidden = false; V.listening = true;
+  setMic("busy", "Starting the microphone…");
+  const ok = S.caps.voice ? await listenCartesia() : listenBrowser();
+  if (!ok) { V.listening = false; return; }
+  setMic("on", listeningLabel());
+  showReply({ say: "Listening. Say “Scrub”, then what you need." });
+};
+
+/* ── presenter-only rehearsal tools ──────────────────────────────────── */
+$("simremove").onclick = async () => {
+  const candidates = S.items.filter((i) => i.status === "tray");
+  if (!candidates.length) return;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  await api("/api/sim/remove", { instrument: pick.instrument }); $("tamperout").textContent = `${pick.name} was taken off the table. Say “Scrub, count”.`;
+};
+$("simrestore").onclick = async () => { await api("/api/sim/restore", {}); S.ghosts = []; render(); };
+$("fault").onclick = () => api("/api/triage/trigger", {}).catch((e) => { $("tamperout").textContent = e.message; });
+$("tamper").onclick = async () => {
+  try { const r = await api("/api/demo/tamper", {}); $("tamperout").textContent = r.detected ? `A copy of the log was edited on line ${r.edited_line}. Verification caught it: ${r.error}. The real log is still ${r.original_intact ? "intact" : "NOT intact"}.` : "Tampering was not detected."; }
+  catch (e) { $("tamperout").textContent = e.message; }
+};
 
 /* ── Convex: live queries feed the board, the timeline and the anchored chain heads ── */
 function loadScript(src) {
@@ -468,11 +600,14 @@ async function connectConvex(url) {
     client.onUpdate("events:recent", {}, (rows) => { S.convexLive = true; S.events = rows; renderLog(); }, fail);
     client.onUpdate("audit:latest", {}, (a) => { S.anchors = a; renderAudit(); }, fail);
     client.onUpdate("audit:alerts", {}, (a) => { S.alerts = a; renderAudit(); }, fail);
+    client.onUpdate("episodes:list", {}, (rows) => { S.episodes = rows; renderDataset(); }, fail);
+    client.onUpdate("episodes:stats", {}, (st) => { S.dstats = st; renderDataset(); }, fail);
   } catch (e) { S.convexLive = false; }
 }
 
 refresh().then(() => { connect(); if (S.caps.convex_url) connectConvex(S.caps.convex_url); });
 setInterval(refresh, 8000);
+setInterval(pollJoints, 500);
 </script>
 </body>
 </html>

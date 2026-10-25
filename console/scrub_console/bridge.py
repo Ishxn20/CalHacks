@@ -7,8 +7,10 @@ Everything that happens is published as an event and the important parts are wri
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
+from collections import deque
 from typing import Callable
 
 from scrub_arm.audit import AuditLog
@@ -16,19 +18,23 @@ from scrub_arm.audit import AuditLog
 from .arm_client import ArmClient, ArmError
 from .intent import Intent
 from .ledger import HELD, IN_FIELD, TRAY, USED, Ledger, UnknownInstrument
+from .report import build_facts, predict_next, summarize_case
 from .sinks import MemorySink, Sink
+from .wake import WakeGate
 
 log = logging.getLogger(__name__)
 
 HOLDING_PHASES = ("verifying", "presenting", "staged")
+_STAGE_IT = re.compile(r"^(?:stage|get|hold|grab)\s+(?:it|that|that one)(?:\s+ready)?[.!]?$", re.I)
 
 
 class Bridge:
     def __init__(self, arm: ArmClient, ledger: Ledger, understand: Callable[[str, str], Intent],
                  sinks: list[Sink] | None = None, audit: AuditLog | None = None, sim: bool = False,
-                 observe: Callable[[], list[str] | None] | None = None, triage=None) -> None:
+                 observe: Callable[[], list[str] | None] | None = None, triage=None, bitdeer=None) -> None:
         self.arm, self.ledger, self.understand, self.audit = arm, ledger, understand, audit
-        self.sim, self.observe, self.triage = sim, observe, triage
+        self.sim, self.observe, self.triage, self.bitdeer = sim, observe, triage, bitdeer
+        self.gate = WakeGate()
         self.stream = MemorySink()
         self.sinks: list[Sink] = [self.stream, *(sinks or [])]
         self._lock = threading.RLock()
@@ -37,16 +43,21 @@ class Bridge:
         self.audit_state: dict = {}
         self._pending: dict[int, dict] = {}       # arm job id -> {"instrument", "kind"}
         self._holding_id: str | None = None       # instrument id the arm is carrying
+        self._suggested: str | None = None        # name of the last suggested next instrument ("stage it")
         self._done_job = 0
         self._seen_arm_events: set[tuple] = set()
         self._fault_seen: str | None = None
         self._sim_removed: set[str] = set()
         self._polls = 0
+        self.telemetry: deque[dict] = deque(maxlen=150)   # ~1 min of joint readings: Droid's evidence on a fault
+        self.observers: list[Callable[[dict], None]] = []  # see every arm status (the dataset recorder)
         self._emit_ledger()                       # so a fresh Convex board shows the starting tray, not stale data
 
     # ── plumbing ──────────────────────────────────────────────────────────
 
     def emit(self, kind: str, /, **data) -> None:
+        if kind == "announce":                    # the robot spoke unprompted: let the answer come without "Scrub"
+            self.gate.open()
         for s in self.sinks:
             try:
                 s.publish(kind, data)
@@ -71,11 +82,31 @@ class Bridge:
 
     def context(self) -> str:
         s = self.status
-        return f"phase={s.get('phase', 'unknown')}; holding={s.get('holding') or 'nothing'}"
+        fix = "yes" if self.triage and self.triage.latest_pending() else "no"
+        return f"phase={s.get('phase', 'unknown')}; holding={s.get('holding') or 'nothing'}; fix awaiting decision={fix}"
+
+    def announce(self, text: str) -> None:
+        """Something the robot says without being asked (a fault, a failed pick, a fix to decide on)."""
+        self.emit("announce", text=text)
 
     # ── speech in ─────────────────────────────────────────────────────────
 
+    def handle_heard(self, text: str, via: str = "voice") -> dict:
+        """Hands-free entry point: everything the always-on mic transcribes comes here. Talk that isn't meant
+        for the robot is dropped without a trace (see wake.py)."""
+        request = self.gate.check(text, self.status.get("phase"))
+        if request is None:
+            return {"ignored": True}
+        if not request:
+            self.gate.open()
+            return {"say": "Yes?", "intent": "wake", "ok": True, "heard": text}
+        out = self.handle_text(request, via=via)
+        self.gate.open()                          # a follow-up ("approve", "backhand") needs no wake word
+        return out
+
     def handle_text(self, text: str, via: str = "text") -> dict:
+        if self._suggested and _STAGE_IT.match(text.strip()):
+            text = f"stage the {self._suggested}"
         self.emit("utterance", text=text, via=via)
         self._audit("utterance", text=text[:300], via=via)
         intent = self.understand(text, self.context())          # may call Claude: keep it outside the lock
@@ -110,7 +141,43 @@ class Bridge:
             return i.say
         if i.kind == "count":
             return self.count_check()["say"]
+        if i.kind in ("approve", "reject"):
+            return self._decide(i.kind)
+        if i.kind == "report":
+            self.case_report()
+            return "The case report is on the screen."
+        if i.kind == "suggest":
+            p = self.suggest_next()["prediction"]
+            return f"Probably the {p['name']} next. Say stage it to get it ready." if p else \
+                "I don't have a confident suggestion yet."
         return i.say        # ask
+
+    def _decide(self, decision: str) -> str:
+        p = self.triage.latest_pending() if self.triage else None
+        if p is None:
+            return "There's no fix waiting for a decision."
+        p = (self.triage.approve if decision == "approve" else self.triage.reject)(p.id, who="voice")
+        return {"approved": "Approved. Restart the arm for the change to take effect.",
+                "rejected": "Rejected. Nothing was changed.",
+                "stale": "The arm's settings changed since that was proposed, so I didn't apply it.",
+                "invalid": "That change failed the safety check, so I didn't apply it."}.get(p.status, f"The fix is {p.status}.")
+
+    # ── after the case ────────────────────────────────────────────────────
+
+    def case_report(self) -> dict:
+        out = summarize_case(build_facts(self.stream.events, self.ledger.counts(), self.audit_state), self.bitdeer)
+        self.emit("report", **out)
+        return out
+
+    def suggest_next(self) -> dict:
+        history = [e["data"]["instrument"] for e in self.stream.of_kind("command")
+                   if e["data"].get("name") == "handoff" and e["data"].get("instrument")]
+        remaining = {i.instrument: self.ledger.name(i.instrument) for i in self.ledger.items if i.status == TRAY}
+        p = predict_next(history, remaining, self.bitdeer)
+        if p:
+            self._suggested = p["name"]
+            self.emit("prediction", **p)
+        return {"prediction": p, "available": self.bitdeer is not None}
 
     # ── count check ───────────────────────────────────────────────────────
 
@@ -178,6 +245,13 @@ class Bridge:
     def _track(self, st: dict) -> None:
         old, self.status = self.status, st
         arm = st.get("arm") or {}
+        self.telemetry.append({"t": round(time.time(), 2), "phase": st.get("phase"), "q": arm.get("q_deg") or [],
+                               "q_cmd": arm.get("q_cmd_deg") or [], "gripper": arm.get("gripper_deg")})
+        for observe in self.observers:
+            try:
+                observe(st)
+            except Exception:  # noqa: BLE001 - an observer must never stop the arm watch
+                log.exception("status observer failed")
         key = lambda s: (s.get("phase"), s.get("holding"), (s.get("arm") or {}).get("fault"))  # noqa: E731
         if key(old) != key(st):
             self.emit("arm", phase=st.get("phase"), holding=st.get("holding"), fault=arm.get("fault"),
@@ -203,6 +277,7 @@ class Bridge:
             self._fault_seen = fault
             self.emit("fault", message=fault)
             self._audit("fault", message=fault)
+            self.announce(f"I've stopped. {fault}")
             if self.triage:
                 self.triage.trigger(fault, self.recent_context())
         elif not fault:
@@ -225,6 +300,8 @@ class Bridge:
         elif kind in ("handoff", "stage", "return") and not st.get("holding"):
             self._move(self._holding_id or inst, TRAY)         # failed pick or put-back: it is on the tray again
             self._holding_id = None
+        if kind in ("handoff", "stage") and job["status"] == "failed":
+            self.announce(f"That didn't work: {job.get('error') or 'the pick failed'}.")
 
     def _hand_over(self) -> None:
         self._move(self._holding_id, IN_FIELD)
@@ -251,8 +328,8 @@ class Bridge:
     # ── views ─────────────────────────────────────────────────────────────
 
     def recent_context(self) -> dict:
-        return {"status": self.status, "events": [e for e in self.stream.events[-60:]
-                                                  if e["kind"] in ("arm_event", "job", "fault", "command", "arm")]}
+        return {"status": self.status, "telemetry": list(self.telemetry),
+                "events": [e for e in self.stream.events[-60:] if e["kind"] in ("arm_event", "job", "fault", "command", "arm")]}
 
     def snapshot(self) -> dict:
         with self._lock:

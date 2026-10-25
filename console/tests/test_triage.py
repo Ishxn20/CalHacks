@@ -103,10 +103,15 @@ def rig(tmp_path):
 def test_droid_gets_a_sandbox_copy_and_the_fault_not_the_repo(rig):
     runner = FakeRunner(edited(tracking_error_limit_deg=30.0))
     t = rig.make(runner)
-    pid = t.trigger(FAULT, {"events": [{"msg": "x"}]})
+    telemetry = [{"t": 100.0, "phase": "moving", "q": [0, 20, 40, 0, 0, 0], "q_cmd": [0, 20, 40, 0, 0, 0], "gripper": 259.4},
+                 {"t": 100.4, "phase": "fault", "q": [0, 21, 12, 0, 0, 0], "q_cmd": [0, 22, 40, 0, 0, 0], "gripper": 259.4}]
+    pid = t.trigger(FAULT, {"events": [{"msg": "x"}], "telemetry": telemetry})
     sandbox = runner.sandboxes[0]
     assert sandbox != rig.cfg.parent and (sandbox / "fault_context.json").exists()
     assert json.loads((sandbox / "fault_context.json").read_text())["fault"] == FAULT
+    csv = (sandbox / "telemetry.csv").read_text().splitlines()
+    assert csv[0].startswith("time_s,phase,q1") and csv[2].startswith("0.4,fault,0,21,12")    # joint 3 lagging 28 deg
+    assert "tracking_error_limit" in (sandbox / "driver.py").read_text()                     # the guard's source
     assert FAULT in runner.prompts[0] and "SMALLEST edit" in runner.prompts[0]
     assert rig.cfg.read_text() == ARM_YAML                       # the real config is untouched
     p = t.proposals[pid]

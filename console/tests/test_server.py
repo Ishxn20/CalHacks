@@ -18,7 +18,7 @@ from scrub_console.speech import CartesiaSpeech
 class FakeCartesia:
     def __init__(self):
         self.stt = SimpleNamespace(transcribe=lambda **kw: SimpleNamespace(text="castroviejo backhand"))
-        self.tts = SimpleNamespace(bytes=lambda **kw: iter([b"RIFF", b"wave"]))
+        self.tts = SimpleNamespace(generate=lambda **kw: SimpleNamespace(read=lambda: b"RIFFwave"))
         self.voices = SimpleNamespace(list=lambda limit=None: [SimpleNamespace(id="v", name="n")])
 
 
@@ -100,7 +100,11 @@ def test_events_stream_live_over_sse(site):
 
 
 def test_voice_in_and_speech_out_use_cartesia(site):
-    site.console.speech = CartesiaSpeech(client=FakeCartesia(), voice_id="v")
+    fake = FakeCartesia()
+    site.console.speech = CartesiaSpeech(client=fake, voice_id="v")
+    code, r, _ = call(site, "/api/audio", raw=b"RIFFfake", headers={"Content-Type": "audio/wav"})
+    assert code == 200 and r == {"ignored": True}               # no wake word: OR talk, dropped
+    fake.stt.transcribe = lambda **kw: SimpleNamespace(text="Scrub, castroviejo backhand")
     code, r, _ = call(site, "/api/audio", raw=b"RIFFfake", headers={"Content-Type": "audio/wav"})
     assert code == 200 and r["heard"] == "castroviejo backhand" and r["intent"] == "handoff"
     code, audio, h = call(site, "/api/tts?text=Releasing.", headers={})
@@ -113,6 +117,14 @@ def test_without_a_cartesia_key_voice_says_so_and_typing_still_works(site):
     code, r, _ = call(site, "/api/audio", raw=b"x", headers={"Content-Type": "audio/wav"})
     assert code == 503
     assert call(site, "/api/utterance", {"text": "stop"})[0] == 200
+
+
+def test_browser_speech_is_gated_by_the_wake_word_and_chatter_leaves_no_trace(site):
+    assert call(site, "/api/heard", {"text": "can someone get the lights"})[1] == {"ignored": True}
+    assert call(site, "/api/heard", {"text": "Scrub"})[1]["say"] == "Yes?"
+    assert call(site, "/api/heard", {"text": "count check"})[1]["intent"] == "count"      # follow-up, no wake word
+    said = [e["data"]["text"] for e in site.console.bridge.stream.of_kind("utterance")]
+    assert said == ["count check"]                                                     # the chatter was never recorded
 
 
 def test_the_count_check_catches_what_was_removed(site):

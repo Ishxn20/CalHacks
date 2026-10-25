@@ -50,7 +50,7 @@ TOOLS = [
                           "instrument": {"type": "string", "description": "as the surgeon said it"},
                           "suture": _nullable({"type": "string", "description": "e.g. prolene, vicryl"}),
                           "size": _nullable({"type": "string", "description": "e.g. 6-0, 4-0, 1.5 mm"}),
-                          "orientation": {"type": ["string", "null"], "enum": ORIENTATIONS + [None]}}}},
+                          "orientation": {"anyOf": [{"type": "string", "enum": ORIENTATIONS}, {"type": "null"}]}}}},
     {"name": "control", "strict": True,
      "description": "A command to the arm itself: release (surgeon has the instrument), stop, go home, "
                     "put the held instrument back, or clear a stop/fault.",
@@ -63,6 +63,14 @@ TOOLS = [
     {"name": "count_check", "strict": True,
      "description": "The surgeon asks for an instrument count / count check.",
      "input_schema": {"type": "object", "additionalProperties": False, "required": [], "properties": {}}},
+    {"name": "decide_fix", "strict": True,
+     "description": "The surgeon approves or rejects the arm configuration fix that was proposed after a fault.",
+     "input_schema": {"type": "object", "additionalProperties": False, "required": ["decision"],
+                      "properties": {"decision": {"type": "string", "enum": ["approve", "reject"]}}}},
+    {"name": "after_case", "strict": True,
+     "description": "Write the end-of-case report, or suggest which instrument will probably be needed next.",
+     "input_schema": {"type": "object", "additionalProperties": False, "required": ["action"],
+                      "properties": {"action": {"type": "string", "enum": ["report", "suggest_next"]}}}},
     {"name": "ask", "strict": True,
      "description": "The request is ambiguous, incomplete or not understood. Ask ONE short question.",
      "input_schema": {"type": "object", "additionalProperties": False, "required": ["question"],
@@ -141,6 +149,10 @@ class ClaudeParser:
 _RULES = [
     ("stop", r"\b(stop|halt|freeze|abort)\b"),
     ("reset", r"\b(reset|clear (the )?(fault|stop))\b"),
+    ("reject", r"\b(reject|decline|discard|don'?t apply|do not apply)\b"),
+    ("approve", r"\b(approve|accept|apply)\b"),
+    ("report", r"\breport\b"),
+    ("suggest", r"\b(what'?s next|what is next|suggest|next instrument)\b"),
     ("count", r"\b(count|how many|accounted)\b"),
     ("home", r"\b(go home|home position|move home)\b"),
     ("return", r"\b(put (it|that) back|return (it|that))\b"),
@@ -192,9 +204,11 @@ def rules_parse(text: str, sutures: dict[str, list[str]] | None = None) -> tuple
 
 # ── entry point ────────────────────────────────────────────────────────────
 
-KINDS = {"handoff", "stage", "used", "ask", "release", "stop", "home", "return", "reset", "count"}
+KINDS = {"handoff", "stage", "used", "ask", "release", "stop", "home", "return", "reset", "count",
+         "approve", "reject", "report", "suggest"}
 _SAY = {"release": "Releasing.", "stop": "Stopping.", "home": "Going home.", "return": "Putting it back.",
-        "reset": "Cleared.", "count": "Counting now."}
+        "reset": "Cleared.", "count": "Counting now.", "approve": "Approving.", "reject": "Rejecting.",
+        "report": "Writing the case report.", "suggest": "Thinking about what's next."}
 
 
 def _clean(fields: dict) -> dict:
@@ -239,4 +253,8 @@ def _from_tool(name: str, inp: dict) -> tuple[str, dict]:
         return "used", {"instrument": inp.get("instrument", "")}
     if name == "count_check":
         return "count", {}
+    if name == "decide_fix":
+        return inp.get("decision", "ask"), {}
+    if name == "after_case":
+        return {"suggest_next": "suggest"}.get(inp.get("action"), inp.get("action", "ask")), {}
     return "ask", {"question": inp.get("question")}

@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -45,6 +46,17 @@ ALLOWED: dict[str, tuple[float, float]] = {
     "gripper.grip_torque_nm": (0.3, 1.2),
 }
 SANDBOX_FILE = "arm.yaml"
+DRIVER_SOURCE = Path(importlib.util.find_spec("scrub_arm.driver").origin)
+
+
+def telemetry_csv(rows: list[dict]) -> str:
+    """Joint readings as a CSV Droid can read: time, phase, measured q1..q6, commanded cmd1..cmd6, gripper."""
+    head = ["time_s", "phase", *(f"q{j}" for j in range(1, 7)), *(f"cmd{j}" for j in range(1, 7)), "gripper_deg"]
+    t0 = rows[0]["t"] if rows else 0.0
+    pad = lambda v: (list(v) + [""] * 6)[:6]  # noqa: E731
+    lines = [",".join(head)] + [",".join(str(x) for x in [round(r["t"] - t0, 2), r.get("phase") or "", *pad(r.get("q") or []),
+                                                          *pad(r.get("q_cmd") or []), r.get("gripper") or ""]) for r in rows]
+    return "\n".join(lines) + "\n"
 
 
 def flatten(d, prefix: str = "") -> dict:
@@ -90,6 +102,11 @@ def validate_change(original: str, proposed: str) -> Validation:
     return Validation(not errors and bool(changes), changes, errors)
 
 
+def spoken_changes(changes: list[dict]) -> str:
+    """'collision guard threshold from 25 to 30' - a change list as one sentence for text-to-speech."""
+    return ", and ".join(f"{c['key'].split('.')[-1].replace('_', ' ')} from {c['old']} to {c['new']}" for c in changes)
+
+
 def make_diff(original: str, proposed: str) -> str:
     return "".join(difflib.unified_diff(original.splitlines(True), proposed.splitlines(True),
                                         "arm.yaml (current)", "arm.yaml (proposed)"))
@@ -128,8 +145,10 @@ class DroidRunner(Protocol):
 def build_prompt(fault: str) -> str:
     return (
         f'A fault stopped the robot arm: "{fault}"\n\n'
-        "This folder holds fault_context.json (the arm's recent events and status) and arm.yaml (its tuning "
-        "config). Read both. If a tuning value in arm.yaml plausibly caused this fault or would have "
+        "This folder holds fault_context.json (the arm's recent events and status), telemetry.csv (the last "
+        "minute of each joint's measured angle against its setpoint), driver.py (the arm controller, where the "
+        "collision guard lives) and arm.yaml (its tuning config). Read them and cite times and joints from the "
+        "telemetry. If a tuning value in arm.yaml plausibly caused this fault or would have "
         "prevented it, make the SMALLEST edit to arm.yaml that addresses it, changing only values under "
         "`motion:`, `pick:`, or `gripper.grip_torque_nm`. Never touch joint limits, gripper calibration, "
         "motor ids, or anything else. If no config change is warranted (for example a real collision), "
@@ -246,6 +265,9 @@ class Triage:
         finally:
             self._busy = False
             self._publish(p)
+            if p.status == "pending":
+                self.emit("announce", text=f"Droid suggests a fix: {spoken_changes(p.changes)}. "
+                                           "Say approve or reject.")
 
     def _step(self, p: Proposal, step: dict) -> None:
         p.steps.append({**step, "t": round(time.time(), 2)})
@@ -262,7 +284,12 @@ class Triage:
         sandbox = self.work_dir / p.id
         sandbox.mkdir(parents=True, exist_ok=True)
         (sandbox / SANDBOX_FILE).write_text(original)
-        (sandbox / "fault_context.json").write_text(json.dumps({"fault": p.fault, **context}, indent=1, default=str))
+        telemetry = context.get("telemetry") or []
+        (sandbox / "fault_context.json").write_text(json.dumps({"fault": p.fault, **{k: v for k, v in context.items()
+                                                                                     if k != "telemetry"}}, indent=1, default=str))
+        (sandbox / "telemetry.csv").write_text(telemetry_csv(telemetry))
+        if DRIVER_SOURCE.exists():
+            shutil.copyfile(DRIVER_SOURCE, sandbox / "driver.py")      # the collision guard and grasp logic, read-only
         summary = asyncio.run(self.runner.run(sandbox, build_prompt(p.fault), lambda s: self._step(p, s)))
         p.summary = summary
         proposed = (sandbox / SANDBOX_FILE).read_text()
@@ -312,6 +339,11 @@ class Triage:
             self.audit.append("triage_decision", id=p.id, decision="rejected", by=who)
         self._publish(p)
         return p
+
+    def latest_pending(self) -> Proposal | None:
+        """The newest proposal still waiting for a person (what "approve" / "reject" by voice applies to)."""
+        waiting = [p for p in self.proposals.values() if p.status == "pending"]
+        return max(waiting, key=lambda p: p.created) if waiting else None
 
     def _pending(self, proposal_id: str) -> Proposal:
         p = self.proposals.get(proposal_id)

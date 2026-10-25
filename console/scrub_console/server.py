@@ -3,7 +3,10 @@
     GET  /                        the dashboard
     GET  /api/state               everything the dashboard shows + which integrations are live
     GET  /api/events?since=N      server-sent events (every console event, newest after N)
-    POST /api/utterance {text}    a typed request            POST /api/audio  (WAV body)  a spoken request
+    GET  /api/arm                 joint angles vs setpoints and the collision-guard limit (the gauges)
+    POST /api/audio  (WAV body)   hands-free speech, transcribed by Cartesia, acted on only after the wake word
+    POST /api/heard {text}        hands-free speech already transcribed in the browser (no Cartesia key), same gate
+    POST /api/utterance {text}    a request with no wake word needed (CLI, tests, the Fetch.ai agent)
     GET  /api/tts?text=...        the reply as speech (Cartesia)
     POST /api/count               count check               POST /api/used {instrument}
     POST /api/report              end-of-case report        POST /api/predict   next-instrument suggestion
@@ -25,11 +28,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import yaml
 from scrub_arm.audit import verify
 
 from .app import Console
 from .arm_client import ArmError
-from .report import build_facts, predict_next, summarize_case
 from .speech import SpeechUnavailable
 
 log = logging.getLogger(__name__)
@@ -37,6 +40,14 @@ log = logging.getLogger(__name__)
 WEB = Path(__file__).resolve().parent / "web"
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 MAX_BODY = 8 * 1024 * 1024
+
+
+def _guard_deg(arm_yaml: Path) -> float | None:
+    """The collision guard: a joint lagging its setpoint by more than this freezes the arm."""
+    try:
+        return (yaml.safe_load(arm_yaml.read_text()).get("motion") or {}).get("tracking_error_limit_deg")
+    except (OSError, yaml.YAMLError, AttributeError):
+        return None
 
 
 def _hostname(h: str) -> str:
@@ -103,6 +114,11 @@ def make_handler(console: Console):
                     return self._send(200, (WEB / "vendor" / "convex-browser.js").read_bytes(), "text/javascript; charset=utf-8")
                 if url.path == "/api/state":
                     return self._json(200, {**bridge.snapshot(), "capabilities": console.capabilities()})
+                if url.path == "/api/arm":                  # joint gauges, polled ~2 Hz: the cached /status, no arm call
+                    arm = bridge.status.get("arm") or {}
+                    return self._json(200, {"phase": bridge.status.get("phase"), "q_deg": arm.get("q_deg") or [],
+                                            "q_cmd_deg": arm.get("q_cmd_deg") or [], "gripper_deg": arm.get("gripper_deg"),
+                                            "guard_deg": _guard_deg(console.triage.config_path)})
                 if url.path == "/api/events":
                     return self._events(int((parse_qs(url.query).get("since") or ["0"])[0]))
                 if url.path == "/api/tts":
@@ -125,6 +141,8 @@ def make_handler(console: Console):
                 if path == "/api/audio":
                     return self._json(200, self._voice(self._body()))
                 a = self._args()
+                if path == "/api/heard":            # hands-free: browser speech recognition, gated by the wake word
+                    return self._json(200, bridge.handle_heard(str(a.get("text", ""))[:500], via="speech"))
                 if path == "/api/utterance":
                     return self._json(200, bridge.handle_text(str(a.get("text", ""))[:500]))
                 if path == "/api/count":
@@ -132,9 +150,9 @@ def make_handler(console: Console):
                 if path == "/api/used":
                     return self._json(200, bridge.handle_text("done with " + str(a.get("instrument", ""))))
                 if path == "/api/report":
-                    return self._json(200, self._report())
+                    return self._json(200, bridge.case_report())
                 if path == "/api/predict":
-                    return self._json(200, self._predict())
+                    return self._json(200, bridge.suggest_next())
                 if path == "/api/triage/approve":
                     return self._json(200, console.triage.approve(str(a.get("id")), who="dashboard").public())
                 if path == "/api/triage/reject":
@@ -186,28 +204,10 @@ def make_handler(console: Console):
         def _voice(self, wav: bytes) -> dict:
             if not wav:
                 raise ValueError("no audio received")
-            heard = console.speech.transcribe(wav)
-            if not heard:
-                return {"heard": "", "say": "I didn't catch that.", "intent": "ask", "ok": False}
-            return bridge.handle_text(heard, via="voice")
+            return bridge.handle_heard(console.speech.transcribe(wav), via="voice")   # silence/chatter -> ignored
 
         def _audit(self) -> dict:
             return bridge.anchor()
-
-        def _report(self) -> dict:
-            facts = build_facts(bridge.stream.events, bridge.ledger.counts(), bridge.audit_state)
-            out = summarize_case(facts, console.bitdeer)
-            bridge.emit("report", **out)
-            return out
-
-        def _predict(self) -> dict:
-            history = [e["data"]["instrument"] for e in bridge.stream.of_kind("command")
-                       if e["data"].get("name") == "handoff" and e["data"].get("instrument")]
-            remaining = {i.instrument: bridge.ledger.name(i.instrument) for i in bridge.ledger.items if i.status == "tray"}
-            p = predict_next(history, remaining, console.bitdeer)
-            if p:
-                bridge.emit("prediction", **p)
-            return {"prediction": p, "available": console.bitdeer is not None}
 
         def _tamper(self) -> dict:
             """Non-destructive: edit a COPY of the console audit log and show that verification catches it."""

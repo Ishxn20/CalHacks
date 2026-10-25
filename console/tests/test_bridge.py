@@ -154,3 +154,28 @@ def test_arm_offline_is_reported_once_then_recovery_is_noticed():
     for _ in range(3):
         b.poll()
     assert kinds(b).count("arm_offline") == 1 and "arm_online" in kinds(b) and b.online is True
+
+
+def test_by_voice_a_fault_is_announced_and_the_fix_is_approved_without_the_wake_word(arm_server, tmp_path):
+    from scrub_console.triage import RehearsalRunner, Triage
+
+    t = Triage(arm_server.config_path, RehearsalRunner(), tmp_path / "triage", background=False)
+    f = "joint3 is 28.0 deg off its setpoint (collision or blocked?) - arm frozen in place"
+    tray = load_tray_config()
+    b = Bridge(ScriptedArm(idle(), idle(f)), Ledger(["scalpel_11"]),
+               lambda text, ctx: understand(text, None, None, ctx, tray), triage=t)
+    t.emit = b.emit
+    b.poll(); b.poll()
+    said = [e["data"]["text"] for e in b.stream.of_kind("announce")]
+    assert said[0].startswith("I've stopped.") and said[1].endswith("Say approve or reject.")
+    r = b.handle_heard("approve")                    # within the follow-up window: no wake word needed
+    assert r["intent"] == "approve" and r["say"].startswith("Approved")
+    assert "tracking_error_limit_deg: 30.0" in arm_server.config_path.read_text()
+    assert b.handle_heard("Scrub, approve")["say"] == "There's no fix waiting for a decision."
+
+
+def test_after_a_suggestion_stage_it_stages_the_suggested_instrument(rig):
+    bridge, _ = rig
+    bridge._suggested = "Potts scissors"        # what suggest_next() remembers (Bitdeer needs a key)
+    r = bridge.handle_heard("Scrub, stage it")
+    assert r["intent"] == "stage" and "Potts" in r["say"]
