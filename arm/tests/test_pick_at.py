@@ -107,10 +107,17 @@ def test_grasp_keeps_tip_direction(ik_app):
 
 
 def test_pick_at_descends_where_refine_aligned(ik_app):
-    """pick.reach rl: after the IK hover, a refine hook (the camera-guided policy) may correct the target;
-    the contact descent then goes straight down at the corrected point."""
+    """After the IK hover a refine hook (the centring) moves the jaws over the instrument; the pick then goes
+    straight down from there, wherever that is."""
+    a, d, pk = ik_app.assistant, ik_app.driver, ik_app.cfg.pick
     calls = []
-    ik_app.assistant.refine = lambda x, y, yaw, th: calls.append((x, y, yaw, th)) or (310.0, 5.0, 10.0)
+
+    def refine(x, y, yaw, th):
+        calls.append((x, y, yaw, th))
+        d.move_to(a._solve(310, 5, pk.table_z + pk.hover, 10), exact=True)
+        return 310.0, 5.0, 10.0
+
+    ik_app.assistant.refine = refine
     ik_app.assistant._pick_at(300, 0, 0, 4.0)
     assert calls == [(300, 0, 0, 4.0)]
     assert ik_app.assistant._picked_from == (310.0, 5.0, 10.0, 4.0)
@@ -191,9 +198,9 @@ def test_move_line_turns_in_place(ik_app):
     assert abs(turn - 20) < 1.0 and abs(tilt1 - tilt0) < 1e-3        # same tilt (straight down or the pick tilt)
 
 
-def test_descent_starts_where_the_staged_centring_finished(ik_app):
-    """refine may return the height it ended at (the 3 cm stage): the contact descent continues from there instead
-    of going back up to the hover; the lift afterwards is straight up."""
+def test_lowering_is_one_straight_move_from_where_centring_left_it(ik_app):
+    """Once centred (here the refine left it 3 cm up), one straight-down move to grasp height -- no going back up,
+    no sideways adjusting -- then straight up (user)."""
     a, d, pk = ik_app.assistant, ik_app.driver, ik_app.cfg.pick
     z3 = pk.table_z + 0.03
 
@@ -205,18 +212,26 @@ def test_descent_starts_where_the_staged_centring_finished(ik_app):
     zs = []
     real = d.move_to
 
+    real_through = d.move_through
+
     def spy(q, speed=1.0, wait=True, exact=False):
         off = real(q, speed, wait, exact)
         zs.append(a.kin.fk(d.q_measured())[0].copy())
         return off
 
-    d.move_to = spy
+    def spy_through(qs, speed=1.0):
+        real_through(qs, speed)
+        zs.append(a.kin.fk(d.q_measured())[0].copy())
+
+    d.move_to, d.move_through = spy, spy_through
     a._pick_at(300, 0, 0, 4.0)
-    d.move_to = real
+    d.move_to, d.move_through = real, real_through
     pts = np.array(zs)
-    after = pts[int(np.argmin(np.abs(pts[:, 2] - z3))):]                  # from the 3 cm stage on
+    after = pts[int(np.argmin(np.abs(pts[:, 2] - z3))):]                  # from where the centring left it
     down = after[: int(np.argmin(after[:, 2])) + 1]
     assert down[:, 2].max() < z3 + 0.002                                   # never climbed back to the hover
+    assert np.abs(down[:, :2] - down[0, :2]).max() < 1e-3                  # no adjusting on the way down
+    assert abs(down[-1, 2] - (pk.table_z + 0.002)) < 0.002                 # to grasp height (4 mm thick: 2 mm)
     up = after[int(np.argmin(after[:, 2])):]
     assert np.abs(up[:, :2] - up[0, :2]).max() < 1e-3                    # lifted straight up
 

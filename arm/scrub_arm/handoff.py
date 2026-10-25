@@ -344,12 +344,13 @@ class ScrubAssistant:
             return False
 
     def move_line(self, dx_mm: float, dy_mm: float, dz_mm: float, step_mm: float = 2.0, speed: float = 0.3,
-                  dyaw_deg: float = 0.0, step_deg: float = 3.0) -> None:
+                  dyaw_deg: float = 0.0, step_deg: float = 3.0, exact: bool = True) -> None:
         """Move the gripper in a straight line by (dx, dy, dz) mm in the table frame (x out from the base, y left,
         z up), holding its orientation (or turning it by dyaw_deg about the vertical through the fingertips, e.g. to
         square the jaws at the hover): re-solved every step_mm / step_deg so the path stays straight, instead of one joint-space
         move (which dipped and swung the gripper on the real arm). The current gravity-sag offset is carried along;
-        the end point is reached exactly."""
+        the end point is reached exactly (exact=False: no correction at the end, e.g. lowering onto the mat, where
+        correcting would push down harder)."""
         d = self.driver
         q0 = d.q_measured()
         off = d.q_command() - q0                                # the setpoint offset holding it here (sag)
@@ -365,22 +366,21 @@ class ScrubAssistant:
                 raise TaskFailed(f"can't move straight by ({dx_mm:.0f}, {dy_mm:.0f}, {dz_mm:.0f}) mm from here")
             qs.append(q)
         d.move_through([qq + off for qq in qs], speed=speed)  # one smooth motion (a stop every 2 mm took ~20 s per 10 cm)
-        d.move_to(q, speed=speed, exact=True)
+        if exact:
+            d.move_to(q, speed=speed, exact=True)
 
     def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float,
-                               allow_flip: bool = True, z_start: float | None = None,
-                               tilt: bool | None = None) -> float:
+                               allow_flip: bool = True, tilt: bool | None = None) -> float:
         """Step the open gripper straight down from hover until the pile pushes back or z_floor is reached.
 
         Contact = any pick.contact_joints lagging its setpoint by more than pick.contact_deviation beyond
         the lag measured at hover (gravity sag). On contact, back off 1 mm and return that z (m).
         Contact on the very first step means something is in the way at hover height: TaskFailed.
-        z_start: begin there instead of the hover (the visual centring's last stage already brought it down).
         """
         pk, d = self.cfg.pick, self.driver
         idx = [self.cfg.joint_index(n) for n in pk.contact_joints]
         slow = self.cfg.motion.approach_speed_scale
-        z_hover = pk.table_z + pk.hover if z_start is None else z_start
+        z_hover = pk.table_z + pk.hover
         # The hover is an IK target: correct the arm's gravity sag there (it sat ~3 cm low on the real arm), then
         # carry that same setpoint offset down every step. Correcting each step instead would also "correct"
         # against the pile pushing back -- pressing harder exactly when contact should stop it.
@@ -408,27 +408,29 @@ class ScrubAssistant:
 
     def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
                  allow_flip: bool = True, fid: str | None = None) -> None:
-        """hover -> open -> contact descent -> grasp -> lift. TaskFailed on a miss (caller decides on retry).
+        """hover -> open -> centre (refine) -> straight down to grasp height -> grasp -> straight up. TaskFailed on
+        a miss (caller decides on retry).
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         plan_yaw = yaw_deg
         z_hover = pk.table_z + pk.hover
-        z_floor = pk.table_z + thickness_mm / 2000.0 - 0.002
-        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_floor, z_hover, allow_flip)
+        z_grasp = pk.table_z + thickness_mm / 2000.0              # jaws close on the instrument's mid-height
+        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_grasp, z_hover, allow_flip)
         q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip, tilt)   # fail before moving if unreachable
         self.phase = Phase.PICKING
         d.move_to(q_hover, exact=True)            # an IK target: cancel gravity sag (the RL alignment starts here)
         d.gripper_open()
-        z_start = None
-        if self.refine is not None:      # (x, y, yaw) or (x, y, yaw, z it finished at: the visual centring stages)
+        if self.refine is not None:      # centres it at the hover: (x, y, yaw[, z]) where it left the jaws
             # fid: which instrument to centre on (tracking "whatever is biggest" chased glare on the real arm)
-            x_mm, y_mm, yaw_deg, *rest = self.refine(x_mm, y_mm, yaw_deg, thickness_mm,
-                                                     **({"fid": fid} if fid else {}))
-            z_start = rest[0] if rest else None
-        z_got = self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor, allow_flip, z_start=z_start, tilt=tilt)
+            x_mm, y_mm, yaw_deg, *_ = self.refine(x_mm, y_mm, yaw_deg, thickness_mm, **({"fid": fid} if fid else {}))
+        # Ready: one smooth straight-down move to grasp height from wherever it was centred -- no adjusting, no
+        # steps, no contact checks on the way (user); then close and go straight back up.
+        slow = self.cfg.motion.approach_speed_scale
+        z_now = self.kin.fk(d.q_measured())[0][2]
+        self.move_line(0, 0, (z_grasp - z_now) * 1000, speed=slow, exact=False)
         got_it = d.gripper_grasp()
         # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
-        self.move_line(0, 0, (z_hover - z_got) * 1000, speed=self.cfg.motion.approach_speed_scale)
+        self.move_line(0, 0, (z_hover - z_grasp) * 1000, speed=slow)
         if not got_it:
             d.gripper_open()
             raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
