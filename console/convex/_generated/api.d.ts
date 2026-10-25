@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as instruments from "../instruments.js";
 import type * as labeling from "../labeling.js";
 import type * as proposals from "../proposals.js";
+import type * as retrier from "../retrier.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   instruments: typeof instruments;
   labeling: typeof labeling;
   proposals: typeof proposals;
+  retrier: typeof retrier;
 }>;
 
 /**
@@ -60,4 +62,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  actionRetrier: import("@convex-dev/action-retrier/_generated/component.js").ComponentApi<"actionRetrier">;
+};

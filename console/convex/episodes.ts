@@ -1,7 +1,9 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
+import { onCompleteValidator } from "@convex-dev/action-retrier";
 import { v } from "convex/values";
+import { retrier } from "./retrier";
 import { labels as labelsValidator } from "./schema";
 
 // Writes are internal: only the console (deploy key) records episodes. Public reads return captions and
@@ -41,16 +43,17 @@ export const record = internalMutation({
       labels: null,
       review: "unreviewed",
     });
-    if (label === "pending") await ctx.scheduler.runAfter(0, internal.labeling.labelEpisode, { episodeId });
+    if (label === "pending") {
+      const runId = await retrier.run(ctx, internal.labeling.labelEpisode, { episodeId }, { onComplete: internal.episodes.labelDone });
+      await ctx.db.patch(episodeId, { labelRunId: runId });
+    }
     return episodeId;
   },
 });
 
-export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("episodes").order("desc").take(12);
-    return rows.map((e) => ({
+/** What the dashboard may see of an episode: captions and flags, never video links. */
+function publicView(e: Doc<"episodes">) {
+  return {
       id: e._id,
       kind: e.kind,
       request: e.request,
@@ -67,7 +70,24 @@ export const list = query({
       qualityFlags: e.labels?.qualityFlags ?? [],
       privacyFlags: e.labels?.privacyFlags ?? [],
       review: e.review,
-    }));
+  };
+}
+
+export const list = query({
+  args: {},
+  handler: async (ctx) => (await ctx.db.query("episodes").order("desc").take(12)).map(publicView),
+});
+
+/** Full-text search over Claude's labels, e.g. "missed grasp potts" while curating the dataset. */
+export const search = query({
+  args: { q: v.string(), acceptedOnly: v.optional(v.boolean()) },
+  handler: async (ctx, { q, acceptedOnly }) => {
+    if (!q.trim()) return [];
+    const rows = await ctx.db
+      .query("episodes")
+      .withSearchIndex("search_labels", (s) => (acceptedOnly ? s.search("searchText", q).eq("review", "accepted") : s.search("searchText", q)))
+      .take(20);
+    return rows.map(publicView);
   },
 });
 
@@ -116,18 +136,25 @@ export const saveLabels = internalMutation({
     if (!e) return;
     // Clean, agreeing, consented episodes are accepted automatically; the rest wait for a person.
     const clean = labels.agreesWithRobot && labels.privacyFlags.length === 0 && labels.qualityFlags.length === 0;
-    await ctx.db.patch(episodeId, { labels, labelStatus: "done", labelError: null, review: clean && e.consent ? "accepted" : "unreviewed" });
+    const searchText = [labels.task, labels.caption, labels.failureMode ?? "success", ...labels.qualityFlags, e.request ?? ""].join(" ");
+    await ctx.db.patch(episodeId, {
+      labels,
+      labelStatus: "done",
+      labelError: null,
+      review: clean && e.consent ? "accepted" : "unreviewed",
+      searchText,
+    });
   },
 });
 
-export const retryFailedLabels = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const failed = await ctx.db.query("episodes").withIndex("by_labelStatus", (q) => q.eq("labelStatus", "failed")).take(5);
-    for (const e of failed) {
-      await ctx.db.patch(e._id, { labelStatus: "pending" });
-      await ctx.scheduler.runAfter(0, internal.labeling.labelEpisode, { episodeId: e._id });
-    }
+/** Runs exactly once when the retrier finishes: a run that used up its retries leaves the episode marked failed. */
+export const labelDone = internalMutation({
+  args: onCompleteValidator,
+  handler: async (ctx, { runId, result }) => {
+    const e = await ctx.db.query("episodes").withIndex("by_labelRunId", (q) => q.eq("labelRunId", runId)).unique();
+    if (!e || result.type === "success" || e.labelStatus === "skipped") return;
+    const why = result.type === "failed" ? result.error : "cancelled";
+    await ctx.db.patch(e._id, { labelStatus: "failed", labelError: `gave up after retries: ${why}` });
   },
 });
 

@@ -25,6 +25,7 @@ from .wake import WakeGate
 log = logging.getLogger(__name__)
 
 HOLDING_PHASES = ("verifying", "presenting", "staged")
+ASK_MEMORY_S = 30.0          # how long a clarifying question stays relevant
 _STAGE_IT = re.compile(r"^(?:stage|get|hold|grab)\s+(?:it|that|that one)(?:\s+ready)?[.!]?$", re.I)
 
 
@@ -44,6 +45,7 @@ class Bridge:
         self._pending: dict[int, dict] = {}       # arm job id -> {"instrument", "kind"}
         self._holding_id: str | None = None       # instrument id the arm is carrying
         self._suggested: str | None = None        # name of the last suggested next instrument ("stage it")
+        self._asked: tuple[str, str, float] | None = None   # (what they said, the question we asked, when)
         self._done_job = 0
         self._seen_arm_events: set[tuple] = set()
         self._fault_seen: str | None = None
@@ -83,7 +85,10 @@ class Bridge:
     def context(self) -> str:
         s = self.status
         fix = "yes" if self.triage and self.triage.latest_pending() else "no"
-        return f"phase={s.get('phase', 'unknown')}; holding={s.get('holding') or 'nothing'}; fix awaiting decision={fix}"
+        ctx = f"phase={s.get('phase', 'unknown')}; holding={s.get('holding') or 'nothing'}; fix awaiting decision={fix}"
+        if self._asked and time.time() - self._asked[2] < ASK_MEMORY_S:
+            ctx += f'; you just asked "{self._asked[1]}" after they said "{self._asked[0]}"'
+        return ctx
 
     def announce(self, text: str) -> None:
         """Something the robot says without being asked (a fault, a failed pick, a fix to decide on)."""
@@ -120,6 +125,8 @@ class Bridge:
                 self.emit("error", message=str(e), say=e.say)
             self._audit("command", kind=intent.kind, fields=intent.fields, source=intent.source, ok=ok)
             self.emit("say", text=say)
+            # Remember a clarifying question for one follow-up, so "Potts" can answer "which scissors?".
+            self._asked = (text, say, time.time()) if intent.kind == "ask" else None
             return {"say": say, "intent": intent.kind, "source": intent.source, "ok": ok, "heard": text}
 
     def _dispatch(self, i: Intent) -> str:

@@ -72,12 +72,19 @@ def cmd_demo(args) -> None:
 
 
 def cmd_export(args) -> None:
-    from .export import fetch_manifest, export
+    from .export import fetch_manifest, export, search_ids
 
     if not args.site_url or not args.key:
         raise SystemExit("--site-url and --key are required (or CONVEX_SITE_URL / EXPORT_KEY)")
-    n = export(fetch_manifest(args.site_url, args.key), Path(args.out))
-    print(f"exported {n} episodes to {args.out}")
+    manifest = fetch_manifest(args.site_url, args.key)
+    if args.search:
+        url = Settings.from_env().convex_url
+        if not url:
+            raise SystemExit("--search needs CONVEX_URL")
+        keep = search_ids(url, args.search)
+        manifest = [e for e in manifest if e["id"] in keep]
+    n = export(manifest, Path(args.out))
+    print(f"exported {n} episodes to {args.out}" + (f' matching "{args.search}"' if args.search else ""))
 
 
 def cmd_asi(args) -> None:
@@ -92,8 +99,21 @@ def cmd_say(args) -> None:
 
 
 def cmd_check(args) -> None:
+    from .asi_agent import agentverse_key_problem
+    from .report import BitdeerError
+
     c = build_console(Settings.from_env(), sim=args.sim)
     print(json.dumps(c.capabilities(), indent=2))
+    if os.environ.get("AGENTVERSE_API_KEY"):
+        print("Fetch.ai:", agentverse_key_problem(os.environ["AGENTVERSE_API_KEY"]) or "Agentverse key looks right")
+    if c.bitdeer:
+        try:
+            models = c.bitdeer.models()
+            ok = c.bitdeer.model in models
+            print(f"Bitdeer: model {c.bitdeer.model} {'is available' if ok else 'is NOT on this account'}"
+                  + ("" if ok else f"; set BITDEER_MODEL to one of: {', '.join(models[:12])}"))
+        except BitdeerError as e:
+            print(f"Bitdeer: {e}")
     try:
         st = c.arm.status()
         print(f"arm reachable at {c.settings.arm_url}: phase={st.get('phase')}")
@@ -125,6 +145,7 @@ def main(argv=None) -> None:
     x.add_argument("--site-url", default=os.environ.get("CONVEX_SITE_URL"), help="Convex HTTP actions URL")
     x.add_argument("--key", default=os.environ.get("EXPORT_KEY"))
     x.add_argument("--out", default="datasets/scrub_v1")
+    x.add_argument("--search", help='only episodes whose labels match, e.g. "missed_grasp" or "potts backhand"')
     x.set_defaults(fn=cmd_export)
     a = sub.add_parser("asi", help="the ASI:One chat agent on Agentverse (needs AGENTVERSE_API_KEY and a running console)")
     a.add_argument("--console-url", default="http://127.0.0.1:8780")

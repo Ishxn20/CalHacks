@@ -63,3 +63,16 @@ def test_the_seed_is_kept_so_the_agent_address_is_stable(tmp_path, monkeypatch):
     first = agent_seed(tmp_path)
     assert first == agent_seed(tmp_path) and len(first) == 64
     assert oct((tmp_path / "asi_agent_seed").stat().st_mode)[-3:] == "600"
+
+
+@pytest.mark.parametrize("key, problem", [
+    (None, "set AGENTVERSE_API_KEY"),
+    ("sk_live_abc", "ASI:One key"),
+    ("not-a-jwt", "start with eyJ"),
+    ("eyJhbGciOiJSUzI1NiJ9.x.y", None),
+])
+def test_the_agentverse_key_type_is_checked_before_registering(key, problem):
+    from scrub_console.asi_agent import agentverse_key_problem
+
+    got = agentverse_key_problem(key)
+    assert (got is None) if problem is None else (problem in got)

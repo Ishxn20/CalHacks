@@ -340,6 +340,9 @@ function renderTriage() {
   $("triage").innerHTML = `<p><b>${esc(p.fault)}</b></p>
     <p>${statusWord(p.status)}${p.simulated ? '<span class="tag">rehearsal, no agent ran</span>' : ""}</p>
     ${p.summary ? `<p class="prose">${esc(p.summary)}</p>` : ""}
+    ${p.cause ? `<p>Likely cause: ${esc(p.cause)}${p.severity ? ` <span class="tag ${p.severity === "high" ? "bad" : p.severity === "medium" ? "warnc" : ""}">${esc(p.severity)} severity</span>` : ""}</p>` : ""}
+    ${p.safe_to_resume === true ? '<p class="good">Droid judges a reset is enough to resume.</p>' : p.safe_to_resume === false ? '<p class="warnc">Droid says a person should inspect the arm before resuming.</p>' : ""}
+    ${p.evidence && p.evidence.length ? `<ul class="evidence">${p.evidence.map((x) => `<li>${Number(x.time_s).toFixed(1)} s, ${esc(x.joint)}: ${esc(x.observation)}</li>`).join("")}</ul>` : ""}
     ${p.steps && p.steps.length ? `<ol class="steps">${p.steps.filter((s) => s.type !== "result").slice(-8).map((s) => `<li>${s.type === "tool" ? "Ran " + esc(s.name) : esc((s.text || "").slice(0, 140))}</li>`).join("")}</ol>` : ""}
     ${p.diff ? `<div class="diff">${diff}</div>` : ""}
     ${p.errors && p.errors.length ? `<p class="bad">Refused: ${p.errors.map(esc).join("; ")}</p>` : ""}
@@ -360,7 +363,7 @@ function renderDataset() {
     : !S.convexLive ? "Recording is on; clips appear here once this page is connected to Convex."
     : `${rec === "simulated" ? "Simulated arm: placeholder frames, so Claude will flag them and they won't be accepted. " : ""}`
       + (st ? `${st.accepted} accepted of ${st.total} recorded (${st.minutes.toFixed(1)} min of training video), ${st.needsReview} waiting for a person. Faces are blurred on the robot before anything is stored.` : "");
-  const word = { pending: "Waiting for Claude…", labeling: "Claude is labelling…", failed: "Labelling failed (retries every 10 min)", skipped: "Not labelled (no consent or no footage)" };
+  const word = { pending: "Waiting for Claude…", labeling: "Claude is labelling…", failed: "Labelling failed; Convex retries it with backoff", skipped: "Not labelled (no consent or no footage)" };
   $("episodes").innerHTML = (S.episodes || []).map((e) => {
     const flags = [...e.privacyFlags.map((f) => "privacy: " + f), ...e.qualityFlags, ...(e.agreesWithRobot === false ? ["disagrees with the robot"] : [])];
     return `<li><p class="req">“${esc(e.request || e.kind)}”</p>
@@ -455,7 +458,7 @@ function onEvent(e) {
   else if (e.kind === "sim" && d.action === "restored") { S.ghosts = []; }
   else if (e.kind === "audit") S.audit[d.source] = { ok: d.ok, entries: d.seq, head: d.head };
   else if (e.kind === "proposal") { S.triage = [d, ...S.triage.filter((p) => p.id !== d.id)]; }
-  else if (e.kind === "announce") { showReply({ say: d.text }); speak(d.text); }
+  else if (e.kind === "announce") { showReply({ say: d.text }); speak(d.text, true); }
   else if (e.kind === "report" || e.kind === "prediction") renderAfter(e);
   else if (e.kind === "arm" || e.kind === "arm_online" || e.kind === "arm_offline") { refresh(); return; }
   render();
@@ -472,13 +475,13 @@ function connect() {
 /* ── speaking: Cartesia Sonic when configured, else the browser's own voice. The mic is deaf while we talk. ── */
 const V = { listening: false, talking: 0, quietUntil: 0, voiceQ: Promise.resolve(), sendQ: Promise.resolve() };
 const deaf = () => V.talking > 0 || performance.now() < V.quietUntil;
-function speak(text) {
+function speak(text, urgent = false) {   // urgent: the robot speaking up unprompted (a fault, a failed pick)
   if (!V.listening || !text) return;
   V.voiceQ = V.voiceQ.then(() => new Promise((done) => {
     V.talking++;
     const end = () => { V.talking--; V.quietUntil = performance.now() + 500; done(); };
     if (S.caps.voice) {
-      const a = new Audio("/api/tts?text=" + encodeURIComponent(text));
+      const a = new Audio("/api/tts?text=" + encodeURIComponent(text) + (urgent ? "&urgent=1" : ""));
       a.onended = a.onerror = end; a.play().catch(end);
     } else if ("speechSynthesis" in window) {
       const u = new SpeechSynthesisUtterance(text); u.onend = u.onerror = end; speechSynthesis.speak(u);

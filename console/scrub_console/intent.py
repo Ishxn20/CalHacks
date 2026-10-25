@@ -92,6 +92,8 @@ def system_prompt(tray: TrayConfig) -> str:
         "could be two instruments, call ask with one short question naming the choices.\n"
         "- Do not guess a suture, size or orientation that was not said; use null.\n"
         "- \"Context\" tells you what the arm is doing now; use it for requests like \"flip it\" or \"I've got it\".\n"
+        "- If Context shows a question you just asked, the surgeon is probably answering it: combine the answer "
+        "with what they asked for before (\"which scissors?\" then \"Potts\" means hand over the Potts scissors).\n"
         "- If you cannot tell what was asked, call ask."
     )
 
@@ -102,6 +104,7 @@ class ClaudeParser:
     def __init__(self, tray: TrayConfig, client=None, model: str = "claude-opus-5-5") -> None:
         self.system, self.model = system_prompt(tray), model
         self._client = client
+        self.last_usage = None
 
     @property
     def client(self):
@@ -120,7 +123,10 @@ class ClaudeParser:
             return None
         try:
             resp = self.client.beta.messages.create(
-                model=self.model, max_tokens=4096, system=self.system, tools=TOOLS,
+                model=self.model, max_tokens=4096, tools=TOOLS,
+                # Tools + system prompt are identical on every turn: cache them so each spoken request only
+                # pays for (and waits on) the few new tokens. Verify with usage.cache_read_input_tokens.
+                system=[{"type": "text", "text": self.system, "cache_control": {"type": "ephemeral"}}],
                 output_config={"effort": "low"},               # a classification: keep latency down
                 betas=["server-side-fallback-2026-07-01"], fallbacks="default",
                 messages=[{"role": "user", "content": f"Context: {context}\nSurgeon said: {text}"}],
@@ -134,6 +140,7 @@ class ClaudeParser:
         except Exception as e:  # noqa: BLE001 - missing key, bad install: never block the demo
             log.warning("claude unavailable (%s); using rules", e)
         else:
+            self.last_usage = getattr(resp, "usage", None)
             if resp.stop_reason == "refusal":
                 log.warning("claude declined (%s); using rules", getattr(resp.stop_details, "category", None))
                 return None

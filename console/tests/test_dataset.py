@@ -126,3 +126,16 @@ def test_export_writes_lerobot_style_layout(tmp_path):
     assert info["total_frames"] == 5 and info["features"]["video"]["deidentified"]
     assert json.loads((tmp_path / "meta" / "episodes.jsonl").read_text())["task"] == "hand the scalpel"
     assert np.load(tmp_path / "data" / "episode_000000.npz")["action"].shape == (5, 7)
+
+
+def test_search_ids_asks_convex_for_accepted_matches_only():
+    from scrub_console.export import search_ids
+
+    class Fake:
+        def query(self, name, args):
+            self.call = (name, args)
+            return [{"id": "e1"}, {"id": "e7"}]
+
+    f = Fake()
+    assert search_ids("http://x", "missed_grasp", client=f) == {"e1", "e7"}
+    assert f.call == ("episodes:search", {"q": "missed_grasp", "acceptedOnly": True})

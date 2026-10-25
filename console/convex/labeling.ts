@@ -150,7 +150,7 @@ export const labelEpisode = internalAction({
         messages: [{ role: "user", content }],
       });
       if (response.stop_reason === "refusal") {
-        // Not transient: don't let the retry cron resend it. A person can look at the clip instead.
+        // Not transient: return normally so the retrier doesn't resend it. A person can look at the clip instead.
         await ctx.runMutation(internal.episodes.setLabelStatus, {
           episodeId,
           status: "skipped",
@@ -167,10 +167,13 @@ export const labelEpisode = internalAction({
         labels: { ...labels, model: response.model },
       });
     } catch (err) {
-      // Typed SDK errors (rate limit, 5xx) and validation failures alike: mark failed; the cron retries.
+      // Show the failure on the dashboard, then rethrow so the Action Retrier backs off and tries again
+      // (rate limits, 5xx, a malformed label). episodes.labelDone records the final outcome.
       const msg =
         err instanceof Anthropic.APIError ? `API ${err.status}: ${err.message}` : err instanceof Error ? err.message : String(err);
       await ctx.runMutation(internal.episodes.setLabelStatus, { episodeId, status: "failed", error: msg });
+      if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) return; // retrying won't help
+      throw err;
     }
   },
 });

@@ -46,6 +46,27 @@ ALLOWED: dict[str, tuple[float, float]] = {
     "gripper.grip_torque_nm": (0.3, 1.2),
 }
 SANDBOX_FILE = "arm.yaml"
+
+# What Droid hands back besides its edit (the Droid SDK's structured output): checked by the SDK against this
+# schema, shown on the dashboard and read out in the alert.
+DIAGNOSIS_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["summary", "cause", "severity", "safe_to_resume", "evidence"],
+    "properties": {
+        "summary": {"type": "string", "description": "two or three plain sentences: what you found and why this change"},
+        "cause": {"type": "string", "description": "the most likely cause, in a few words"},
+        "severity": {"type": "string", "enum": ["low", "medium", "high"],
+                     "description": "high if a person or the arm could have been hurt, or the cause is unknown"},
+        "safe_to_resume": {"type": "boolean",
+                           "description": "true only if the cause is understood and a reset is enough"},
+        "evidence": {"type": "array", "maxItems": 5, "items": {
+            "type": "object", "additionalProperties": False, "required": ["time_s", "joint", "observation"],
+            "properties": {"time_s": {"type": "number"}, "joint": {"type": "string"},
+                           "observation": {"type": "string"}}}},
+    },
+}
+DIAGNOSIS_FIELDS = ("cause", "severity", "safe_to_resume", "evidence")
 DRIVER_SOURCE = Path(importlib.util.find_spec("scrub_arm.driver").origin)
 
 
@@ -131,15 +152,21 @@ class Proposal:
     original_sha: str = ""
     proposed_text: str = ""
     needs_restart: bool = False
+    cause: str | None = None
+    severity: str | None = None
+    safe_to_resume: bool | None = None
+    evidence: list | None = None
 
     def public(self) -> dict:
-        d = {k: v for k, v in self.__dict__.items() if k != "proposed_text"}
+        d = {k: v for k, v in self.__dict__.items()
+             if k != "proposed_text" and not (k in DIAGNOSIS_FIELDS and v is None)}
         d["steps"] = d["steps"][-40:]
         return d
 
 
 class DroidRunner(Protocol):
-    async def run(self, sandbox: Path, prompt: str, on_step: Callable[[dict], None]) -> str: ...
+    async def run(self, sandbox: Path, prompt: str, on_step: Callable[[dict], None]) -> str | dict:
+        """The summary text, or a dict matching DIAGNOSIS_SCHEMA."""
 
 
 def build_prompt(fault: str) -> str:
@@ -152,7 +179,8 @@ def build_prompt(fault: str) -> str:
         "prevented it, make the SMALLEST edit to arm.yaml that addresses it, changing only values under "
         "`motion:`, `pick:`, or `gripper.grip_torque_nm`. Never touch joint limits, gripper calibration, "
         "motor ids, or anything else. If no config change is warranted (for example a real collision), "
-        "change nothing. Finish with two or three plain sentences: what you found and why this change."
+        "change nothing. Then report: a short summary, the most likely cause, a severity, whether a reset is "
+        "enough to resume safely, and the evidence (time in seconds, joint, what you saw) that supports it."
     )
 
 
@@ -195,7 +223,7 @@ class SdkDroidRunner:
         )
         handlers = InteractionHandlers(on_permission=make_permission_handler(sandbox))
         async with Session(cwd=str(sandbox), config=config, interactions=handlers, api_key=self.api_key) as session:
-            async with session.stream(prompt, timeout=self.timeout_s) as stream:
+            async with session.stream(prompt, output=DIAGNOSIS_SCHEMA, timeout=self.timeout_s) as stream:
                 async for event in stream:
                     if isinstance(event, ToolCall):
                         on_step({"type": "tool", "name": event.name, "input": dict(event.input)})
@@ -205,7 +233,11 @@ class SdkDroidRunner:
                     elif isinstance(event, AssistantMessage) and event.text.strip():
                         on_step({"type": "message", "text": event.text.strip()})
             result = stream.result
-        return result.text if result.success else f"Droid did not finish ({result.subtype})."
+        if not result.success:
+            return f"Droid did not finish ({result.subtype})."
+        if getattr(result, "structured_output", None):
+            return dict(result.structured_output)
+        return result.text
 
 
 class RehearsalRunner:
@@ -222,7 +254,8 @@ class RehearsalRunner:
         text = path.read_text().replace(f"tracking_error_limit_deg: {old}", f"tracking_error_limit_deg: {min(old + 5, 40)}", 1)
         on_step({"type": "tool", "name": "Edit", "input": {"file_path": str(path)}})
         path.write_text(text)
-        return "REHEARSAL ONLY (no agent ran): raised the collision-guard threshold by 5 degrees."
+        return {"summary": "REHEARSAL ONLY (no agent ran): raised the collision-guard threshold by 5 degrees.",
+                "cause": "rehearsal: no diagnosis was made", "severity": "low", "safe_to_resume": False, "evidence": []}
 
 
 # ── Triage ─────────────────────────────────────────────────────────────────
@@ -266,8 +299,9 @@ class Triage:
             self._busy = False
             self._publish(p)
             if p.status == "pending":
-                self.emit("announce", text=f"Droid suggests a fix: {spoken_changes(p.changes)}. "
-                                           "Say approve or reject.")
+                why = f"Likely cause: {p.cause}. " if p.cause else ""
+                risk = f"Severity {p.severity}. " if p.severity else ""
+                self.emit("announce", text=f"{why}{risk}Droid suggests {spoken_changes(p.changes)}. Say approve or reject.")
 
     def _step(self, p: Proposal, step: dict) -> None:
         p.steps.append({**step, "t": round(time.time(), 2)})
@@ -290,8 +324,13 @@ class Triage:
         (sandbox / "telemetry.csv").write_text(telemetry_csv(telemetry))
         if DRIVER_SOURCE.exists():
             shutil.copyfile(DRIVER_SOURCE, sandbox / "driver.py")      # the collision guard and grasp logic, read-only
-        summary = asyncio.run(self.runner.run(sandbox, build_prompt(p.fault), lambda s: self._step(p, s)))
-        p.summary = summary
+        out = asyncio.run(self.runner.run(sandbox, build_prompt(p.fault), lambda s: self._step(p, s)))
+        if isinstance(out, dict):
+            p.summary = str(out.get("summary", ""))
+            p.cause, p.severity = out.get("cause"), out.get("severity")
+            p.safe_to_resume, p.evidence = out.get("safe_to_resume"), list(out.get("evidence") or [])
+        else:
+            p.summary = out
         proposed = (sandbox / SANDBOX_FILE).read_text()
         if proposed == original:
             p.status = "no_change"

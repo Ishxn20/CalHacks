@@ -80,3 +80,48 @@ def test_real_sdk_accepts_the_arguments_we_send():
     c = Cartesia(api_key="x")
     assert {"model_id", "transcript", "voice", "output_format"} <= set(inspect.signature(c.tts.generate).parameters)
     assert {"file", "model", "language"} <= set(inspect.signature(c.stt.transcribe).parameters)
+
+
+class FakeDicts:
+    def __init__(self, fail=False):
+        self.created, self.fail = [], fail
+
+    def create(self, name, items):
+        if self.fail:
+            raise RuntimeError("quota")
+        self.created.append((name, items))
+        return SimpleNamespace(id=f"pdict_{len(self.created)}")
+
+
+def test_alerts_use_the_firm_voice_and_routine_lines_the_calm_one():
+    from scrub_console.speech import ROUTINE, URGENT
+
+    fake = FakeCartesia()
+    sp = CartesiaSpeech(client=fake, voice_id="v")
+    sp.synthesize("Releasing.")
+    sp.synthesize("I've stopped.", urgent=True)
+    assert fake.tts_calls[0]["generation_config"] == ROUTINE
+    assert fake.tts_calls[1]["generation_config"] == URGENT
+    sp.synthesize("Releasing.", urgent=True)                 # same words, other voice: not served from cache
+    assert len(fake.tts_calls) == 3
+
+
+def test_the_pronunciation_dictionary_is_created_once_and_reused(tmp_path):
+    from scrub_console.speech import PRONUNCIATIONS
+
+    fake, dicts = FakeCartesia(), FakeDicts()
+    fake.pronunciation_dicts = dicts
+    sp = CartesiaSpeech(client=fake, voice_id="v", state_dir=tmp_path)
+    sp.synthesize("Castroviejo, backhand.")
+    assert fake.tts_calls[0]["pronunciation_dict_id"] == "pdict_1"
+    assert dicts.created[0][1] == PRONUNCIATIONS
+    again = CartesiaSpeech(client=fake, voice_id="v", state_dir=tmp_path)      # next start: read from state_dir
+    again.synthesize("Vicryl.")
+    assert len(dicts.created) == 1 and fake.tts_calls[1]["pronunciation_dict_id"] == "pdict_1"
+
+
+def test_speech_still_works_when_the_dictionary_cannot_be_made(tmp_path):
+    fake = FakeCartesia()
+    fake.pronunciation_dicts = FakeDicts(fail=True)
+    assert CartesiaSpeech(client=fake, voice_id="v", state_dir=tmp_path).synthesize("Releasing.") == b"RIFFdata"
+    assert "pronunciation_dict_id" not in fake.tts_calls[0]

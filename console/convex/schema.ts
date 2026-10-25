@@ -41,9 +41,15 @@ export default defineSchema({
     labels: v.union(labels, v.null()),
     // Dataset gate: only consented, labelled, privacy-clean episodes are exported for training.
     review: v.union(v.literal("unreviewed"), v.literal("accepted"), v.literal("rejected")),
+    // Claude's task, caption and failure mode as one string, for full-text search when curating the dataset.
+    searchText: v.optional(v.string()),
+    // The Action Retrier run labelling this episode, so its completion callback can find it.
+    labelRunId: v.optional(v.string()),
   })
     .index("by_labelStatus", ["labelStatus"])
-    .index("by_review", ["review"]),
+    .index("by_labelRunId", ["labelRunId"])
+    .index("by_review", ["review"])
+    .searchIndex("search_labels", { searchField: "searchText", filterFields: ["review"] }),
 
   // Every console event (utterance, intent, command, job, fault, count, ...), newest last by creation time.
   events: defineTable({
@@ -51,7 +57,7 @@ export default defineSchema({
     data: v.any(),
     seq: v.number(),
     t: v.number(),
-  }),
+  }).index("by_t", ["t"]),
 
   // One document per physical instrument: where it is right now.
   instruments: defineTable({
@@ -92,5 +98,10 @@ export default defineSchema({
     steps: v.optional(v.any()),
     needs_restart: v.optional(v.boolean()),
     original_sha: v.optional(v.string()),
+    // Droid's structured diagnosis (triage.py DIAGNOSIS_SCHEMA).
+    cause: v.optional(v.string()),
+    severity: v.optional(v.string()),
+    safe_to_resume: v.optional(v.boolean()),
+    evidence: v.optional(v.any()),
   }).index("by_proposal_id", ["id"]),
 });

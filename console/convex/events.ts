@@ -17,3 +17,14 @@ export const recent = query({
     return rows.reverse().map((r) => ({ seq: r.seq, t: r.t, kind: r.kind, data: r.data }));
   },
 });
+
+const KEEP_MS = 7 * 24 * 3600 * 1000;
+
+export const prune = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const old = await ctx.db.query("events").withIndex("by_t", (q) => q.lt("t", (Date.now() - KEEP_MS) / 1000)).take(1000);
+    for (const e of old) await ctx.db.delete(e._id);
+    return old.length;
+  },
+});

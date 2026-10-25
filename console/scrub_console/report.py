@@ -36,6 +36,15 @@ class BitdeerClient:
         except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError) as e:
             raise BitdeerError(f"bitdeer request failed: {e}") from e
 
+    def models(self) -> list[str]:
+        """Model ids this key can use (OpenAI-compatible GET /models)."""
+        req = urllib.request.Request(self.base_url + "/models", headers={"Authorization": "Bearer " + self.api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                return sorted(m["id"] for m in json.loads(resp.read()).get("data", []))
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError) as e:
+            raise BitdeerError(f"could not list Bitdeer models: {e}") from e
+
     @property
     def label(self) -> str:
         return f"bitdeer:{self.model}"

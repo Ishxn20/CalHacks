@@ -168,3 +168,21 @@ def test_rules_keep_suture_size_and_orientation_from_a_plain_sentence(tray, reso
     assert "prolene" not in fields["instrument"] and "backhand" not in fields["instrument"]
     i = understand("the ryder with polypropylene 4-0", resolve, None, tray=tray)
     assert i.kind == "handoff" and i.fields["suture"] == "prolene" and i.fields["size"] == "4-0"
+
+
+def test_claude_gets_a_cached_system_prompt(tray, resolve):
+    calls = []
+
+    class Fake:
+        class beta:
+            class messages:
+                @staticmethod
+                def create(**kw):
+                    calls.append(kw)
+                    return SimpleNamespace(stop_reason="end_turn", usage=None, content=[
+                        SimpleNamespace(type="tool_use", name="count_check", input={})])
+
+    p = ClaudeParser(tray, client=Fake())
+    assert understand("count check please", resolve, p).kind == "count"
+    system = calls[0]["system"]
+    assert system[0]["cache_control"] == {"type": "ephemeral"} and "scrub assistant" in system[0]["text"]

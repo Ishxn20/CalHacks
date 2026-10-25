@@ -1,15 +1,22 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import actionRetrierTest from "@convex-dev/action-retrier/test";
+import { convexTest, type TestConvex } from "convex-test";
 import { expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/!(*.*.*)*.*s");
+
+function setup(): TestConvex<typeof schema> {
+  const t = convexTest(schema, modules);
+  actionRetrierTest.register(t);
+  return t;
+}
 const board = (...rows: [string, string, string][]) =>
   rows.map(([uid, instrument, status]) => ({ uid, instrument, name: instrument.toUpperCase(), status }));
 
 test("events come back oldest first and are capped at the newest 150", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   for (let i = 1; i <= 160; i++) await t.mutation(internal.events.add, { kind: "utterance", data: { text: `r${i}` }, seq: i, t: i });
   const rows = await t.query(api.events.recent, {});
   expect(rows).toHaveLength(150);
@@ -31,7 +38,7 @@ test("writes are internal: the generated public api exposes only the read querie
 });
 
 test("the board syncs: inserts, moves, and removals; counts follow", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   await t.mutation(internal.instruments.sync, { items: board(["a#1", "resano", "tray"], ["b#1", "potts", "tray"]) });
   expect((await t.query(api.instruments.list, {})).counts).toMatchObject({ tray: 2, in_field: 0 });
   await t.mutation(internal.instruments.sync, { items: board(["a#1", "resano", "in_field"], ["b#1", "potts", "tray"]) });
@@ -43,7 +50,7 @@ test("the board syncs: inserts, moves, and removals; counts follow", async () =>
 });
 
 test("an unchanged board writes nothing new", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   const items = board(["a#1", "resano", "tray"]);
   await t.mutation(internal.instruments.sync, { items });
   const before = await t.run((ctx) => ctx.db.query("instruments").collect());
@@ -53,7 +60,7 @@ test("an unchanged board writes nothing new", async () => {
 });
 
 test("audit anchors: normal growth is quiet, a log that goes backwards raises an alert", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   for (const seq of [1, 2, 5]) await t.mutation(internal.audit.anchor, { source: "arm", seq, head: `h${seq}`, ok: true });
   expect(await t.query(api.audit.alerts, {})).toHaveLength(0);
   expect((await t.query(api.audit.latest, {})).arm).toMatchObject({ seq: 5, head: "h5" });
@@ -65,7 +72,7 @@ test("audit anchors: normal growth is quiet, a log that goes backwards raises an
 });
 
 test("two different heads for the same entry is a fork alert; a repeat is ignored", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   await t.mutation(internal.audit.anchor, { source: "console", seq: 4, head: "aaa", ok: true });
   await t.mutation(internal.audit.anchor, { source: "console", seq: 4, head: "aaa", ok: true });
   expect(await t.query(api.audit.alerts, {})).toHaveLength(0);
@@ -74,7 +81,7 @@ test("two different heads for the same entry is a fork alert; a repeat is ignore
 });
 
 test("sources are tracked separately", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   await t.mutation(internal.audit.anchor, { source: "arm", seq: 9, head: "x", ok: true });
   await t.mutation(internal.audit.anchor, { source: "console", seq: 2, head: "y", ok: false });
   expect(await t.query(api.audit.alerts, {})).toHaveLength(0);
@@ -82,7 +89,7 @@ test("sources are tracked separately", async () => {
 });
 
 test("a proposal is updated in place as its status changes", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   const base = { id: "t1", fault: "joint3 lag", created: 1, simulated: true, steps: [{ type: "tool", name: "Read" }] };
   await t.mutation(internal.proposals.upsert, { ...base, status: "running" });
   await t.mutation(internal.proposals.upsert, { ...base, status: "pending", diff: "+x", changes: [{ key: "k", old: 1, new: 2 }] });
@@ -99,7 +106,7 @@ const goodLabels = {
   model: "claude-opus-5-5",
 };
 
-async function recorded(t: ReturnType<typeof convexTest>, opts: { consent: boolean; withVideo: boolean }) {
+async function recorded(t: ReturnType<typeof setup>, opts: { consent: boolean; withVideo: boolean }) {
   const blob = await t.run((ctx) => ctx.storage.store(new Blob(["x"])));
   return t.mutation(internal.episodes.record, {
     jobId: 1, kind: "handoff", request: "castroviejo, backhand", startedAt: 1000, endedAt: 9000, outcome: "done", error: null,
@@ -117,7 +124,7 @@ test("recording is internal: the public api can read episodes but not write them
 });
 
 test("only consented episodes with footage are sent to Claude", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   await recorded(t, { consent: false, withVideo: true });
   await recorded(t, { consent: true, withVideo: false });
   await recorded(t, { consent: true, withVideo: true });
@@ -126,7 +133,7 @@ test("only consented episodes with footage are sent to Claude", async () => {
 });
 
 test("clean labels are accepted automatically; the public list carries no video links", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   const id = await recorded(t, { consent: true, withVideo: true });
   await t.mutation(internal.episodes.saveLabels, { episodeId: id, labels: goodLabels });
   expect(await t.query(api.episodes.stats, {})).toMatchObject({ total: 1, labeled: 1, accepted: 1, needsReview: 0, frames: 80 });
@@ -137,7 +144,7 @@ test("clean labels are accepted automatically; the public list carries no video 
 });
 
 test("privacy or quality flags, or disagreeing with the robot, hold an episode for a person", async () => {
-  const t = convexTest(schema, modules);
+  const t = setup();
   for (const labels of [{ ...goodLabels, privacyFlags: ["face"] }, { ...goodLabels, qualityFlags: ["dark"] },
                         { ...goodLabels, agreesWithRobot: false }]) {
     const id = await recorded(t, { consent: true, withVideo: true });
@@ -145,4 +152,56 @@ test("privacy or quality flags, or disagreeing with the robot, hold an episode f
   }
   expect(await t.query(api.episodes.stats, {})).toMatchObject({ accepted: 0, needsReview: 3 });
   expect(await t.query(internal.episodes.exportManifest, {})).toHaveLength(0);
+});
+
+test("labelling runs through the Action Retrier component and the run id is kept on the episode", async () => {
+  const t = setup();
+  const id = await recorded(t, { consent: true, withVideo: true });
+  const e = await t.run((ctx) => ctx.db.get(id));
+  expect(e?.labelStatus).toBe("pending");
+  expect(e?.labelRunId).toBeTruthy();
+});
+
+test("when the retrier gives up, only that episode is marked failed", async () => {
+  const t = setup();
+  const a = await recorded(t, { consent: true, withVideo: true });
+  const b = await recorded(t, { consent: true, withVideo: true });
+  const runA = (await t.run((ctx) => ctx.db.get(a)))!.labelRunId!;
+  await t.mutation(internal.episodes.labelDone, { runId: runA as never, result: { type: "failed", error: "API 529: overloaded" } });
+  const [ea, eb] = await t.run(async (ctx) => [await ctx.db.get(a), await ctx.db.get(b)]);
+  expect(ea).toMatchObject({ labelStatus: "failed", labelError: "gave up after retries: API 529: overloaded" });
+  expect(eb?.labelStatus).toBe("pending");
+});
+
+test("labels are searchable; the accepted-only filter hides episodes still under review", async () => {
+  const t = setup();
+  const good = await recorded(t, { consent: true, withVideo: true });
+  await t.mutation(internal.episodes.saveLabels, { episodeId: good, labels: goodLabels });
+  const flagged = await recorded(t, { consent: true, withVideo: true });
+  await t.mutation(internal.episodes.saveLabels, {
+    episodeId: flagged,
+    labels: { ...goodLabels, caption: "The gripper closed on nothing.", success: false, failureMode: "missed_grasp", agreesWithRobot: false },
+  });
+  expect((await t.query(api.episodes.search, { q: "missed_grasp" })).map((e) => e.id)).toEqual([flagged]);
+  expect(await t.query(api.episodes.search, { q: "missed_grasp", acceptedOnly: true })).toHaveLength(0);
+  expect((await t.query(api.episodes.search, { q: "needle holder", acceptedOnly: true })).map((e) => e.id)).toEqual([good]);
+  expect(await t.query(api.episodes.search, { q: "  " })).toEqual([]);
+});
+
+test("events older than a week are pruned; recent ones stay", async () => {
+  const t = setup();
+  const now = Date.now() / 1000;
+  await t.mutation(internal.events.add, { kind: "utterance", data: {}, seq: 1, t: now - 8 * 24 * 3600 });
+  await t.mutation(internal.events.add, { kind: "utterance", data: {}, seq: 2, t: now - 60 });
+  expect(await t.mutation(internal.events.prune, {})).toBe(1);
+  expect((await t.query(api.events.recent, {})).map((e) => e.seq)).toEqual([2]);
+});
+
+test("a proposal carries Droid's structured diagnosis", async () => {
+  const t = setup();
+  await t.mutation(internal.proposals.upsert, {
+    id: "t2", fault: "joint3 lag", created: 1, status: "pending", cause: "speed too high", severity: "medium",
+    safe_to_resume: true, evidence: [{ time_s: 12.4, joint: "joint3", observation: "lag 31 deg" }],
+  });
+  expect((await t.query(api.proposals.recent, {}))[0]).toMatchObject({ severity: "medium", safe_to_resume: true });
 });

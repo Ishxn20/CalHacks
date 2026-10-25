@@ -32,6 +32,15 @@ def fetch_manifest(site_url: str, key: str) -> list[dict]:
     return json.loads(_get(site_url.rstrip("/") + "/export/manifest", {"Authorization": f"Bearer {key}"}))
 
 
+def search_ids(convex_url: str, text: str, client=None) -> set[str]:
+    """Ids of accepted episodes whose Claude labels match `text` (Convex full-text search, episodes:search)."""
+    if client is None:
+        from convex import ConvexClient
+
+        client = ConvexClient(convex_url)
+    return {e["id"] for e in client.query("episodes:search", {"q": text, "acceptedOnly": True})}
+
+
 def frames_to_arrays(lines: list[dict]) -> dict[str, np.ndarray]:
     def vec(q: list, g) -> list[float]:
         q = list(q or []) + [None] * (6 - len(q or []))

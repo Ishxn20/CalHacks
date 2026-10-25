@@ -107,3 +107,18 @@ def test_prediction_must_name_an_instrument_that_is_on_the_tray(bitdeer):
 def test_no_prediction_without_a_model_or_candidates(bitdeer):
     _, client = bitdeer()
     assert predict_next([], REMAINING, None) is None and predict_next([], {}, client) is None
+
+
+def test_bitdeer_lists_the_models_on_the_account(monkeypatch):
+    import io
+    import json as _json
+    import urllib.request
+
+    from scrub_console.report import BitdeerClient
+
+    def fake_urlopen(req, timeout=None):
+        assert req.full_url.endswith("/models") and req.headers["Authorization"] == "Bearer k"
+        return io.BytesIO(_json.dumps({"data": [{"id": "b/model"}, {"id": "a/model"}]}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    assert BitdeerClient("k").models() == ["a/model", "b/model"]

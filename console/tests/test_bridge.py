@@ -179,3 +179,24 @@ def test_after_a_suggestion_stage_it_stages_the_suggested_instrument(rig):
     bridge._suggested = "Potts scissors"        # what suggest_next() remembers (Bitdeer needs a key)
     r = bridge.handle_heard("Scrub, stage it")
     assert r["intent"] == "stage" and "Potts" in r["say"]
+
+
+def test_a_clarifying_question_is_remembered_for_the_follow_up(rig, monkeypatch):
+    bridge, _ = rig
+    seen = []
+    real = bridge.understand
+    bridge.understand = lambda text, ctx: (seen.append(ctx), real(text, ctx))[1]
+    assert bridge.handle_text("hand me a sponge")["intent"] == "ask"   # not on the tray: it asks
+    bridge.handle_text("potts")
+    assert "you just asked" in seen[1] and "sponge" in seen[1]
+    bridge.handle_text("count check")                                    # an answered question is forgotten
+    assert "you just asked" not in seen[2]
+
+
+def test_the_question_is_forgotten_after_a_while(rig, monkeypatch):
+    import scrub_console.bridge as b
+
+    bridge, _ = rig
+    bridge.handle_text("hand me a sponge")
+    monkeypatch.setattr(b, "ASK_MEMORY_S", 0.0)
+    assert "you just asked" not in bridge.context()

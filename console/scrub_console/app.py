@@ -127,7 +127,8 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
     triage.emit = bridge.emit
     dataset = _dataset(record, sinks, bridge, sim) if record else None
     speech = CartesiaSpeech(api_key=os.environ.get("CARTESIA_API_KEY"), voice_id=s.cartesia_voice,
-                            tts_model=s.cartesia_tts_model, stt_model=s.cartesia_stt_model)
+                            tts_model=s.cartesia_tts_model, stt_model=s.cartesia_stt_model, state_dir=s.audit_dir,
+                            pronunciation_dict_id=os.environ.get("CARTESIA_PRONUNCIATION_DICT_ID"))
     net = None
     if agents:
         from .agents import AgentArm, AgentNetwork

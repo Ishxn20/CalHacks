@@ -117,6 +117,19 @@ def agent_seed(log_dir: Path) -> str:
     return path.read_text().strip()
 
 
+def agentverse_key_problem(key: str | None) -> str | None:
+    """Why `key` can't register an agent, or None if it looks right. Agentverse API keys are JWTs ("eyJ...");
+    an ASI:One key ("sk_...") is a different credential and Agentverse rejects it with a vague 401."""
+    if not key:
+        return "set AGENTVERSE_API_KEY (agentverse.ai > Profile > API Keys)"
+    if key.startswith("sk_"):
+        return ("AGENTVERSE_API_KEY holds an ASI:One key (sk_...). Registering an agent needs an Agentverse key: "
+                "agentverse.ai > Profile > API Keys > create one (it starts with eyJ), and put it in .env instead.")
+    if not key.startswith("eyJ"):
+        return "AGENTVERSE_API_KEY doesn't look like an Agentverse API key (they start with eyJ)."
+    return None
+
+
 def run(console_url: str, log_dir: Path, port: int = 8001) -> None:
     import uagents.asgi
 
@@ -127,8 +140,8 @@ def run(console_url: str, log_dir: Path, port: int = 8001) -> None:
     from uagents_core.utils.registration import RegistrationRequestCredentials, register_chat_agent
 
     key = os.environ.get("AGENTVERSE_API_KEY")
-    if not key:
-        raise SystemExit("set AGENTVERSE_API_KEY (agentverse.ai > Profile > API keys)")
+    if problem := agentverse_key_problem(key):
+        raise SystemExit(problem)
     seed = agent_seed(log_dir)
     agent = Agent(name="scrub-assistant", seed=seed, port=port, mailbox=True)
     console, pending = Console(console_url), {}

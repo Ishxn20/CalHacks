@@ -12,7 +12,7 @@ import droid_sdk
 from droid_sdk import (AssistantMessage, EditAction, ExecuteAction, PermissionOption, PermissionRequest,
                        ToolCall, ToolConfirmationOutcome, ToolResult, ToolUseBlock)
 from scrub_arm.audit import AuditLog
-from scrub_console.triage import (ALLOWED, RehearsalRunner, SdkDroidRunner, Triage, make_permission_handler,
+from scrub_console.triage import (ALLOWED, DIAGNOSIS_SCHEMA, RehearsalRunner, SdkDroidRunner, Triage, make_permission_handler,
                                   validate_change)
 
 ARM_YAML = (Path(__file__).resolve().parents[2] / "arm" / "config" / "arm.yaml").read_text()
@@ -217,6 +217,10 @@ def test_permission_handler_allows_only_the_sandbox_config(tmp_path):
 
 # ── SdkDroidRunner against a faked Session ─────────────────────────────────
 
+DIAGNOSIS = {"summary": "Joint 3 lagged while carrying the clamp; raised the guard slightly.", "cause": "payload lag on joint 3",
+             "severity": "medium", "safe_to_resume": True,
+             "evidence": [{"time_s": 41.2, "joint": "joint3", "observation": "measured trailed setpoint by 27 deg"}]}
+
 class FakeStream:
     def __init__(self, events, result):
         self._events, self.result = events, result
@@ -253,12 +257,14 @@ def test_sdk_runner_restricts_tools_and_reports_every_step(tmp_path, monkeypatch
 
         def stream(self, prompt, **kw):
             seen["prompt"], seen["stream_kw"] = prompt, kw
-            return FakeStream(events, SimpleNamespace(success=True, text="Raised the threshold.", subtype="success"))
+            return FakeStream(events, SimpleNamespace(success=True, text="Raised the threshold.", subtype="success",
+                                                      structured_output=DIAGNOSIS))
 
     monkeypatch.setattr(droid_sdk, "Session", FakeSession)
     steps = []
     out = asyncio.run(SdkDroidRunner(timeout_s=30).run(tmp_path, "fix it", steps.append))
-    assert out == "Raised the threshold."
+    assert out == DIAGNOSIS
+    assert seen["stream_kw"]["output"] == DIAGNOSIS_SCHEMA            # the SDK checks Droid's answer against it
     assert [s["type"] for s in steps] == ["tool", "result", "message"]
     cfg = seen["config"]
     assert set(cfg.restrict_tools) == {"Read", "Edit", "Grep", "Glob"} and cfg.autonomy == droid_sdk.Autonomy.LOW
@@ -276,3 +282,27 @@ def test_sdk_runner_reports_a_run_that_did_not_finish(tmp_path, monkeypatch):
 
     monkeypatch.setattr(droid_sdk, "Session", FakeSession)
     assert "interrupted" in asyncio.run(SdkDroidRunner().run(tmp_path, "x", lambda s: None))
+
+
+class DiagnosingRunner(FakeRunner):
+    async def run(self, sandbox, prompt, on_step):
+        await super().run(sandbox, prompt, on_step)
+        return DIAGNOSIS
+
+
+def test_a_structured_diagnosis_is_kept_on_the_proposal_and_read_out(rig):
+    t = rig.make(DiagnosingRunner(edited(tracking_error_limit_deg=30.0)))
+    p = t.proposals[t.trigger(FAULT, {})]
+    assert p.status == "pending" and p.summary == DIAGNOSIS["summary"]
+    assert (p.cause, p.severity, p.safe_to_resume) == ("payload lag on joint 3", "medium", True)
+    assert p.evidence[0]["joint"] == "joint3"
+    pub = p.public()
+    assert pub["severity"] == "medium" and pub["evidence"] == DIAGNOSIS["evidence"]
+    said = [d["text"] for k, d in rig.emitted if k == "announce"][-1]
+    assert said.startswith("Likely cause: payload lag on joint 3. Severity medium.") and "approve or reject" in said
+
+
+def test_a_text_only_answer_leaves_the_diagnosis_fields_out(rig):
+    t = rig.make(FakeRunner(edited(tracking_error_limit_deg=30.0)))
+    pub = t.proposals[t.trigger(FAULT, {})].public()
+    assert not {"cause", "severity", "safe_to_resume", "evidence"} & set(pub)     # Convex optionals can't be null

@@ -8,7 +8,7 @@
     POST /api/heard {text}        hands-free speech already transcribed in the browser (no Cartesia key), same gate
     POST /api/utterance {text}    a request with no wake word needed (CLI, tests, the Fetch.ai agent)
     POST /api/understand {text}   dry run: the intent and reply a request would get, without acting on it
-    GET  /api/tts?text=...        the reply as speech (Cartesia)
+    GET  /api/tts?text=...[&urgent=1]  the reply as speech (Cartesia; urgent = alert voice)
     POST /api/count               count check               POST /api/used {instrument}
     POST /api/report              end-of-case report        POST /api/predict   next-instrument suggestion
     POST /api/triage/approve|reject {id}
@@ -123,8 +123,9 @@ def make_handler(console: Console):
                 if url.path == "/api/events":
                     return self._events(int((parse_qs(url.query).get("since") or ["0"])[0]))
                 if url.path == "/api/tts":
-                    text = (parse_qs(url.query).get("text") or [""])[0]
-                    return self._send(200, console.speech.synthesize(text), "audio/wav")
+                    q = parse_qs(url.query)
+                    text, urgent = (q.get("text") or [""])[0], (q.get("urgent") or [""])[0] == "1"
+                    return self._send(200, console.speech.synthesize(text, urgent=urgent), "audio/wav")
                 if url.path == "/api/audit":
                     return self._json(200, self._audit())
                 self._fail(404, "not found")
