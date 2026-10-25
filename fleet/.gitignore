@@ -1,6 +1,0 @@
-node_modules/
-.env.local
-dist/
-datasets/
-*.egg-info/
-__pycache__/
