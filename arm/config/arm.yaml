@@ -54,9 +54,9 @@ gripper:
                     [-41.2, 57.5], [-12.2, 67.3], [17.0, 77.0], [42.0, 85.3]]
 
 motion:
-  speed_scale: 0.5             # global multiplier on max_vel_deg_s; keep low until poses are proven
+  speed_scale: 0.375           # global multiplier on max_vel_deg_s; 75% of the calibrated 0.5 (jaw snapping, 2026-10-25)
   approach_speed_scale: 0.25   # extra multiplier for the final approach / retreat at the tray
-  min_move_s: 0.4
+  min_move_s: 0.53             # 0.4 / 0.75: short moves slow to 75% too
   settle_tol_deg: 3.0          # measured-vs-target tolerance to call a move "arrived"
   settle_timeout_s: 1.5
   # Freeze the arm if any joint lags its setpoint by more than this (collision guard).
