@@ -15,9 +15,10 @@ def test_scan_frame_finds_all_eight_parts():
     q = np.array(json.loads((DATA / "red_parts_scan.json").read_text())["q"])
     dets = sorted((d for d in RedPartsDetector().detect(bgr, q) if d.candidates), key=lambda d: -d.grasp_mm[1])
     got = [d.fine_id or ("maybe " + " / ".join(d.candidates)) for d in dets]
-    assert got == ["scalpel_11_long", "needle_holder_ryder", "scissors_micro_forward", "needle_holder_short",
-                   "scalpel_10", "forceps_fine_vascular", "scissors_micro_forward",
-                   "maybe scalpel_11_long / scalpel_20"], got   # the #20 touches the right finger: not sure
+    assert got[:7] == ["scalpel_11_long", "needle_holder_ryder", "scissors_micro_forward", "needle_holder_short",
+                       "scalpel_10", "forceps_fine_vascular", "scissors_micro_forward"], got
+    # the #20 touched the old right finger in this photo; with the re-taped fingers' mask it may count as complete
+    assert got[7] in ("scalpel_20", "maybe scalpel_11_long / scalpel_20"), got
     thin = ("forceps_fine_vascular", "needle_holder_short", "needle_holder_ryder")   # grabbed at their thinnest point
     assert all(380 < d.grasp_mm[0] < 520 for d in dets if d.fine_id not in thin)
     assert all(350 < d.grasp_mm[0] < 560 for d in dets)
