@@ -39,7 +39,8 @@ def arm_server(tmp_path):
     audit = AuditLog(tmp_path / "arm_audit.jsonl")
     httpd = serve(app.assistant, app.catalog, "127.0.0.1", 0, token=TOKEN, audit=audit)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    yield SimpleNamespace(url=f"http://127.0.0.1:{httpd.server_address[1]}", token=TOKEN, app=app, audit=audit)
+    yield SimpleNamespace(url=f"http://127.0.0.1:{httpd.server_address[1]}", token=TOKEN, app=app, audit=audit,
+                          config_path=d / "arm.yaml")
     httpd.shutdown()
     httpd.server_close()
     app.driver.shutdown()
