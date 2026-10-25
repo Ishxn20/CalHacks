@@ -1,7 +1,9 @@
-"""python -m scrub_console {demo,serve,say,check}
+"""python -m scrub_console {demo,serve,say,check,export}
 
     demo [--fast] [--agents]                     simulated arm + console + dashboard in one process, no hardware
-    serve [--sim] [--demo] [--rehearse-droid] [--agents]   the dashboard at http://127.0.0.1:8780 (arm server must be running)
+    serve [--sim] [--demo] [--rehearse-droid] [--agents] [--record CAMERA|sim]
+                                                 the dashboard at http://127.0.0.1:8780 (arm server must be running)
+    export --site-url URL --key KEY --out DIR    accepted episodes as a LeRobot-style training set
     say "needle holder, 6-0 prolene, backhand"   one request through the same path the dashboard uses
     check                                        which integrations are configured, and is the arm reachable
 """
@@ -10,7 +12,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import threading
+from pathlib import Path
 
 from .app import build_console
 from .arm_client import ArmError
@@ -31,7 +35,8 @@ def _banner(caps: dict) -> None:
 def cmd_serve(args) -> None:
     from .server import serve
 
-    c = build_console(Settings.from_env(), sim=args.sim, demo=args.demo, rehearse_droid=args.rehearse_droid, agents=args.agents)
+    c = build_console(Settings.from_env(), sim=args.sim, demo=args.demo, rehearse_droid=args.rehearse_droid, agents=args.agents,
+                      record=args.record)
     stop = threading.Event()
     threading.Thread(target=c.bridge.run, args=(args.poll, stop), name="poll", daemon=True).start()
     httpd = serve(c, args.host, args.port)
@@ -65,6 +70,15 @@ def cmd_demo(args) -> None:
         d.stop()
 
 
+def cmd_export(args) -> None:
+    from .export import fetch_manifest, export
+
+    if not args.site_url or not args.key:
+        raise SystemExit("--site-url and --key are required (or CONVEX_SITE_URL / EXPORT_KEY)")
+    n = export(fetch_manifest(args.site_url, args.key), Path(args.out))
+    print(f"exported {n} episodes to {args.out}")
+
+
 def cmd_say(args) -> None:
     c = build_console(Settings.from_env(), sim=args.sim)
     print(json.dumps(c.bridge.handle_text(" ".join(args.text), via="cli"), indent=2))
@@ -96,7 +110,15 @@ def main(argv=None) -> None:
                    help="if the Droid CLI is not installed, rehearse triage with a canned (clearly labelled) edit")
     s.add_argument("--agents", action="store_true",
                    help="run voice / arm / eyes as Fetch.ai uAgents that carry the commands (needs the agents extra)")
+    s.add_argument("--record", metavar="CAMERA|sim",
+                   help="record every arm job for the training set: a wrist-camera index, or 'sim' for placeholder "
+                        "frames (needs Convex and the dataset extra; turning it on is consent for research use)")
     s.set_defaults(fn=cmd_serve)
+    x = sub.add_parser("export", help="download accepted episodes as a LeRobot-style training set")
+    x.add_argument("--site-url", default=os.environ.get("CONVEX_SITE_URL"), help="Convex HTTP actions URL")
+    x.add_argument("--key", default=os.environ.get("EXPORT_KEY"))
+    x.add_argument("--out", default="datasets/scrub_v1")
+    x.set_defaults(fn=cmd_export)
     r = sub.add_parser("demo", help="simulated arm + console + dashboard in one process (no hardware)")
     r.add_argument("--port", type=int, default=8780)
     r.add_argument("--fast", action="store_true", help="speed the simulated arm up")

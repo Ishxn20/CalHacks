@@ -107,9 +107,8 @@ function phaseTimeline(frames: Frame[]): string {
 export const labelEpisode = internalAction({
   args: { episodeId: v.id("episodes") },
   handler: async (ctx, { episodeId }) => {
-    const row = await ctx.runQuery(internal.episodes.forLabeling, { episodeId });
-    if (!row || !row.episode.consent || row.episode.keyframeIds.length === 0) return;
-    const e = row.episode;
+    const e = await ctx.runQuery(internal.episodes.forLabeling, { episodeId });
+    if (!e || !e.consent || e.keyframeIds.length === 0) return;
     await ctx.runMutation(internal.episodes.setLabelStatus, { episodeId, status: "labeling", error: null });
     try {
       let frames: Frame[] = [];
@@ -130,7 +129,7 @@ export const labelEpisode = internalAction({
       content.push({
         type: "text",
         text: [
-          `Robot: ${row.robotName}. Job kind: ${e.kind}. Spoken request: ${e.request ?? "(none)"}.`,
+          `${e.simulated ? "Simulated arm: the frames are placeholders, not a camera." : "Real arm."} Job kind: ${e.kind}. Spoken request: ${e.request ?? "(none)"}.`,
           `Robot-reported outcome: ${e.outcome ?? "unknown"}${e.error ? ` (error: ${e.error})` : ""}.`,
           `Duration ${e.endedAt ? ((e.endedAt - e.startedAt) / 1000).toFixed(1) : "?"} s, ${e.frameCount} frames at ${e.fps} fps; faces blurred on-device: ${e.facesBlurred}.`,
           "Phase timeline from the arm controller:",

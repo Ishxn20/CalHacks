@@ -1,7 +1,50 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+// What Claude writes for each recorded episode (labeling.ts).
+export const labels = v.object({
+  task: v.string(),
+  caption: v.string(),
+  success: v.boolean(),
+  failureMode: v.union(v.string(), v.null()),
+  segments: v.array(v.object({ startS: v.number(), endS: v.number(), phase: v.string(), description: v.string() })),
+  instrumentVisible: v.boolean(),
+  qualityFlags: v.array(v.string()),
+  // Anything that could identify a patient or staff member (faces, name badges, screens, wristbands).
+  privacyFlags: v.array(v.string()),
+  agreesWithRobot: v.boolean(),
+  model: v.string(),
+});
+
 export default defineSchema({
+  // One arm job (handoff / stage / return) recorded for world-model training: face-blurred wrist video,
+  // a per-frame state/action table and the spoken request, all in Convex file storage.
+  episodes: defineTable({
+    jobId: v.number(),
+    kind: v.string(),
+    request: v.union(v.string(), v.null()),
+    startedAt: v.number(),
+    endedAt: v.number(),
+    outcome: v.string(),
+    error: v.union(v.string(), v.null()),
+    videoId: v.union(v.id("_storage"), v.null()),
+    framesId: v.union(v.id("_storage"), v.null()),
+    keyframeIds: v.array(v.id("_storage")),
+    keyframeTimesS: v.array(v.number()),
+    frameCount: v.number(),
+    fps: v.number(),
+    facesBlurred: v.number(),
+    consent: v.boolean(),
+    simulated: v.boolean(),
+    labelStatus: v.union(v.literal("pending"), v.literal("labeling"), v.literal("done"), v.literal("failed"), v.literal("skipped")),
+    labelError: v.union(v.string(), v.null()),
+    labels: v.union(labels, v.null()),
+    // Dataset gate: only consented, labelled, privacy-clean episodes are exported for training.
+    review: v.union(v.literal("unreviewed"), v.literal("accepted"), v.literal("rejected")),
+  })
+    .index("by_labelStatus", ["labelStatus"])
+    .index("by_review", ["review"]),
+
   // Every console event (utterance, intent, command, job, fault, count, ...), newest last by creation time.
   events: defineTable({
     kind: v.string(),

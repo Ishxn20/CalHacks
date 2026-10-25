@@ -90,3 +90,59 @@ test("a proposal is updated in place as its status changes", async () => {
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ id: "t1", status: "pending", diff: "+x", simulated: true });
 });
+
+// ── training episodes ───────────────────────────────────────────────────────
+
+const goodLabels = {
+  task: "hand the Castroviejo needle holder, backhand", caption: "The arm hands over the needle holder.", success: true,
+  failureMode: null, segments: [], instrumentVisible: true, qualityFlags: [], privacyFlags: [], agreesWithRobot: true,
+  model: "claude-opus-5-5",
+};
+
+async function recorded(t: ReturnType<typeof convexTest>, opts: { consent: boolean; withVideo: boolean }) {
+  const blob = await t.run((ctx) => ctx.storage.store(new Blob(["x"])));
+  return t.mutation(internal.episodes.record, {
+    jobId: 1, kind: "handoff", request: "castroviejo, backhand", startedAt: 1000, endedAt: 9000, outcome: "done", error: null,
+    videoId: opts.withVideo ? blob : null, framesId: opts.withVideo ? blob : null, keyframeIds: opts.withVideo ? [blob] : [],
+    keyframeTimesS: opts.withVideo ? [0] : [], frameCount: 80, fps: 10, facesBlurred: 0, consent: opts.consent, simulated: true,
+  });
+}
+
+test("recording is internal: the public api can read episodes but not write them", () => {
+  // @ts-expect-error episodes.record is internal
+  void api.episodes.record;
+  // @ts-expect-error episodes.uploadUrl is internal
+  void api.episodes.uploadUrl;
+  expect(typeof api.episodes.list).toBeDefined();
+});
+
+test("only consented episodes with footage are sent to Claude", async () => {
+  const t = convexTest(schema, modules);
+  await recorded(t, { consent: false, withVideo: true });
+  await recorded(t, { consent: true, withVideo: false });
+  await recorded(t, { consent: true, withVideo: true });
+  const statuses = (await t.query(api.episodes.list, {})).map((e) => e.labelStatus).sort();
+  expect(statuses).toEqual(["pending", "skipped", "skipped"]);
+});
+
+test("clean labels are accepted automatically; the public list carries no video links", async () => {
+  const t = convexTest(schema, modules);
+  const id = await recorded(t, { consent: true, withVideo: true });
+  await t.mutation(internal.episodes.saveLabels, { episodeId: id, labels: goodLabels });
+  expect(await t.query(api.episodes.stats, {})).toMatchObject({ total: 1, labeled: 1, accepted: 1, needsReview: 0, frames: 80 });
+  const [row] = await t.query(api.episodes.list, {});
+  expect(row.caption).toBe(goodLabels.caption);
+  expect(JSON.stringify(row)).not.toMatch(/https?:/);
+  expect(await t.query(internal.episodes.exportManifest, {})).toHaveLength(1);
+});
+
+test("privacy or quality flags, or disagreeing with the robot, hold an episode for a person", async () => {
+  const t = convexTest(schema, modules);
+  for (const labels of [{ ...goodLabels, privacyFlags: ["face"] }, { ...goodLabels, qualityFlags: ["dark"] },
+                        { ...goodLabels, agreesWithRobot: false }]) {
+    const id = await recorded(t, { consent: true, withVideo: true });
+    await t.mutation(internal.episodes.saveLabels, { episodeId: id, labels });
+  }
+  expect(await t.query(api.episodes.stats, {})).toMatchObject({ accepted: 0, needsReview: 3 });
+  expect(await t.query(internal.episodes.exportManifest, {})).toHaveLength(0);
+});

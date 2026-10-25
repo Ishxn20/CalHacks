@@ -9,8 +9,12 @@
  */
 
 import type * as audit from "../audit.js";
+import type * as crons from "../crons.js";
+import type * as episodes from "../episodes.js";
 import type * as events from "../events.js";
+import type * as http from "../http.js";
 import type * as instruments from "../instruments.js";
+import type * as labeling from "../labeling.js";
 import type * as proposals from "../proposals.js";
 
 import type {
@@ -21,8 +25,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   audit: typeof audit;
+  crons: typeof crons;
+  episodes: typeof episodes;
   events: typeof events;
+  http: typeof http;
   instruments: typeof instruments;
+  labeling: typeof labeling;
   proposals: typeof proposals;
 }>;
 
