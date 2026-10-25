@@ -12,7 +12,6 @@ from scrub_vision.templates import load_instruments
 CAM = CamSpec()
 S = CAM.height_mm / CAM.fx
 H = np.array([[S, 0, -CAM.w / 2 * S], [0, S, -CAM.h / 2 * S], [0, 0, 1]])
-STAGING = [(250.0, -200.0), (250.0, -260.0)]
 
 
 def frame(specs):
@@ -38,7 +37,7 @@ def server(tmp_path):
     img, world["masks"] = frame([("forceps_resano", -60, -60, 0.0), ("scissors_potts", 120, 40, 1.0)])
     gm = np.zeros(img.shape[:2], bool)
     gm[int(img.shape[0] * 0.8):] = True
-    svc = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path)
+    svc = VisionService(lambda: img, H, gm, TrueInstances(world), log_dir=tmp_path)
     svc.world = world
     httpd = make_server(svc, "127.0.0.1", 0)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -66,16 +65,6 @@ def test_plan_unknown_instrument_is_fail_not_500(server):
     assert p["action"] == "fail"
 
 
-def test_plan_marks_staging_used(server):
-    url, svc, _ = server
-    img, svc.world["masks"] = frame([("forceps_resano", 0, -20, 0.0)])  # target only
-    svc.frame_source = lambda: img
-    post(url + "/plan", {"instrument": "scissors_potts"})                 # not visible -> move resano aside
-    assert svc.used_staging == {0}
-    post(url + "/reset_staging", {})
-    assert svc.used_staging == set()
-
-
 def test_verify_matches(server):
     url, svc, _ = server
     img, svc.world["masks"] = frame([("forceps_resano", 0, 60, np.pi / 2)])   # reaching into the gripper zone
@@ -101,9 +90,9 @@ def test_detections_off_the_work_mat_are_dropped(tmp_path):
     img, world["masks"] = frame([("forceps_resano", -60, -60, 0.0), ("scissors_potts", 120, 40, 1.0)])
     gm = np.zeros(img.shape[:2], bool)
     mat_mm = [(-200, -150), (40, -150), (40, 50), (-200, 50)]          # covers resano, not potts
-    svc = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path,
+    svc = VisionService(lambda: img, H, gm, TrueInstances(world), log_dir=tmp_path,
                         region=region_mask(mat_mm, H, img.shape[:2]))
     ids = {d.fine_id for d in svc.detect(img)}
     assert "forceps_resano" in ids and "scissors_potts" not in ids
-    no_mat = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path)
+    no_mat = VisionService(lambda: img, H, gm, TrueInstances(world), log_dir=tmp_path)
     assert len(no_mat.detect(img)) == 2

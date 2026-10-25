@@ -233,13 +233,13 @@ class ScrubAssistant:
         self._verify(r)
 
     def _acquire_ik(self, r: Resolved) -> None:
-        """Look at the pile, uncover the requested instrument if it's buried, then pick it."""
+        """Look at the pile and pick the requested instrument; if it's covered or out of reach, say so (nothing is
+        moved out of the way: user decision 2026-10-24)."""
         from .perception_client import PerceptionClient
 
         pk, d = self.cfg.pick, self.driver
         client = PerceptionClient(pk.perception_url)
-        missed = False
-        for _ in range(pk.max_declutter_moves):
+        for attempt in range(2):           # a miss: the pile may have shifted, look again once
             self.phase = Phase.MOVING
             d.move_pose("scan")
             d.gripper_open()           # closed fingers hang into the middle of the wrist camera's view
@@ -249,28 +249,17 @@ class ScrubAssistant:
                 raise TaskFailed(plan.get("say") or f"I can't find the {r.instrument.name}")
             t = plan["target"]
             self._log(f"plan: {plan['action']} {t.get('id')} at ({t['x_mm']:.0f}, {t['y_mm']:.0f})")
-            grasping = plan["action"] == "grasp_target"
-            if not grasping:          # check the drop-off is reachable before lifting anything
-                p = plan["place"]
-                self._solve(p["x_mm"], p["y_mm"], pk.table_z + pk.hover, p["yaw_deg"])
-                self._solve(p["x_mm"], p["y_mm"], pk.table_z + t["thickness_mm"] / 2000.0 + 0.005, p["yaw_deg"])
             try:
                 # Either way round: the pinch is symmetric, and a tilted gripper can only lean away from the
                 # base (yaw 48 was unreachable at (445, 18), yaw -132 fine). A flipped requested instrument is
                 # presented with the wrist turned 180 deg (_flipped), still handle-first.
                 self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"))
             except TaskFailed:
-                if missed:
+                if attempt:
                     raise
-                missed = True        # the pile may have shifted: look again once
                 continue
-            if grasping:
-                self.holding = r
-                return
-            self.holding = Resolved(slot=None, instrument=self._instrument(t.get("id")), orientation=None)
-            self._log(f"carrying {self.holding.instrument.name} to staging")
-            self._place_at(p["x_mm"], p["y_mm"], p["yaw_deg"], t["thickness_mm"])
-        raise TaskFailed(f"couldn't uncover the {r.instrument.name} in {pk.max_declutter_moves} moves")
+            self.holding = r
+            return
 
     def _pick(self, r: Resolved) -> None:
         d, slot = self.driver, r.slot
@@ -487,14 +476,6 @@ class ScrubAssistant:
         d.gripper_open()
         self.holding = None
         d.move_to(q_hover, speed=slow)
-
-    def _instrument(self, fid: str | None):
-        from .config import Instrument
-
-        if fid and fid in self.catalog.tray.instruments:
-            return self.catalog.tray.instruments[fid]
-        return Instrument(id=fid or "unknown", name=(fid or "instrument").replace("_", " "), category="unknown",
-                          orientable=False, aliases=[])
 
     def _oriented(self, pose: str, orientation: str | None, flipped: bool = False) -> np.ndarray:
         """Pose with the wrist (joint6) rotated for forehand/backhand, plus 180 deg if the instrument was picked

@@ -96,9 +96,6 @@ class PickCfg:
     descend_step: float            # m
     contact_deviation: float       # rad
     contact_joints: list[str]
-    max_declutter_moves: int
-    staging: list[tuple[float, float]]   # m
-    staging_yaw: float             # rad
     tilt_pose: str | None = None   # grasp with this taught pose's gripper tilt (Kinematics.set_pick_tilt)
 
 
@@ -275,9 +272,6 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         descend_step=float(pk.get("descend_step_mm", 3.0)) / 1000.0,
         contact_deviation=_rad(pk.get("contact_deviation_deg", 1.5)),
         contact_joints=[str(j) for j in pk.get("contact_joints", ["joint2", "joint3"])],
-        max_declutter_moves=int(pk.get("max_declutter_moves", 6)),
-        staging=[(float(x) / 1000.0, float(y) / 1000.0) for x, y in pk.get("staging_mm", [])],
-        staging_yaw=_rad(pk.get("staging_yaw_deg", 0.0)),
         tilt_pose=pk.get("tilt_pose") or None,
     )
 

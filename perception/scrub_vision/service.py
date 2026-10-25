@@ -2,12 +2,12 @@
 
     python -m scrub_vision.service [--weights weights/pile_seg.pt] [--frame some.jpg] [--port 8770]
 
-    POST /plan {"instrument": id}            -> declutter plan (see planner.py)
+    POST /plan {"instrument": id}            -> grasp plan, or why not (see planner.py)
     POST /verify {"expected": id, "slot": _} -> {"ok", "detected", "confidence"} (arm's verify hook)
-    POST /reset_staging                      -> forget which staging spots are used
+    POST /reset_staging                      -> a new pile: forget what was learned about this one
     GET  /debug                              -> annotated JPEG of the last analysed frame
     GET  /status
-Reads repo-root config/camera.yaml (calibration) and arm/config/arm.yaml (pick.staging_mm).
+Reads repo-root config/camera.yaml (calibration).
 """
 from __future__ import annotations
 
@@ -67,12 +67,9 @@ class YoloSegmenter:
 
 class VisionService:
     def __init__(self, frame_source: Callable[[], np.ndarray], H: np.ndarray, gripper_mask: np.ndarray,
-                 segmenter, staging: list[tuple[float, float]], log_dir: Path | None = None,
-                 staging_yaw_deg: float = 0.0, region: np.ndarray | None = None) -> None:
+                 segmenter, log_dir: Path | None = None, region: np.ndarray | None = None) -> None:
         self.frame_source, self.H, self.gripper_mask, self.segmenter = frame_source, H, gripper_mask, segmenter
         self.region = region          # work mat in pixels; detections mostly off it are ignored
-        self.staging, self.staging_yaw_deg = staging, staging_yaw_deg
-        self.used_staging: set[int] = set()
         self.log_dir = log_dir
         self.instruments = load_instruments()
         self.templates = build_templates(self.instruments, TEMPLATE_MM_PER_PX)
@@ -92,11 +89,7 @@ class VisionService:
                         "say": f"I don't know what {target_id.replace('_', ' ')} looks like"}
             bgr = self.frame_source()
             dets = self.detect(bgr)
-            staged_xy = [self.staging[i] for i in self.used_staging]
-            p = plan(dets, target_id, self.H, self.staging, self.used_staging, staged_xy=staged_xy,
-                     staging_yaw_deg=self.staging_yaw_deg)
-            if p["action"] == "move_aside":
-                self.used_staging.add(p["staging_index"])
+            p = plan(dets, target_id, self.H)
             chosen = None
             if p.get("target"):
                 chosen = min(dets, key=lambda d: np.hypot(d.grasp_mm[0] - p["target"]["x_mm"],
@@ -156,8 +149,6 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
         def do_GET(self):
             if self.path.startswith("/debug"):
                 return self._send(200, svc.debug_jpeg(), "image/jpeg")
-            if self.path.startswith("/status"):
-                return self._json(200, {"used_staging": sorted(svc.used_staging), "staging": svc.staging})
             self._json(404, {"error": "not found"})
 
         def do_POST(self):
@@ -169,7 +160,6 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
                 if self.path.startswith("/verify"):
                     return self._json(200, svc.verify(str(body.get("expected", ""))))
                 if self.path.startswith("/reset_staging"):
-                    svc.used_staging.clear()
                     return self._json(200, {"ok": True})
                 self._json(404, {"error": "not found"})
             except Exception as e:  # noqa: BLE001 - always answer; the arm turns errors into speech
@@ -197,7 +187,6 @@ def main(argv=None) -> None:
     ap.add_argument("--weights", help="YOLO-seg weights; omit for the HSV fallback segmenter")
     ap.add_argument("--frame", help="analyse this image instead of the camera (testing)")
     ap.add_argument("--camera-yaml", default=str(ROOT / "config" / "camera.yaml"))
-    ap.add_argument("--arm-yaml", default=str(ROOT / "arm" / "config" / "arm.yaml"))
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8770)
     args = ap.parse_args(argv)
@@ -205,8 +194,6 @@ def main(argv=None) -> None:
 
     cam = yaml.safe_load(Path(args.camera_yaml).read_text())
     H = np.array(cam["H_px_to_mm"], float)
-    pick = (yaml.safe_load(Path(args.arm_yaml).read_text()) or {}).get("pick", {})
-    staging = [tuple(map(float, p)) for p in pick.get("staging_mm", [])]
     if args.frame:
         img = cv2.imread(args.frame)
         source = lambda: img  # noqa: E731
@@ -222,8 +209,7 @@ def main(argv=None) -> None:
                        [[0, int(shape[0] * .75)], [shape[1], int(shape[0] * .75)], [shape[1], shape[0]], [0, shape[0]]],
                        shape)
     seg = YoloSegmenter(args.weights) if args.weights else BackgroundSegmenter()
-    svc = VisionService(source, H, gm, seg, staging, log_dir=Path(__file__).resolve().parents[1] / "logs",
-                        staging_yaw_deg=float(pick.get("staging_yaw_deg", 0.0)),
+    svc = VisionService(source, H, gm, seg, log_dir=Path(__file__).resolve().parents[1] / "logs",
                         region=region_mask(cam["mat_mm"], H, shape) if cam.get("mat_mm") else None)
     httpd = make_server(svc, args.host, args.port)
     print(f"scrub_vision listening on http://{args.host}:{args.port} ({'YOLO' if args.weights else 'background-difference fallback'})",

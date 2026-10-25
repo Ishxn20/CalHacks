@@ -8,7 +8,7 @@ import urllib.request
 
 from .handoff import TaskFailed
 
-ACTIONS = ("grasp_target", "move_aside", "fail")
+ACTIONS = ("grasp_target", "fail")
 
 
 class PerceptionClient:
@@ -29,8 +29,6 @@ class PerceptionClient:
             raise TaskFailed(f"perception gave a bad plan: {data!r}"[:200])
         if data["action"] != "fail":
             _numbers(data.get("target"), ("x_mm", "y_mm", "yaw_deg", "thickness_mm"), "target")
-        if data["action"] == "move_aside":
-            _numbers(data.get("place"), ("x_mm", "y_mm", "yaw_deg"), "place")
         return data
 
 
