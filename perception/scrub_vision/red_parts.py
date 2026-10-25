@@ -205,7 +205,7 @@ class RedPartsDetector:
 
     def _detection(self, comp: np.ndarray, complete: bool, cv_: _Canvas) -> Detection:
         f = features(comp)
-        g_mm = cv_.to_mm(np.array([f["centre_rc"]]))[0]
+        g_mm = cv_.to_mm(np.array([f["centre_rc"]]))[0] + np.array(self.model.get("grasp_offset_mm", (0.0, 0.0)))
         ax_cr = f["axis_cr"]                                   # canvas (col, row) -> table: col = -y, row = -x
         axis_deg = float(np.degrees(np.arctan2(-ax_cr[0], -ax_cr[1])))
         det = Detection(mask=cv_.back_to_image(comp), coarse=None, fine_id=None, length_mm=f["length"],

@@ -123,3 +123,6 @@ classes:
     - 0.05
 # Measured joints (rad) at the scan pose with the gripper open: the camera pose the service assumes.
 scan_q: [0.06213, 1.60996, 1.88494, -1.15857, -0.00268, -0.05177]
+# Added to every grab point: the fingertips (camera.yaml aim_px at 3 cm) landed this far from the part's centreline
+# seen from the hover, averaged over 7 parts (2026-10-24, sd 1.4 / 2.6 mm); measured by hovering, not picking.
+grasp_offset_mm: [-1.4, -10.6]
