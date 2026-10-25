@@ -121,6 +121,9 @@ def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: lis
     length, width, axis_deg, cpx = measure(mask, H)
     det = Detection(mask=mask, coarse=coarse, fine_id=None, length_mm=length, width_mm=width,
                     axis_deg=axis_deg, centroid_px=cpx, seg_conf=seg_conf)
+    # until a template says otherwise (an `other` object may match none): grasp the middle, across the long axis
+    det.grasp_px, det.grasp_mm = cpx, tuple(float(v) for v in _apply(H, cpx)[0])
+    det.yaw_deg = axis_deg + 90.0
     outer_px, holes_px = _contours(mask)
     if not outer_px:
         return det
@@ -152,7 +155,7 @@ def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: lis
     rival = next((s[0] for s in scored if s[3].fine_id not in looks), 0.0)
     det.exposure = float(exposure)
     det.confidence = float(best * seg_conf)
-    det.thickness_mm = instruments[bt.fine_id].thickness_mm
+    det.thickness_mm = bt.thickness_mm          # as it lies (a forceps on its side is its width tall)
     det.coarse = bt.coarse if coarse is None else coarse
     if fit >= FIT_MIN:
         det.candidates = sorted({s[3].fine_id for s in scored if best - s[0] < MARGIN_MIN} | looks)

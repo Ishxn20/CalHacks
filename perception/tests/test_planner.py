@@ -154,3 +154,24 @@ def test_unrecognised_blob_on_top_of_target_blocks_the_grasp():
     tgt.mask[100:110, 190:215] = False         # the target is cut where the blob lies on it
     p = plan([tgt, blob], "forceps_resano", H, STAGING, set())
     assert p["action"] != "grasp_target"
+
+
+def test_unknown_object_on_target_is_moved_aside_first(insts, templates):
+    """Something no template explains (class `other`, e.g. a random object) lying across the requested instrument:
+    move it out of the way first, grasped at its middle across its long axis."""
+    import trimesh
+    target = scene_mesh(insts["scalpel_10"])
+    rod = trimesh.creation.box((90.0, 15.0, 6.0))                   # matches no template (all are 125+ mm)
+    _, masks = render_scene([(target, pose(0, -20, target.extents[2] / 2, 0.0)), (rod, pose(0, -20, 12.0, np.pi / 2))],
+                            CAM, np.random.default_rng(0))
+    dets = [identify(masks[0], "scalpel", H, templates, insts), identify(masks[1], "other", H, templates, insts)]
+    p = plan(dets, "scalpel_10", H, STAGING, set())
+    assert p["action"] == "move_aside" and p["say"] == "Moving the object aside"
+    assert abs(p["target"]["x_mm"]) < 5 and abs(p["target"]["y_mm"] + 20) < 5     # the rod's middle
+
+
+def test_forceps_on_its_side_reports_its_lying_height(insts, templates):
+    m = scene_mesh(insts["forceps_fine_vascular"], "side")
+    _, masks = render_scene([(m, pose(0, -20, m.extents[2] / 2, 0.3))], CAM, np.random.default_rng(0))
+    d = identify(masks[0], "forceps", H, templates, insts)
+    assert d.fine_id == "forceps_fine_vascular" and abs(d.thickness_mm - 12.8) < 0.5     # its width, not 8 mm

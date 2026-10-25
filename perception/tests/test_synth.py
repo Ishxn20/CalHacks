@@ -95,3 +95,16 @@ def test_one_colour_per_pile_but_it_varies_between_piles():
         scene_cols.append(ca)
     spread = np.ptp(np.array(scene_cols), axis=0).max()
     assert spread > 100                            # different sets are different colours
+
+
+def test_dataset_has_other_objects_and_side_poses(tmp_path):
+    """Random distractors are labelled `other`; instruments with a side rest are drawn lying on their side too."""
+    import numpy as np
+    from scrub_vision.synth import random_pile
+    from scrub_vision.templates import classes, load_instruments
+    insts = load_instruments()
+    rng = np.random.default_rng(1)
+    piles = [random_pile(insts, rng, 6, n_other=3) for _ in range(20)]
+    assert sum(cls == "other" for p in piles for _, _, cls, _ in p) >= 60
+    side = [m for p in piles for m, _, cls, _ in p if cls == "forceps" and m.extents[2] > m.extents[1]]
+    assert side and set(classes()) == {"scalpel", "forceps", "micro_scissors", "ring_needle_holder", "other"}

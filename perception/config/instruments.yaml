@@ -5,28 +5,35 @@
 #   grasp_frac  grasp point distance from the tip, as a fraction of length (handle stays free)
 #   thickness_mm height of the instrument lying flat (for grasp/place z)
 #   group       instruments in the same group are interchangeable: a request for one accepts any of them
+#   rests       how it can lie on the table: flat (largest face down, the default) and/or side (on its edge: the
+#               printed forceps and micro scissors do, which shows their bent tips as hooks)
 # Lengths are measured from the meshes, not stored here.
-classes: [clamp_cross, clamp_satinsky, castroviejo, ring_needle_holder, potts, micro_scissors, forceps, scalpel]
+#
+# The set we have (user photo 2026-10-24, the only requestable instruments; tray.yaml in_set): #10, #20 and long
+# #11 scalpels, fine vascular forceps, both micro scissors, short Mayo-Hegar and Ryder needle holders. The model
+# learns their families; everything else is `other` (other prints, random objects) for the planner to move aside.
+classes: [scalpel, forceps, micro_scissors, ring_needle_holder, other]
 
 instruments:
-  clamp_aortic_cross:        {coarse: clamp_cross,        stl: "Aortic cross-clamp 25 cm (angled).stl",           tip: min_x, grasp_frac: 0.30, thickness_mm: 4.5}
-  clamp_side_biting:         {coarse: clamp_satinsky,     stl: "Side-biting clamp 25 cm (Satinsky).stl",          tip: min_x, grasp_frac: 0.30, thickness_mm: 4.0}
-  needle_holder_castroviejo: {coarse: castroviejo,        stl: "Castroviejo needle holder 14 cm (fine).stl",      tip: min_x, grasp_frac: 0.30, thickness_mm: 8.0}
+  clamp_aortic_cross:        {coarse: other,              stl: "Aortic cross-clamp 25 cm (angled).stl",           tip: min_x, grasp_frac: 0.30, thickness_mm: 4.5}
+  clamp_side_biting:         {coarse: other,              stl: "Side-biting clamp 25 cm (Satinsky).stl",          tip: min_x, grasp_frac: 0.30, thickness_mm: 4.0}
+  needle_holder_castroviejo: {coarse: other,              stl: "Castroviejo needle holder 14 cm (fine).stl",      tip: min_x, grasp_frac: 0.30, thickness_mm: 8.0}
   needle_holder_ryder:       {coarse: ring_needle_holder, stl: "Ryder needle holder 18 cm.stl",                   tip: min_x, grasp_frac: 0.30, thickness_mm: 3.0}
   needle_holder_short:       {coarse: ring_needle_holder, stl: "Mayo-Hegar needle holder 15 cm (regular short).stl", tip: min_x, grasp_frac: 0.30, thickness_mm: 3.5}
   needle_holder_long:        {coarse: ring_needle_holder, stl: "Mayo-Hegar needle holder 20 cm (regular long).stl",  tip: min_x, grasp_frac: 0.30, thickness_mm: 3.8}
-  scissors_potts:            {coarse: potts,              stl: "Potts scissors 18 cm (45 deg).stl",               tip: min_x, grasp_frac: 0.30, thickness_mm: 3.0}
+  scissors_potts:            {coarse: other,              stl: "Potts scissors 18 cm (45 deg).stl",               tip: min_x, grasp_frac: 0.30, thickness_mm: 3.0}
   # Forward and back-facing differ only in a tip bend out of the table plane: identical from above.
-  scissors_micro_forward:    {coarse: micro_scissors,     stl: "Micro scissors 15 cm (forward-facing 45 deg).stl", tip: min_x, grasp_frac: 0.30, thickness_mm: 9.6, group: micro_scissors}
-  scissors_micro_back:       {coarse: micro_scissors,     stl: "Micro scissors 15 cm (back-facing 135 deg).stl",  tip: min_x, grasp_frac: 0.30, thickness_mm: 12.3, group: micro_scissors}
-  forceps_fine_vascular:     {coarse: forceps,            stl: "Fine vascular forceps 18 cm.stl",                 tip: min_x, grasp_frac: 0.30, thickness_mm: 8.0}
-  forceps_debakey:           {coarse: forceps,            stl: "DeBakey forceps 20 cm (2.0 mm).stl",              tip: min_x, grasp_frac: 0.30, thickness_mm: 9.0}
-  forceps_resano:            {coarse: forceps,            stl: "Resano forceps 23 cm (heavy- 3.0 mm).stl",        tip: min_x, grasp_frac: 0.30, thickness_mm: 10.0}
+  scissors_micro_forward:    {coarse: micro_scissors,     stl: "Micro scissors 15 cm (forward-facing 45 deg).stl", tip: min_x, grasp_frac: 0.30, thickness_mm: 9.6, group: micro_scissors, rests: [flat, side]}
+  scissors_micro_back:       {coarse: micro_scissors,     stl: "Micro scissors 15 cm (back-facing 135 deg).stl",  tip: min_x, grasp_frac: 0.30, thickness_mm: 12.3, group: micro_scissors, rests: [flat, side]}
+  forceps_fine_vascular:     {coarse: forceps,            stl: "Fine vascular forceps 18 cm.stl",                 tip: min_x, grasp_frac: 0.30, thickness_mm: 8.0, rests: [flat, side]}
+  forceps_debakey:           {coarse: forceps,            stl: "DeBakey forceps 20 cm (2.0 mm).stl",              tip: min_x, grasp_frac: 0.30, thickness_mm: 9.0, rests: [flat, side]}
+  forceps_resano:            {coarse: forceps,            stl: "Resano forceps 23 cm (heavy- 3.0 mm).stl",        tip: min_x, grasp_frac: 0.30, thickness_mm: 10.0, rests: [flat, side]}
   # Scalpels: blade glued onto the handle's squared end, overlapping it by blade_overlap_mm.
   # All blades are treated the same (user decision 2026-10-24): any scalpel satisfies any scalpel request.
   scalpel_10: {coarse: scalpel, stl: ["Scalpel handle #3 (fits #10-#11-#15).stl", "Scalpel blade #10.stl"], tip: max_x, grasp_frac: 0.40, thickness_mm: 4.5, group: scalpel}
   scalpel_11: {coarse: scalpel, stl: ["Scalpel handle #3 (fits #10-#11-#15).stl", "Scalpel blade #11.stl"], tip: max_x, grasp_frac: 0.40, thickness_mm: 4.5, group: scalpel}
   scalpel_15: {coarse: scalpel, stl: ["Scalpel handle #3 (fits #10-#11-#15).stl", "Scalpel blade #15.stl"], tip: max_x, grasp_frac: 0.40, thickness_mm: 4.5, group: scalpel}
   scalpel_20: {coarse: scalpel, stl: ["Scalpel handle #4 (fits #20).stl", "Scalpel blade #20.stl"],           tip: max_x, grasp_frac: 0.40, thickness_mm: 4.5, group: scalpel}
+  scalpel_11_long: {coarse: scalpel, stl: ["Scalpel handle #3L long (fits #10-#11-#15).stl", "Scalpel blade #11.stl"], tip: max_x, grasp_frac: 0.40, thickness_mm: 4.5, group: scalpel}
 
 blade_overlap_mm: 15.0

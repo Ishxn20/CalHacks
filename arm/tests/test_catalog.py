@@ -109,3 +109,16 @@ def test_ik_mode_generic_scalpel_resolves_to_a_scalpel(tray):
     assert cat.resolve("scalpel").instrument.id.startswith("scalpel_")
     with pytest.raises(ResolveError, match="which forceps"):
         cat.resolve("forceps")
+
+
+def test_ik_mode_only_takes_the_set_we_have():
+    """tray.yaml in_set (the 8 printed parts we have): camera picks refuse anything else, and a category with one
+    member in the set resolves to it ('forceps', 'tweezers' -> the fine vascular forceps)."""
+    from scrub_arm.config import DEFAULT_TRAY_PATH
+    cat = Catalog(load_tray_config(DEFAULT_TRAY_PATH), require_slot=False)
+    assert cat.resolve("tweezers").instrument.id == cat.resolve("forceps").instrument.id == "forceps_fine_vascular"
+    assert cat.resolve("long scalpel").instrument.id == "scalpel_11_long"
+    with pytest.raises(ResolveError, match="don't have the Resano"):
+        cat.resolve("resano")
+    with pytest.raises(ResolveError, match="which needle holder"):
+        cat.resolve("needle holder")

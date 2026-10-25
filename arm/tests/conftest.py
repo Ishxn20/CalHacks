@@ -17,6 +17,9 @@ def config_dir(tmp_path):
     d = tmp_path / "config"
     shutil.copytree(ROOT / "config", d)
     shutil.copy(DEFAULT_TRAY_PATH, d)
+    # Tests use the whole instrument vocabulary, not just the set we have (tray.yaml in_set; tested on its own).
+    tray = d / "tray.yaml"
+    tray.write_text(re.sub(r"^in_set:.*?\]\n", "", tray.read_text(), flags=re.M | re.S))
     # Tests assume the placeholder gripper, not whatever `gcal` measured on the real arm.
     text = (d / "arm.yaml").read_text()
     # Likewise the tray-slot mode and placeholder poses, not the arm's taught ik setup.

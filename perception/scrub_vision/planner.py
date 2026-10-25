@@ -19,6 +19,7 @@ SURE_EXPOSURE = 0.9      # identity is only trusted when nearly the whole instru
 # Grasping the requested instrument: 60 % for now (user decision). On the real camera a lone scalpel scored 0.87
 # (pen marks and a slightly short outline), so 0.9 refused an uncovered instrument.
 GRASP_EXPOSURE = 0.6
+OTHER_MAX_WIDTH_MM = 35.0   # an unrecognised `other` object narrower than the open jaws (~40 mm) can be moved aside
 _names: dict[str, str] | None = None
 
 
@@ -66,7 +67,8 @@ def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tup
         return any(np.hypot(d.grasp_mm[0] - x, d.grasp_mm[1] - y) < STAGED_RADIUS_MM for x, y in staged_xy)
 
     every = dets                                       # incl. blobs no template explains: they still cover things
-    dets = [d for d in dets if d.candidates]          # only recognised instruments are targets or movers
+    # targets and movers: recognised instruments, plus `other` objects (not in our set, random things) the jaws fit
+    dets = [d for d in dets if d.candidates or (d.coarse == "other" and d.width_mm <= OTHER_MAX_WIDTH_MM)]
     grabbable = [d for d in dets if on_top(d, every) and feasible(d, every, H)]
     targets = sorted((d for d in dets if matches(d, target_id)), key=lambda d: -d.confidence)
     for t in targets:
@@ -93,4 +95,4 @@ def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tup
     x, y = staging[free[0]]
     return {"action": "move_aside", "target": _target_json(m, m.fine_id), "staging_index": free[0],
             "place": {"x_mm": x, "y_mm": y, "yaw_deg": staging_yaw_deg},
-            "say": f"Moving the {display_name(m.fine_id) if m.fine_id else m.coarse or 'instrument'} aside"}
+            "say": f"Moving the {display_name(m.fine_id) if m.fine_id else 'object' if m.coarse == 'other' else m.coarse or 'instrument'} aside"}

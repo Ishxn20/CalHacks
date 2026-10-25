@@ -22,11 +22,13 @@ instruments:
   forceps_resano:            {name: Resano forceps, category: forceps,
                               aliases: [resano, heavy forceps]}
   forceps_fine_vascular:     {name: Fine vascular forceps, category: forceps,
-                              aliases: [fine forceps, vascular forceps, fine pickups]}
+                              aliases: [fine forceps, vascular forceps, fine pickups, tweezers, tweezer]}
   scalpel_10:                {name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
   scalpel_11:                {name: "#11 scalpel", category: scalpel, aliases: [11 blade, number 11, "#11", eleven blade]}
   scalpel_15:                {name: "#15 scalpel", category: scalpel, aliases: [15 blade, number 15, "#15", fifteen blade]}
   scalpel_20:                {name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
+  scalpel_11_long:           {name: "Long #11 scalpel", category: scalpel,
+                              aliases: [long scalpel, long 11 blade, long eleven blade, long blade, "#3l", 3l handle]}
   scissors_potts:            {name: Potts scissors, category: scissors, orientable: true,
                               aliases: [potts, pots, pott scissors]}
   scissors_micro_forward:    {name: Forward micro scissors, category: scissors, orientable: true,
@@ -39,6 +41,11 @@ instruments:
                               aliases: [side biting clamp, side biter, partial occlusion clamp]}
   probe_coronary:            {name: Coronary probe, category: probe,
                               aliases: [probe, coronary probe, coronary dilator]}
+
+# The set we actually have (user photo 2026-10-24): camera picks (pick.mode ik) only take these. Everything else
+# the camera sees is something to move out of the way.
+in_set: [scalpel_10, scalpel_20, scalpel_11_long, forceps_fine_vascular, scissors_micro_forward,
+         scissors_micro_back, needle_holder_short, needle_holder_ryder]
 
 # Canonical suture names and what people may say instead.
 sutures:

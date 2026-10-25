@@ -164,6 +164,7 @@ class TrayConfig:
     instruments: dict[str, Instrument]
     sutures: dict[str, list[str]]
     slots: list[Slot]
+    in_set: list[str] = field(default_factory=list)   # ik picks: the only requestable instruments (empty = all)
 
 
 @dataclass
@@ -340,7 +341,11 @@ def load_tray_config(path: Path | str | None = None) -> TrayConfig:
             approach=[str(p) for p in s["approach"]],
         ))
     sutures = {k: [str(a) for a in v] for k, v in (d.get("sutures") or {}).items()}
-    return TrayConfig(instruments=instruments, sutures=sutures, slots=slots)
+    in_set = [str(i) for i in d.get("in_set") or []]
+    unknown = [i for i in in_set if i not in instruments]
+    if unknown:
+        raise ValueError(f"in_set: unknown instruments {unknown}")
+    return TrayConfig(instruments=instruments, sutures=sutures, slots=slots, in_set=in_set)
 
 
 def load_poses(path: Path | str | None = None) -> PoseLibrary:

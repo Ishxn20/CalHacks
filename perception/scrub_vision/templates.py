@@ -27,6 +27,7 @@ class Instrument:
     grasp_frac: float
     thickness_mm: float
     group: str | None = None      # interchangeable instruments (all scalpels; both micro scissors)
+    rests: tuple[str, ...] = ("flat",)   # flat (largest face down) and/or side (on its edge)
 
 
 @dataclass
@@ -38,6 +39,8 @@ class Template:
     grasp_px: tuple[float, float]
     flipped: bool
     mm_per_px: float
+    thickness_mm: float = 5.0         # height lying this way (side: the flat pose's width)
+    rest: str = "flat"
     _canon: object = field(default=None, repr=False, compare=False)   # identify.py's cached polygons
 
 
@@ -67,7 +70,8 @@ def load_instruments(path: Path | None = None) -> dict[str, Instrument]:
     for iid, v in d["instruments"].items():
         stl = v["stl"] if isinstance(v["stl"], list) else [v["stl"]]
         out[iid] = Instrument(id=iid, coarse=v["coarse"], stl=stl, tip=v["tip"], grasp_frac=float(v["grasp_frac"]),
-                              thickness_mm=float(v["thickness_mm"]), group=v.get("group"))
+                              thickness_mm=float(v["thickness_mm"]), group=v.get("group"),
+                              rests=tuple(v.get("rests", ["flat"])))
     return out
 
 
@@ -80,6 +84,8 @@ def _flat(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     long_ = max(other, key=lambda i: e[i])
     mid = [i for i in other if i != long_][0]
     m.vertices = m.vertices[:, [long_, mid, thin]]
+    if np.linalg.det(np.eye(3)[[long_, mid, thin]]) < 0:    # an odd axis swap mirrors: keep the normals pointing out
+        m.faces = m.faces[:, ::-1]
     m.vertices -= m.vertices.min(0)
     return m
 
@@ -87,8 +93,17 @@ def _flat(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 _mesh_cache: dict[str, trimesh.Trimesh] = {}
 
 
-def mesh_for(inst: Instrument) -> trimesh.Trimesh:
-    """Flat mesh in mm with the tip at +x (scalpel = handle + blade joined end to end)."""
+def mesh_for(inst: Instrument, rest: str = "flat") -> trimesh.Trimesh:
+    """Mesh in mm with the tip at +x (scalpel = handle + blade joined end to end), lying flat or on its side
+    (turned 90 deg about the long axis), min corner at 0."""
+    if rest != "flat":
+        key = f"{inst.id}@{rest}"
+        if key not in _mesh_cache:
+            m = mesh_for(inst).copy()
+            m.vertices = m.vertices[:, [0, 2, 1]] * [1, -1, 1]        # 90 deg about x: width up, thickness across
+            m.vertices -= m.vertices.min(0)
+            _mesh_cache[key] = m
+        return _mesh_cache[key]
     if inst.id in _mesh_cache:
         return _mesh_cache[inst.id]
     parts = [_flat(trimesh.load(STL_DIR / f)) for f in inst.stl]
@@ -138,9 +153,12 @@ def _grasp_px(mask: np.ndarray, frac: float) -> tuple[float, float]:
 def build_templates(instruments: dict[str, Instrument], mm_per_px: float) -> list[Template]:
     out = []
     for inst in instruments.values():
-        mesh = mesh_for(inst)
-        for flip in (False, True):
-            mask = silhouette(mesh, mm_per_px, flip)
-            out.append(Template(fine_id=inst.id, coarse=inst.coarse, mask=mask, length_mm=float(mesh.extents[0]),
-                                grasp_px=_grasp_px(mask, inst.grasp_frac), flipped=flip, mm_per_px=mm_per_px))
+        for rest in inst.rests:
+            mesh = mesh_for(inst, rest)
+            th = inst.thickness_mm if rest == "flat" else float(mesh.extents[2])
+            for flip in (False, True):
+                mask = silhouette(mesh, mm_per_px, flip)
+                out.append(Template(fine_id=inst.id, coarse=inst.coarse, mask=mask, length_mm=float(mesh.extents[0]),
+                                    grasp_px=_grasp_px(mask, inst.grasp_frac), flipped=flip, mm_per_px=mm_per_px,
+                                    thickness_mm=th, rest=rest))
     return out

@@ -177,13 +177,19 @@ class Catalog:
         size_n = normalize_size(size)
         orient_n = normalize_orientation(orientation)
 
+        in_set = self.tray.in_set or list(self.tray.instruments)
         if not self.require_slot and match.startswith("category:"):
             cat = match.split(":", 1)[1]
-            if cat in INTERCHANGEABLE_CATEGORIES:      # any member will do; the planner accepts the whole group
-                match = next(i for i, inst in self.tray.instruments.items() if inst.category == cat)
+            members = [i for i in in_set if self.tray.instruments[i].category == cat]
+            if not members:
+                raise ResolveError(f"we don't have any {cat.replace('_', ' ')} in this set")
+            if len(members) == 1 or cat in INTERCHANGEABLE_CATEGORIES:   # any member will do (planner: whole group)
+                match = members[0]
             else:
                 raise ResolveError(f"which {cat.replace('_', ' ')}? say its name")
         if not self.require_slot:
+            if match not in in_set:
+                raise ResolveError(f"we don't have the {self.tray.instruments[match].name} in this set")
             inst = self.tray.instruments[match]
             orient = (orient_n or self.default_orientation) if inst.orientable else None
             return Resolved(slot=None, instrument=inst, orientation=orient)

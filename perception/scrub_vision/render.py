@@ -43,13 +43,14 @@ class CamSpec:
 _scene_cache: dict[str, trimesh.Trimesh] = {}
 
 
-def scene_mesh(inst: Instrument) -> trimesh.Trimesh:
-    """Flat mesh (tip at +x) centred on its bounding box, so z spans [-t/2, t/2]."""
-    if inst.id not in _scene_cache:
-        m = mesh_for(inst).copy()
+def scene_mesh(inst: Instrument, rest: str = "flat") -> trimesh.Trimesh:
+    """Mesh lying flat or on its side (tip at +x), centred on its bounding box, so z spans [-t/2, t/2]."""
+    key = f"{inst.id}@{rest}"
+    if key not in _scene_cache:
+        m = mesh_for(inst, rest).copy()
         m.vertices -= m.bounds.mean(0)
-        _scene_cache[inst.id] = m
-    return _scene_cache[inst.id]
+        _scene_cache[key] = m
+    return _scene_cache[key]
 
 
 def pose(x: float, y: float, z: float, yaw: float, flip: bool = False) -> np.ndarray:
@@ -93,7 +94,7 @@ def render_scene(items: list[tuple[trimesh.Trimesh, np.ndarray]], cam: CamSpec, 
     order = sorted(range(len(items)), key=lambda k: items[k][1][2, 3])
     for k in order:
         mesh, T = items[k]
-        base = (np.array(colours[k], np.float32) if colours else
+        base = (np.array(colours[k], np.float32) if colours and colours[k] is not None else
                 np.clip(shared * rng.uniform(0.93, 1.07) + rng.normal(0, 3, 3), 0, 255))
         v = mesh.vertices @ T[:3, :3].T + T[:3, 3]
         tri = v[mesh.faces]
