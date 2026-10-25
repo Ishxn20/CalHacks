@@ -58,12 +58,14 @@ class Console:
     parser: ClaudeParser | None = None
     sim: bool = False
     demo: bool = False
+    agents: object = None            # AgentNetwork when running with --agents
 
     def capabilities(self) -> dict:
         runner = self.triage.runner
         return {"sim": self.sim, "demo": self.demo, "claude": self.parser is not None,
                 "voice": self.speech.available, "convex": any(isinstance(s, ConvexSink) for s in self.sinks),
                 "convex_url": self.settings.convex_url,
+                "agents": self.agents.addresses if self.agents else None,
                 "bitdeer": self.bitdeer is not None,
                 "droid": None if runner is None else ("rehearsal" if getattr(runner, "simulated", False) else "sdk")}
 
@@ -80,7 +82,7 @@ def _droid_runner(rehearse: bool):
 
 
 def build_console(settings: Settings | None = None, sim: bool = False, demo: bool = False,
-                  rehearse_droid: bool = False, arm_config: Path | None = None) -> Console:
+                  rehearse_droid: bool = False, arm_config: Path | None = None, agents: bool = False) -> Console:
     s = settings or Settings.from_env()
     tray = load_tray_config()
     arm = ArmClient(s.arm_url, s.arm_token)
@@ -107,4 +109,12 @@ def build_console(settings: Settings | None = None, sim: bool = False, demo: boo
     speech = CartesiaSpeech(api_key=os.environ.get("CARTESIA_API_KEY"), voice_id=s.cartesia_voice,
                             tts_model=s.cartesia_tts_model, stt_model=s.cartesia_stt_model)
     bitdeer = BitdeerClient(s.bitdeer_key, s.bitdeer_base_url, s.bitdeer_model) if s.bitdeer_key else None
-    return Console(s, tray, arm, ledger, bridge, speech, audit, triage, bitdeer, sinks, parser, sim, demo)
+    net = None
+    if agents:
+        from .agents import AgentArm, AgentNetwork
+
+        look = bridge.sim_visible if sim else PerceptionCounter(s.perception_url)
+        net = AgentNetwork(understand_fn, arm, look=look,
+                           on_hop=lambda src, dst, what: bridge.emit("agent_hop", source=src, target=dst, what=what)).start()
+        bridge.arm, bridge.understand, bridge.observe = AgentArm(net, arm), net.understand, net.look
+    return Console(s, tray, arm, ledger, bridge, speech, audit, triage, bitdeer, sinks, parser, sim, demo, net)

@@ -42,6 +42,7 @@ class Bridge:
         self._fault_seen: str | None = None
         self._sim_removed: set[str] = set()
         self._polls = 0
+        self._emit_ledger()                       # so a fresh Convex board shows the starting tray, not stale data
 
     # ── plumbing ──────────────────────────────────────────────────────────
 
@@ -113,10 +114,13 @@ class Bridge:
 
     # ── count check ───────────────────────────────────────────────────────
 
+    def sim_visible(self) -> list[str]:
+        """What a camera would see in simulation: everything the ledger puts on the table, minus what was removed."""
+        return [i.instrument for i in self.ledger.items if i.status in (TRAY, USED) and i.uid not in self._sim_removed]
+
     def _observed(self) -> tuple[list[str] | None, str]:
         if self.sim:
-            return ([i.instrument for i in self.ledger.items
-                     if i.status in (TRAY, USED) and i.uid not in self._sim_removed], "simulated")
+            return (self.observe() if self.observe else self.sim_visible()), "simulated"
         if self.observe:
             try:
                 return self.observe(), "camera"

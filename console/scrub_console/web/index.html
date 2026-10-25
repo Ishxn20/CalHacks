@@ -185,7 +185,7 @@ button { cursor: pointer; }
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-const S = { arm: {}, items: [], counts: {}, caps: {}, sim: false, online: null, audit: {}, triage: [], events: [], ghosts: [], lastCount: null, seq: 0 };
+const S = { arm: {}, items: [], counts: {}, caps: {}, sim: false, online: null, audit: {}, triage: [], events: [], ghosts: [], lastCount: null, seq: 0, convexLive: false, anchors: {}, alerts: [] };
 const NAMES = { claude: "Claude", voice: "Cartesia", convex: "Convex", bitdeer: "Bitdeer", droid: "Droid" };
 let speakReplies = true;
 
@@ -256,7 +256,8 @@ function renderHeader() {
   const env = $("env"); env.textContent = S.sim ? "Simulated arm" : "Real arm"; env.className = "env " + (S.sim ? "sim" : "real");
   const c = S.caps, items = [
     ["claude", c.claude ? "on" : "off", "Claude"], ["voice", c.voice ? "on" : "off", "Cartesia"],
-    ["convex", c.convex ? "on" : "off", "Convex"], ["bitdeer", c.bitdeer ? "on" : "off", "Bitdeer"],
+    ["convex", c.convex ? (S.convexLive ? "on" : "partial") : "off", "Convex"], ["bitdeer", c.bitdeer ? "on" : "off", "Bitdeer"],
+    ["agents", c.agents ? "on" : "off", "Fetch.ai agents"],
     ["droid", c.droid === "sdk" ? "on" : c.droid === "rehearsal" ? "partial" : "off", c.droid === "rehearsal" ? "Droid (rehearsal)" : "Droid"],
   ];
   $("caps").innerHTML = items.map(([, st, label]) => `<li class="${st}">${label}</li>`).join("");
@@ -278,7 +279,9 @@ function renderAudit() {
   const rows = [["Arm command log", S.audit.arm], ["Console log", S.audit.console]];
   $("audit").innerHTML = rows.map(([k, a]) => !a ? `<div class="row"><span class="k">${k}</span><span class="v">not checked yet</span></div>`
     : `<div class="row"><span class="k">${k}</span><span class="v ${a.ok ? "good" : a.ok === false ? "bad" : ""}">${a.ok ? "intact" : a.ok === false ? "TAMPERED" : "unknown"}${a.entries != null ? ", " + a.entries + " entries" : ""}</span></div>`).join("");
-  $("auditnote").textContent = S.caps.convex ? "The latest chain heads are also published to Convex, so deleting the end of a log is noticed." : "Convex is off, so heads are not published anywhere else: deleting the end of a log would not be noticed.";
+  const anchored = Object.entries(S.anchors).map(([k, a]) => `${k} ${a.seq} entries`).join(", ");
+  const alerts = S.alerts.map((a) => `<p class="bad">Convex noticed: ${esc(a.detail)}</p>`).join("");
+  $("auditnote").innerHTML = alerts + esc(S.caps.convex ? (S.convexLive ? `Chain heads are published to Convex${anchored ? " (" + anchored + ")" : ""}, so deleting the end of a log is noticed.` : "Convex is configured but this page is not connected to it yet.") : "Convex is off, so heads are not published anywhere else: deleting the end of a log would not be noticed.");
 }
 
 function renderTriage() {
@@ -316,6 +319,7 @@ function describe(e) {
     case "prediction": return ["", `Suggestion: ${d.name}`];
     case "tamper_demo": return [d.ok ? "bad" : "ok", d.ok ? "Tampering was NOT detected" : `Tampering detected on line ${d.line}`];
     case "sim": return ["warn", `Simulation: instrument ${d.action}`];
+    case "agent_hop": return ["", `Agent message: ${d.source} to ${d.target} (${d.what})`];
     case "arm_offline": return ["bad", "Lost contact with the arm"];
     case "arm_online": return ["ok", "Arm connected"];
     case "error": return ["bad", d.say || d.message];
@@ -337,8 +341,9 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":
 
 /* ── state in ────────────────────────────────────────────────────────── */
 function takeState(s) {
-  S.arm = s.arm || {}; S.items = s.ledger.items; S.counts = s.ledger.counts; S.caps = s.capabilities; S.sim = s.sim; S.online = s.online;
-  S.audit = s.audit || {}; S.triage = s.triage || []; S.events = s.events || []; S.seq = s.seq || 0;
+  S.arm = s.arm || {}; S.caps = s.capabilities; S.sim = s.sim; S.online = s.online;
+  S.audit = s.audit || {}; S.triage = s.triage || []; S.seq = s.seq || 0;
+  if (!S.convexLive) { S.items = s.ledger.items; S.counts = s.ledger.counts; S.events = s.events || []; }
   const lastCount = [...S.events].reverse().find((e) => e.kind === "count");
   if (lastCount && !S.lastCount) setCount(lastCount.data);
 }
@@ -355,9 +360,10 @@ async function refresh() {
 }
 
 function onEvent(e) {
-  S.seq = e.seq; S.events.push(e); if (S.events.length > 300) S.events.shift();
+  S.seq = e.seq;
+  if (!S.convexLive) { S.events.push(e); if (S.events.length > 300) S.events.shift(); }
   const d = e.data;
-  if (e.kind === "ledger") { S.items = d.items; S.counts = d.counts; if (S.lastCount && !S.lastCount.ok) { /* keep the ghosts until the next count */ } }
+  if (e.kind === "ledger") { if (S.convexLive) return; S.items = d.items; S.counts = d.counts; if (S.lastCount && !S.lastCount.ok) { /* keep the ghosts until the next count */ } }
   else if (e.kind === "count") setCount(d);
   else if (e.kind === "sim" && d.action === "restored") { S.ghosts = []; }
   else if (e.kind === "audit") S.audit[d.source] = { ok: d.ok, entries: d.seq, head: d.head };
@@ -450,7 +456,22 @@ function encodeWav(chunks, inRate, outRate) {
 }
 $("mic").onclick = toggleMic;
 
-refresh().then(connect);
+/* ── Convex: live queries feed the board, the timeline and the anchored chain heads ── */
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.append(s); });
+}
+async function connectConvex(url) {
+  try {
+    await loadScript("/vendor/convex-browser.js");
+    const client = new window.convex.ConvexClient(url), fail = () => { S.convexLive = false; };
+    client.onUpdate("instruments:list", {}, (d) => { S.convexLive = true; S.items = d.items; S.counts = d.counts; render(); }, fail);
+    client.onUpdate("events:recent", {}, (rows) => { S.convexLive = true; S.events = rows; renderLog(); }, fail);
+    client.onUpdate("audit:latest", {}, (a) => { S.anchors = a; renderAudit(); }, fail);
+    client.onUpdate("audit:alerts", {}, (a) => { S.alerts = a; renderAudit(); }, fail);
+  } catch (e) { S.convexLive = false; }
+}
+
+refresh().then(() => { connect(); if (S.caps.convex_url) connectConvex(S.caps.convex_url); });
 setInterval(refresh, 8000);
 </script>
 </body>

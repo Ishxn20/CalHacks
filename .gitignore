@@ -20,6 +20,6 @@ sim/policy/checkpoints/*/replay_buffer.pkl
 # secrets, runtime logs, node
 .env
 .env.*
+!.env.example
 logs/
 node_modules/
-console/convex/_generated/

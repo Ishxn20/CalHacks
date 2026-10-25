@@ -99,6 +99,8 @@ def make_handler(console: Console):
                     return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
                 if url.path == "/favicon.ico":
                     return self._send(204, b"")
+                if url.path == "/vendor/convex-browser.js":
+                    return self._send(200, (WEB / "vendor" / "convex-browser.js").read_bytes(), "text/javascript; charset=utf-8")
                 if url.path == "/api/state":
                     return self._json(200, {**bridge.snapshot(), "capabilities": console.capabilities()})
                 if url.path == "/api/events":
