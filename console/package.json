@@ -1,0 +1,25 @@
+{
+  "name": "scrub-console-convex",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Convex backend for the scrub console: live events, instrument board, audit anchors, triage proposals",
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p convex"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "convex": "^1.48.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "^26.6.5",
+    "convex-test": "^0.0.65",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

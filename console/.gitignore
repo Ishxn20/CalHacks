@@ -1,0 +1,6 @@
+
+.env.local
+# local Convex backend: its database and admin key
+.convex/
+# exported training sets
+datasets/
