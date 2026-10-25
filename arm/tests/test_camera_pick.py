@@ -34,9 +34,11 @@ def test_confirmed_miss_rescans_and_a_good_pick_keeps_the_jaws_closed(app):
 
 def test_nothing_seen_gives_up_without_moving_to_pick(app):
     c = camera(app)
-    c.look = Mock(return_value=[])
+    other = SimpleNamespace(fine_id="scalpel_20", alt_ids=[], candidates=["scalpel_20"], exposure=1, length_mm=171.4)
+    c.look = Mock(return_value=[other])
     assert not c.pick(app.catalog.resolve("10 blade"))
     c.a._pick_at.assert_not_called()
+    assert "the camera sees: scalpel_20 171 mm" in c.a.events[-1]["msg"]     # says why, for the next try
 
 
 def test_camera_failure_after_lift_keeps_jaws_closed(app):
@@ -94,3 +96,18 @@ def test_http_handoff_fails_cleanly_when_the_camera_pick_gives_up(app):
     job = a.wait_idle()
     assert job["status"] == "failed" and "couldn't pick up" in job["error"]
     assert a.phase == Phase.IDLE
+
+
+def test_a_wrong_size_picture_is_never_measured_and_the_camera_is_reopened(app, monkeypatch):
+    import numpy as np
+    import scrub_arm.camera_pick as cp
+    c = camera(app)
+    c.size, c.camera_index = (1920, 1080), 0
+    small, full = np.zeros((540, 960, 3), np.uint8), np.zeros((1080, 1920, 3), np.uint8)
+    c.cap = SimpleNamespace(read=lambda: (True, small), release=lambda: None)
+    monkeypatch.setattr(cp, "_open_camera", lambda i: SimpleNamespace(read=lambda: (True, full), release=lambda: None))
+    assert c.frame() is full
+    assert any("960x540" in e["msg"] for e in c.a.events)
+    c.cap = SimpleNamespace(read=lambda: (True, small), release=lambda: None)
+    monkeypatch.setattr(cp, "_open_camera", lambda i: c.cap)       # still wrong after reopening: refuse
+    assert c.frame() is None
