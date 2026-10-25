@@ -1,0 +1,8 @@
+{
+ "min_px": 20000,
+ "gone_fraction": 0.3,
+ "wrist_tilt_deg": 0,
+ "held_px": 93138,
+ "gone_px": null,
+ "note": "2026-10-25 tools/handoff_calib.py: #20 held at the taught hand-off pose = 93138 px (tilt -10..+10 the same, +20 = 1307: tool out of view). Gone not measured (run stopped); background without a tool reads 100-1300 px, so 'taken' = below 30% of the held count (~28000)."
+}

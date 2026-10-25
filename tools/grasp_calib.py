@@ -18,14 +18,14 @@ def snap(name):
     ok, f = cap.read(); cv2.imwrite(str(out / f"{name}.jpg"), f)
     json.dump({"q": d.q_measured().tolist(), "target": [X, Y, YAW]}, open(out / f"{name}.json", "w"))
 _grasp = d.gripper_grasp
-def look(close_mm=None):
-    snap(f"{tag}_open"); ok = _grasp(close_mm); snap(f"{tag}_closed"); return ok
+def look():
+    snap(f"{tag}_open"); ok = _grasp(); snap(f"{tag}_closed"); return ok
 d.gripper_grasp = look
 tag = f"x{X:.0f}_y{Y:.0f}_yaw{YAW:.0f}"
 try:
     d.move_pose("scan", speed=0.5)
     try:
-        a._pick_at(X, Y, YAW, 4.5, jaw_mm=(33.0, 1.0))
+        a._pick_at(X, Y, YAW, 4.5, jaw_open_mm=33.0)
     except TaskFailed as e:
         print("expected miss:", e)
     d.move_pose("scan", speed=0.5)

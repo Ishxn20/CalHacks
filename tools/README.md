@@ -20,3 +20,6 @@ Outputs (photos + joint angles) go to `hw_check/real/` (gitignored).
 | `grasp_calib.py X Y YAW` | real pick motion onto bare table; photograph where the fingertips meet |
 | `touch_table.py X Y YAW` | step the open jaws down onto bare table until contact; report the tool-point height |
 | `hover_check.py OUTDIR [DX DY]` / `hover_err.py OUTDIR` | hover 3 cm above each part's grab point (no contact) and measure the miss |
+| `handoff_calib.py [TOOL]` | present a held tool, sweep the wrist tilt, count how much of the tool the camera sees; writes `handoff_calib.json` (pick.py's "taken" threshold) |
+| `handoff_view.py [TOOL]` | present a held tool and print the camera's tool count every 0.7 s for 30 s |
+| `tug_calib.py [TOOL]` | log joint deflection and torque at the hand-off pose, still vs pulled (tug sensing: too small to use, see handoff_calib) |
