@@ -21,6 +21,12 @@ TOL_MM = 1.5            # silhouette match tolerance (thin tines are ~2 mm wide)
 LENGTH_WEIGHT = 2.0     # score penalty per unit relative length error (Castroviejo 140 vs micro scissors 150)
 
 
+def bbox_centre(mask: np.ndarray) -> tuple[float, float]:
+    """Centre of the mask's bounding box (pixels): the pickup point (user: pick at the bounding box's centre)."""
+    vs, us = np.nonzero(mask)
+    return (float(us.min() + us.max()) / 2, float(vs.min() + vs.max()) / 2)
+
+
 @dataclass(eq=False)   # identity equality: masks are arrays
 class Detection:
     mask: np.ndarray
@@ -121,8 +127,9 @@ def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: lis
     length, width, axis_deg, cpx = measure(mask, H)
     det = Detection(mask=mask, coarse=coarse, fine_id=None, length_mm=length, width_mm=width,
                     axis_deg=axis_deg, centroid_px=cpx, seg_conf=seg_conf)
-    # until a template says otherwise (an `other` object may match none): grasp the middle, across the long axis
-    det.grasp_px, det.grasp_mm = cpx, tuple(float(v) for v in _apply(H, cpx)[0])
+    # pickup point: the bounding box's centre (user); jaws across the long axis until a template gives the tip end
+    bc = bbox_centre(mask)
+    det.grasp_px, det.grasp_mm = bc, tuple(float(v) for v in _apply(H, bc)[0])
     det.yaw_deg = axis_deg + 90.0
     outer_px, holes_px = _contours(mask)
     if not outer_px:
@@ -164,10 +171,8 @@ def identify(mask: np.ndarray, coarse: str | None, H: np.ndarray, templates: lis
             det.alt_ids = sorted(looks - {bt.fine_id})
     tc = _tc(bt)
     th = theta + be * np.pi
-    grasp_mm = tc.grasp_q @ _rot(th).T + c
+    grasp_mm = tc.grasp_q @ _rot(th).T + c          # the template's grasp point: only for which way the tip points
     tip_mm = tc.tip_q @ _rot(th).T + c
-    det.grasp_mm = (float(grasp_mm[0]), float(grasp_mm[1]))
-    det.grasp_px = tuple(float(v) for v in _apply(np.linalg.inv(H), grasp_mm)[0])
     tip_dir = np.degrees(np.arctan2(*(tip_mm - grasp_mm)[::-1]))
     det.axis_deg = float(tip_dir)
     det.yaw_deg = float(tip_dir + 90.0)

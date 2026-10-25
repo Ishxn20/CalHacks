@@ -56,7 +56,7 @@ def test_plan_from_injected_frame(server):
     url, _, logs = server
     p = post(url + "/plan", {"instrument": "forceps_resano"})
     assert p["action"] == "grasp_target" and p["target"]["id"] == "forceps_resano"
-    assert abs(p["target"]["x_mm"] - (-14)) < 15   # tip at x=+55, grasp 0.3*230 mm back from it
+    assert abs(p["target"]["x_mm"] - (-60)) < 15   # tip at x=+55: the bounding box's centre is 115 mm back
     assert list(logs.glob("*.json")) and list(logs.glob("*.jpg"))
 
 

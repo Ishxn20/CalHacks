@@ -53,14 +53,15 @@ def test_coarse_class_restricts_candidates(insts, templates):
     assert d.fine_id is None
 
 
-def test_identify_flipped_grasp_at_tip_end(insts, templates):
+def test_identify_flipped_picks_at_the_bbox_centre_and_knows_the_tip(insts, templates):
     fid, yaw = "scissors_potts", 1.0
     mask = one(insts, fid, yaw=yaw, flip=True)
     d = identify(mask, None, table_H(), templates, insts)
     assert d.fine_id == fid
-    # tip of the instrument is +x in its own frame -> world direction (cos yaw, sin yaw) from centre (0, -20)
-    v = np.array(d.grasp_mm) - [0, -20]
-    assert np.dot(v, [np.cos(yaw), np.sin(yaw)]) > 20
+    # pickup point = the bounding box's centre (user), here the instrument's centre (0, -20) to within its asymmetry
+    assert np.hypot(d.grasp_mm[0] - 0, d.grasp_mm[1] + 20) < 15
+    # the tip is still found: +x in its own frame -> world direction (cos yaw, sin yaw)
+    assert np.cos(np.radians(d.axis_deg) - yaw) > 0.95
 
 
 def test_length_gate_rejects_merged_blob(insts, templates):
@@ -88,11 +89,11 @@ def test_exposure_drops_when_occluded(insts, templates):
 def test_feasible_rejects_jaw_over_upper_mask(insts, templates):
     ta = scene_mesh(insts["forceps_resano"]).extents[2]
     _, (under, top) = render(insts, [("forceps_resano", 0, -20, ta / 2, 0.0, False),
-                                     ("forceps_debakey", 46, -20, ta + 5, np.pi / 2, False)])
+                                     ("forceps_debakey", 0, -20, ta + 5, np.pi / 2, False)])
     H = table_H()
     du = identify(under, None, H, templates, insts)
     dt = identify(top, None, H, templates, insts)
-    # Resano's grasp is ~0.3 of its length from the tip (+x end, ~46 mm from centre): DeBakey lies across it
+    # Resano's pickup point is its bounding box's centre: DeBakey lies across it there
     assert not feasible(du, [dt], H)
     assert feasible(dt, [du], H)
 
