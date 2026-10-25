@@ -153,6 +153,8 @@ class SimBus:
     Knobs for tests/demos:
       object_in_jaws  - gripper stalls short of closed (successful grasp) when True
       external_offset - added to measured positions (e.g. simulate a surgeon's tug)
+      sag             - where each joint settles relative to its setpoint (gravity on the real arm's stiff-ish
+                        MIT joints: joint 2 sat 4 deg low, joint 3 2 deg short)
     """
 
     def __init__(self, cfg: ArmConfig, start: np.ndarray | None = None) -> None:
@@ -162,6 +164,7 @@ class SimBus:
         self.enabled = False
         self.object_in_jaws = True
         self.external_offset = np.zeros(7)
+        self.sag = np.zeros(7)
         self._last = time.perf_counter()
         self._vmax = np.append(cfg.max_vel * 100.0, math.radians(2000))
 
@@ -197,7 +200,7 @@ class SimBus:
         now = time.perf_counter()
         dt, self._last = now - self._last, now
         if self.enabled:
-            step = np.clip(self.target - self.pos, -self._vmax * dt, self._vmax * dt)
+            step = np.clip(self.target + self.sag - self.pos, -self._vmax * dt, self._vmax * dt)
             self.pos = self.pos + step
 
     def cached(self) -> tuple[np.ndarray, np.ndarray]:

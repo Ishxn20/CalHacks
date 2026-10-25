@@ -16,6 +16,9 @@ from .templates import load_instruments
 TRAY_YAML = Path(__file__).resolve().parents[2] / "config" / "tray.yaml"
 STAGED_RADIUS_MM = 60.0
 SURE_EXPOSURE = 0.9      # identity is only trusted when nearly the whole instrument is visible
+# Grasping the requested instrument: 60 % for now (user decision). On the real camera a lone scalpel scored 0.87
+# (pen marks and a slightly short outline), so 0.9 refused an uncovered instrument.
+GRASP_EXPOSURE = 0.6
 _names: dict[str, str] | None = None
 
 
@@ -55,7 +58,7 @@ def _target_json(d: Detection, fid: str | None, ambiguous: bool = False) -> dict
 
 def plan(dets: list[Detection], target_id: str, H: np.ndarray, staging: list[tuple[float, float]],
          used_staging: set[int], staged_xy: list[tuple[float, float]] | None = None,
-         exposure_min: float = SURE_EXPOSURE, conf_min: float = 0.5, staging_yaw_deg: float = 0.0) -> dict:
+         exposure_min: float = GRASP_EXPOSURE, conf_min: float = 0.5, staging_yaw_deg: float = 0.0) -> dict:
     name = display_name(target_id)
     staged_xy = staged_xy or []
 

@@ -32,6 +32,8 @@ HELP = """\
   set <joint 1-6> <deg>   move one joint to an absolute angle
   save <name>             save current setpoint as a pose (A1.above, A1.grasp, home, handoff, staged, verify, rest)
   go <name> [speed]       move to a saved pose (speed multiplier, default 1)
+  mx | my | mz <mm>       straight-line move in the table frame (x out from the base, y left, z up), same
+                          orientation: e.g. mx 10
   poses                   list poses
   del <name>              delete a pose
   open | close            gripper open / soft close (close reports whether it's holding something)
@@ -99,6 +101,15 @@ def run_teach(app: App) -> None:
                 poses.set(name, q)
                 poses.save()
                 print(f"  saved {name}: {_fmt(q)}" + ("" if d.enabled else "  (saved while limp; re-save after `hold` for exact replay)"))
+            elif cmd in ("mx", "my", "mz"):
+                if asst.kin is None:
+                    print("  needs pick.mode ik (kinematics)")
+                    continue
+                mm = float(args[0])
+                d.clear_abort()
+                asst.move_line(*(mm if cmd == ax else 0.0 for ax in ("mx", "my", "mz")))
+                p, _ = asst.kin.fk(d.q_measured())
+                print(f"  tool at ({p[0]*1000:.1f}, {p[1]*1000:.1f}, {p[2]*1000:.1f}) mm")
             elif cmd == "go":
                 d.clear_abort()
                 d.move_pose(args[0], speed=float(args[1]) if len(args) > 1 else 1.0)

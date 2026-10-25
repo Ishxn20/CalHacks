@@ -13,6 +13,10 @@ from dataclasses import dataclass
 
 from .config import Instrument, Slot, TrayConfig
 
+# Categories whose members are interchangeable (perception config/instruments.yaml `group`): a generic request
+# ("scalpel") needs no further detail in camera mode. All scalpel blades count the same (user decision).
+INTERCHANGEABLE_CATEGORIES = {"scalpel"}
+
 _WORD_NUMBERS = {
     "zero": "0", "oh": "0", "o": "0", "one": "1", "two": "2", "three": "3", "four": "4",
     "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
@@ -174,8 +178,11 @@ class Catalog:
         orient_n = normalize_orientation(orientation)
 
         if not self.require_slot and match.startswith("category:"):
-            label = match.split(":", 1)[1].replace("_", " ")
-            raise ResolveError(f"which {label}? say its name")
+            cat = match.split(":", 1)[1]
+            if cat in INTERCHANGEABLE_CATEGORIES:      # any member will do; the planner accepts the whole group
+                match = next(i for i, inst in self.tray.instruments.items() if inst.category == cat)
+            else:
+                raise ResolveError(f"which {cat.replace('_', ' ')}? say its name")
         if not self.require_slot:
             inst = self.tray.instruments[match]
             orient = (orient_n or self.default_orientation) if inst.orientable else None

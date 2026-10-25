@@ -13,7 +13,7 @@ import numpy as np
 
 from .templates import Instrument, Template, interchangeable
 
-LENGTH_TOL = 0.08
+LENGTH_TOL = 0.15   # real camera: a lone printed scalpel measured 9-11 % short (thin pale blade tip, mapping near the frame edge); was 0.08
 MARGIN_MIN = 0.05
 FIT_MIN = 0.6           # below this the best template doesn't explain the blob: identity unknown
 CANON_MM_PER_PX = 0.5

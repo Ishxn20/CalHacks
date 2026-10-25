@@ -132,10 +132,18 @@ def test_confident_same_class_sibling_can_be_moved():
     assert p["action"] == "move_aside" and p["target"]["id"] == "forceps_debakey"
 
 
-def test_target_needs_near_full_view_to_grasp():
-    partial = _det("needle_holder_castroviejo", "castroviejo", ["needle_holder_castroviejo"], 0.8, 50)
+def test_target_needs_most_of_it_in_view_to_grasp():
+    partial = _det("needle_holder_castroviejo", "castroviejo", ["needle_holder_castroviejo"], 0.5, 50)
     p = plan([partial], "needle_holder_castroviejo", H, STAGING, set())
     assert p["action"] != "grasp_target"
+
+
+def test_target_at_87_percent_exposure_is_grasped():
+    # the real lone scalpel scored 0.87 and was refused under the old 0.9 threshold
+    lone = _det("scalpel_11", "scalpel", ["scalpel_10", "scalpel_11", "scalpel_15", "scalpel_20"], 0.87, 50)
+    lone.alt_ids = ["scalpel_10", "scalpel_15", "scalpel_20"]          # as identify() sets for the scalpel group
+    p = plan([lone], "scalpel_10", H, STAGING, set())
+    assert p["action"] == "grasp_target"
 
 
 def test_unrecognised_blob_on_top_of_target_blocks_the_grasp():

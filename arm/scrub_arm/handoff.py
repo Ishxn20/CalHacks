@@ -59,6 +59,10 @@ class ScrubAssistant:
         self.cfg = driver.cfg
         self.kin = kin                      # Kinematics, only in pick.mode == "ik"
         self._picked_from: tuple | None = None   # (x_mm, y_mm, yaw_deg, thickness_mm) of the last ik pick
+        self._flipped = False               # last pick's jaws 180 deg from the plan's yaw: present with the wrist turned
+        # Optional closed-loop alignment at hover (pick.reach rl): (x_mm, y_mm, yaw_deg, thickness_mm) ->
+        # corrected (x_mm, y_mm, yaw_deg) to descend at. Set by the launcher that owns the camera.
+        self.refine = None
 
         self.phase = Phase.IDLE
         self.holding: Resolved | None = None
@@ -184,7 +188,7 @@ class ScrubAssistant:
     def _do_stage(self, r: Resolved) -> str:
         self._acquire(r)
         self.phase = Phase.MOVING
-        self.driver.move_to(self._oriented("staged", r.orientation))
+        self.driver.move_to(self._oriented("staged", r.orientation, self._flipped and self.kin is not None))
         self.phase = Phase.STAGED
         return f"staged {r.describe()}"
 
@@ -237,6 +241,7 @@ class ScrubAssistant:
         for _ in range(pk.max_declutter_moves):
             self.phase = Phase.MOVING
             d.move_pose("scan")
+            d.gripper_open()           # closed fingers hang into the middle of the wrist camera's view
             d.sleep(0.3)               # wrist camera: let a frame from the settled scan pose arrive
             plan = client.plan(r.instrument.id)
             if plan["action"] == "fail":
@@ -249,9 +254,10 @@ class ScrubAssistant:
                 self._solve(p["x_mm"], p["y_mm"], pk.table_z + pk.hover, p["yaw_deg"])
                 self._solve(p["x_mm"], p["y_mm"], pk.table_z + t["thickness_mm"] / 2000.0 + 0.005, p["yaw_deg"])
             try:
-                # The requested instrument keeps its tip on a fixed side of the gripper so the taught
-                # handoff pose presents it handle-first; movers can be pinched either way round.
-                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], allow_flip=not grasping)
+                # Either way round: the pinch is symmetric, and a tilted gripper can only lean away from the
+                # base (yaw 48 was unreachable at (445, 18), yaw -132 fine). A flipped requested instrument is
+                # presented with the wrist turned 180 deg (_flipped), still handle-first.
+                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"))
             except TaskFailed:
                 if missed:
                     raise
@@ -312,29 +318,74 @@ class ScrubAssistant:
 
     # ── ik picking (pick.mode == "ik") ────────────────────────────────────
 
-    def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float, allow_flip: bool = True) -> np.ndarray:
-        """Joint vector for a top-down grasp pose, or TaskFailed if the arm can't reach it."""
+    def _solve(self, x_mm: float, y_mm: float, z_m: float, yaw_deg: float, allow_flip: bool = True,
+               tilt: bool | None = None) -> np.ndarray:
+        """Joint vector for a grasp pose (the pick tilt where it reaches, else top-down; see Kinematics.ik_topdown),
+        or TaskFailed if the arm can't reach it."""
         assert self.kin is not None, "pick.mode is not 'ik'"
         q = self.kin.ik_topdown(x_mm / 1000.0, y_mm / 1000.0, z_m, math.radians(yaw_deg),
-                                self.driver.q_command(), (self.cfg.lower, self.cfg.upper), allow_flip=allow_flip)
+                                self.driver.q_command(), (self.cfg.lower, self.cfg.upper), allow_flip=allow_flip,
+                                tilt=tilt)
         if q is None:
             raise TaskFailed(f"can't reach ({x_mm:.0f}, {y_mm:.0f}) mm at {z_m * 1000:.0f} mm")
         return q
 
+    def _tilt_for(self, x_mm: float, y_mm: float, yaw_deg: float, z_lo: float, z_hi: float,
+                  allow_flip: bool = True) -> bool:
+        """One orientation for a whole hover -> table -> lift: the pick tilt if it reaches both ends here, else
+        straight down (solving each height on its own mixed the two mid-descent, and the lift couldn't follow)."""
+        if self.kin.tilt_R is None:
+            return False
+        try:
+            self._solve(x_mm, y_mm, z_hi, yaw_deg, allow_flip, tilt=True)
+            self._solve(x_mm, y_mm, z_lo, yaw_deg, allow_flip, tilt=True)
+            return True
+        except TaskFailed:
+            return False
+
+    def move_line(self, dx_mm: float, dy_mm: float, dz_mm: float, step_mm: float = 2.0, speed: float = 0.3,
+                  dyaw_deg: float = 0.0, step_deg: float = 3.0) -> None:
+        """Move the gripper in a straight line by (dx, dy, dz) mm in the table frame (x out from the base, y left,
+        z up), holding its orientation (or turning it by dyaw_deg about the vertical through the fingertips, e.g. to
+        square the jaws at the hover): re-solved every step_mm / step_deg so the path stays straight, instead of one joint-space
+        move (which dipped and swung the gripper on the real arm). The current gravity-sag offset is carried along;
+        the end point is reached exactly."""
+        d = self.driver
+        q0 = d.q_measured()
+        off = d.q_command() - q0                                # the setpoint offset holding it here (sag)
+        p0, R0 = self.kin.fk(q0)
+        delta = np.array([dx_mm, dy_mm, dz_mm]) / 1000.0
+        n = max(1, int(np.ceil(max(np.linalg.norm(delta) * 1000.0 / step_mm, abs(dyaw_deg) / step_deg))))
+        q, qs = q0, []
+        for i in range(1, n + 1):                      # solve the whole line first: nothing moves if any of it fails
+            t = np.radians(dyaw_deg) * i / n
+            Rz = np.array([[np.cos(t), -np.sin(t), 0.0], [np.sin(t), np.cos(t), 0.0], [0.0, 0.0, 1.0]])
+            q = self.kin.ik_pose(p0 + delta * i / n, Rz @ R0, q, (self.cfg.lower, self.cfg.upper))
+            if q is None:
+                raise TaskFailed(f"can't move straight by ({dx_mm:.0f}, {dy_mm:.0f}, {dz_mm:.0f}) mm from here")
+            qs.append(q)
+        d.move_through([qq + off for qq in qs], speed=speed)  # one smooth motion (a stop every 2 mm took ~20 s per 10 cm)
+        d.move_to(q, speed=speed, exact=True)
+
     def _descend_until_contact(self, x_mm: float, y_mm: float, yaw_deg: float, z_floor: float,
-                               allow_flip: bool = True) -> float:
+                               allow_flip: bool = True, z_start: float | None = None,
+                               tilt: bool | None = None) -> float:
         """Step the open gripper straight down from hover until the pile pushes back or z_floor is reached.
 
         Contact = any pick.contact_joints lagging its setpoint by more than pick.contact_deviation beyond
         the lag measured at hover (gravity sag). On contact, back off 1 mm and return that z (m).
         Contact on the very first step means something is in the way at hover height: TaskFailed.
+        z_start: begin there instead of the hover (the visual centring's last stage already brought it down).
         """
         pk, d = self.cfg.pick, self.driver
         idx = [self.cfg.joint_index(n) for n in pk.contact_joints]
         slow = self.cfg.motion.approach_speed_scale
-        z_hover = pk.table_z + pk.hover
-        solve = lambda z: self._solve(x_mm, y_mm, z, yaw_deg, allow_flip)  # noqa: E731
-        d.move_to(solve(z_hover))
+        z_hover = pk.table_z + pk.hover if z_start is None else z_start
+        # The hover is an IK target: correct the arm's gravity sag there (it sat ~3 cm low on the real arm), then
+        # carry that same setpoint offset down every step. Correcting each step instead would also "correct"
+        # against the pile pushing back -- pressing harder exactly when contact should stop it.
+        off = d.move_to(self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip, tilt), exact=True)
+        solve = lambda z: self._solve(x_mm, y_mm, z, yaw_deg, allow_flip, tilt) + off  # noqa: E731
         samples = []
         for _ in range(5):
             d.sleep(0.02)
@@ -356,23 +407,35 @@ class ScrubAssistant:
         return z
 
     def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
-                 allow_flip: bool = True) -> None:
+                 allow_flip: bool = True, fid: str | None = None) -> None:
         """hover -> open -> contact descent -> grasp -> lift. TaskFailed on a miss (caller decides on retry).
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
+        plan_yaw = yaw_deg
         z_hover = pk.table_z + pk.hover
-        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip)   # fail before moving if unreachable
-        self.phase = Phase.PICKING
-        d.move_to(q_hover)
-        d.gripper_open()
         z_floor = pk.table_z + thickness_mm / 2000.0 - 0.002
-        self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor, allow_flip)
+        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_floor, z_hover, allow_flip)
+        q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, allow_flip, tilt)   # fail before moving if unreachable
+        self.phase = Phase.PICKING
+        d.move_to(q_hover, exact=True)            # an IK target: cancel gravity sag (the RL alignment starts here)
+        d.gripper_open()
+        z_start = None
+        if self.refine is not None:      # (x, y, yaw) or (x, y, yaw, z it finished at: the visual centring stages)
+            # fid: which instrument to centre on (tracking "whatever is biggest" chased glare on the real arm)
+            x_mm, y_mm, yaw_deg, *rest = self.refine(x_mm, y_mm, yaw_deg, thickness_mm,
+                                                     **({"fid": fid} if fid else {}))
+            z_start = rest[0] if rest else None
+        z_got = self._descend_until_contact(x_mm, y_mm, yaw_deg, z_floor, allow_flip, z_start=z_start, tilt=tilt)
         got_it = d.gripper_grasp()
-        d.move_to(q_hover, speed=self.cfg.motion.approach_speed_scale)
+        # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
+        self.move_line(0, 0, (z_hover - z_got) * 1000, speed=self.cfg.motion.approach_speed_scale)
         if not got_it:
             d.gripper_open()
             raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
         self._picked_from = (x_mm, y_mm, yaw_deg, thickness_mm)
+        _, R = self.kin.fk(d.q_measured())
+        jaw = R @ self.kin.jaw_axis_local
+        self._flipped = abs((math.degrees(math.atan2(jaw[1], jaw[0])) - plan_yaw + 180.0) % 360.0 - 180.0) > 90.0
 
     def _place_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
                   sense_contact: bool = False) -> None:
@@ -381,17 +444,18 @@ class ScrubAssistant:
         pk, d = self.cfg.pick, self.driver
         slow = self.cfg.motion.approach_speed_scale
         z_place = pk.table_z + thickness_mm / 2000.0 + 0.005
-        q_hover = self._solve(x_mm, y_mm, pk.table_z + pk.hover, yaw_deg)
-        q_down = self._solve(x_mm, y_mm, z_place, yaw_deg)       # both solved before any motion
+        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_place, pk.table_z + pk.hover)
+        q_hover = self._solve(x_mm, y_mm, pk.table_z + pk.hover, yaw_deg, tilt=tilt)
+        q_down = self._solve(x_mm, y_mm, z_place, yaw_deg, tilt=tilt)       # both solved before any motion
         self.phase = Phase.RETURNING
-        d.move_to(q_hover)
-        if sense_contact:
+        off = d.move_to(q_hover, exact=True)      # sag-corrected: uncorrected, the real arm sat ~3 cm low, which
+        if sense_contact:                         # would have put this "5 mm above the table" into the table
             try:
-                self._descend_until_contact(x_mm, y_mm, yaw_deg, z_place)
+                self._descend_until_contact(x_mm, y_mm, yaw_deg, z_place, tilt=tilt)
             except TaskFailed:
                 pass              # something right under the hover point: let go from there, gently held above
         else:
-            d.move_to(q_down, speed=slow)
+            d.move_to(q_down + off, speed=slow)
         d.gripper_open()
         self.holding = None
         d.move_to(q_hover, speed=slow)
@@ -404,17 +468,19 @@ class ScrubAssistant:
         return Instrument(id=fid or "unknown", name=(fid or "instrument").replace("_", " "), category="unknown",
                           orientable=False, aliases=[])
 
-    def _oriented(self, pose: str, orientation: str | None) -> np.ndarray:
-        """Pose with the wrist (joint6) rotated for forehand/backhand, wrapped into joint limits."""
+    def _oriented(self, pose: str, orientation: str | None, flipped: bool = False) -> np.ndarray:
+        """Pose with the wrist (joint6) rotated for forehand/backhand, plus 180 deg if the instrument was picked
+        the other way round (flipped), wrapped into joint limits."""
         q = self.driver.pose_q(pose)
-        if orientation is None:
+        if orientation is None and not flipped:
             return q
         offsets = self.cfg.handoff.orientation_offsets
-        if orientation not in offsets:
+        if orientation is not None and orientation not in offsets:
             raise TaskFailed(f"no wrist offset configured for {orientation!r}")
         j6 = self.cfg.joints[-1]
         base = q[-1]
-        options = [base + offsets[orientation] + k * 2 * math.pi for k in (0, -1, 1)]
+        turn = (offsets[orientation] if orientation is not None else 0.0) + (math.pi if flipped else 0.0)
+        options = [base + turn + k * 2 * math.pi for k in (0, -1, 1)]
         valid = [v for v in options if j6.lower <= v <= j6.upper]
         if not valid:
             raise ArmFault(
@@ -427,7 +493,7 @@ class ScrubAssistant:
     def _present(self, r: Resolved) -> None:
         self.phase = Phase.MOVING
         self._log(f"presenting {r.describe()}")
-        self.driver.move_to(self._oriented("handoff", r.orientation))
+        self.driver.move_to(self._oriented("handoff", r.orientation, self._flipped and self.kin is not None))
         self.phase = Phase.PRESENTING
 
     def _wait_for_take(self) -> str:

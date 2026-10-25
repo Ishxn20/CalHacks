@@ -91,3 +91,19 @@ def test_debug_returns_jpeg(server):
     post(url + "/plan", {"instrument": "forceps_resano"})
     with urllib.request.urlopen(url + "/debug", timeout=10) as r:
         assert r.headers["Content-Type"] == "image/jpeg" and r.read(2) == b"\xff\xd8"
+
+
+def test_detections_off_the_work_mat_are_dropped(tmp_path):
+    """Only instruments mostly on the mat count (wood grain off the mat produced false detections)."""
+    from scrub_vision.service import region_mask
+
+    world = {}
+    img, world["masks"] = frame([("forceps_resano", -60, -60, 0.0), ("scissors_potts", 120, 40, 1.0)])
+    gm = np.zeros(img.shape[:2], bool)
+    mat_mm = [(-200, -150), (40, -150), (40, 50), (-200, 50)]          # covers resano, not potts
+    svc = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path,
+                        region=region_mask(mat_mm, H, img.shape[:2]))
+    ids = {d.fine_id for d in svc.detect(img)}
+    assert "forceps_resano" in ids and "scissors_potts" not in ids
+    no_mat = VisionService(lambda: img, H, gm, TrueInstances(world), STAGING, log_dir=tmp_path)
+    assert len(no_mat.detect(img)) == 2

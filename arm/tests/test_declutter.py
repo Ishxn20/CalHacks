@@ -73,7 +73,7 @@ def make_app(config_dir):
 def run(app, text="resano"):
     r = app.catalog.resolve(text)
     app.assistant.submit("handoff", r)
-    return app.assistant.wait_idle(timeout=30)
+    return app.assistant.wait_idle(timeout=60)    # 6 declutter cycles took ~29 s in the simulator
 
 
 def test_grasp_target_first_try(make_app):
@@ -166,3 +166,26 @@ def test_bad_numbers_fail_with_speech_not_fault(bad):
     with pytest.raises(TaskFailed):
         PerceptionClient(fake.url).plan("forceps_resano")
     fake.httpd.shutdown()
+
+
+def test_jaws_open_before_looking(make_app, monkeypatch):
+    """The real wrist camera's gripper mask only covers OPEN fingers (two bottom corners); closed fingers hang
+    into the middle of the view. So the scan must open the jaws before asking for a plan."""
+    app, _ = make_app([GRASP])
+    app.driver.set_gripper(app.cfg.gripper.closed)
+    seen = []
+    orig = PerceptionClient.plan
+    monkeypatch.setattr(PerceptionClient, "plan",
+                        lambda self, fid: seen.append(app.driver.snapshot()["gripper_cmd_deg"]) or orig(self, fid))
+    assert run(app)["status"] == "done"
+    assert seen and abs(seen[0] - round(float(__import__("math").degrees(app.cfg.gripper.open)), 2)) < 0.01
+
+
+def test_centring_is_told_which_instrument_it_is_centring_on(make_app):
+    """The real run's centring chased glare and the paper's edge (the largest masks near the jaws): refine gets the
+    planned instrument's id so it can track only that instrument."""
+    app, _ = make_app([GRASP])
+    seen = []
+    app.assistant.refine = lambda x, y, yaw, th, fid=None: seen.append(fid) or (x, y, yaw)
+    assert run(app)["status"] == "done"
+    assert seen == ["forceps_resano"]

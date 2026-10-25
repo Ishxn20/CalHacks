@@ -99,6 +99,7 @@ class PickCfg:
     max_declutter_moves: int
     staging: list[tuple[float, float]]   # m
     staging_yaw: float             # rad
+    tilt_pose: str | None = None   # grasp with this taught pose's gripper tilt (Kinematics.set_pick_tilt)
 
 
 @dataclass
@@ -276,6 +277,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         max_declutter_moves=int(pk.get("max_declutter_moves", 6)),
         staging=[(float(x) / 1000.0, float(y) / 1000.0) for x, y in pk.get("staging_mm", [])],
         staging_yaw=_rad(pk.get("staging_yaw_deg", 0.0)),
+        tilt_pose=pk.get("tilt_pose") or None,
     )
 
     s = d.get("server", {}) or {}

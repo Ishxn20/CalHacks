@@ -41,6 +41,8 @@ def build(sim: bool = False, config_dir: Path | str | None = None) -> App:
         from .kinematics import Kinematics   # needs the `kinematics` extra (pinocchio)
 
         kin = Kinematics()
+        if cfg.pick.tilt_pose and cfg.pick.tilt_pose in poses.poses:
+            kin.set_pick_tilt(poses.poses[cfg.pick.tilt_pose].q)
     assistant = ScrubAssistant(driver, catalog, Verifier(cfg.verify), kin=kin)
     return App(cfg, tray, poses, driver, catalog, assistant)
 

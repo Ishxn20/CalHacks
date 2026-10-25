@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 import yaml
 
-from .identify import Detection, annotate, identify, segment_background
+from .identify import Detection, _apply, annotate, identify, segment_background
 from .planner import plan
 from .templates import build_templates, load_instruments
 
@@ -42,13 +42,15 @@ class BackgroundSegmenter:
 
 
 class YoloSegmenter:
-    def __init__(self, weights: str | Path, conf: float = 0.35) -> None:
+    # imgsz 960 on the real 1920x1080 wrist camera: at the trained 640 the scalpels were missed; 960 found all four
+    # printed tools on the first real scan frame (0.73-0.90) with nothing else on the mat.
+    def __init__(self, weights: str | Path, conf: float = 0.35, imgsz: int = 960) -> None:
         from ultralytics import YOLO
 
-        self.model, self.conf = YOLO(str(weights)), conf
+        self.model, self.conf, self.imgsz = YOLO(str(weights)), conf, imgsz
 
     def __call__(self, bgr: np.ndarray, gripper_mask: np.ndarray | None) -> list[tuple[np.ndarray, str | None, float]]:
-        r = self.model.predict(bgr, conf=self.conf, retina_masks=True, verbose=False)[0]
+        r = self.model.predict(bgr, conf=self.conf, imgsz=self.imgsz, retina_masks=True, verbose=False)[0]
         if r.masks is None:
             return []
         out = []
@@ -66,8 +68,9 @@ class YoloSegmenter:
 class VisionService:
     def __init__(self, frame_source: Callable[[], np.ndarray], H: np.ndarray, gripper_mask: np.ndarray,
                  segmenter, staging: list[tuple[float, float]], log_dir: Path | None = None,
-                 staging_yaw_deg: float = 0.0) -> None:
+                 staging_yaw_deg: float = 0.0, region: np.ndarray | None = None) -> None:
         self.frame_source, self.H, self.gripper_mask, self.segmenter = frame_source, H, gripper_mask, segmenter
+        self.region = region          # work mat in pixels; detections mostly off it are ignored
         self.staging, self.staging_yaw_deg = staging, staging_yaw_deg
         self.used_staging: set[int] = set()
         self.log_dir = log_dir
@@ -78,6 +81,8 @@ class VisionService:
 
     def detect(self, bgr: np.ndarray, mask_gripper: bool = True) -> list[Detection]:
         segs = self.segmenter(bgr, self.gripper_mask if mask_gripper else None)
+        if self.region is not None:
+            segs = [s for s in segs if (s[0] & self.region).sum() >= 0.8 * s[0].sum()]
         return [identify(m, c, self.H, self.templates, self.instruments, seg_conf=p) for m, c, p in segs]
 
     def plan(self, target_id: str) -> dict:
@@ -176,6 +181,11 @@ def make_server(svc: VisionService, host: str, port: int) -> ThreadingHTTPServer
     return httpd
 
 
+def region_mask(poly_mm, H: np.ndarray, shape) -> np.ndarray:
+    """Table polygon (mm, e.g. the work mat's corners) -> pixel mask through the inverse homography."""
+    return _gripper_mask(_apply(np.linalg.inv(H), np.asarray(poly_mm, float)), shape)
+
+
 def _gripper_mask(poly, shape) -> np.ndarray:
     m = np.zeros(shape, np.uint8)
     cv2.fillPoly(m, [np.array(poly, np.int32)], 1)
@@ -213,7 +223,8 @@ def main(argv=None) -> None:
                        shape)
     seg = YoloSegmenter(args.weights) if args.weights else BackgroundSegmenter()
     svc = VisionService(source, H, gm, seg, staging, log_dir=Path(__file__).resolve().parents[1] / "logs",
-                        staging_yaw_deg=float(pick.get("staging_yaw_deg", 0.0)))
+                        staging_yaw_deg=float(pick.get("staging_yaw_deg", 0.0)),
+                        region=region_mask(cam["mat_mm"], H, shape) if cam.get("mat_mm") else None)
     httpd = make_server(svc, args.host, args.port)
     print(f"scrub_vision listening on http://{args.host}:{args.port} ({'YOLO' if args.weights else 'background-difference fallback'})",
           flush=True)

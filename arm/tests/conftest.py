@@ -19,9 +19,11 @@ def config_dir(tmp_path):
     shutil.copy(DEFAULT_TRAY_PATH, d)
     # Tests assume the placeholder gripper, not whatever `gcal` measured on the real arm.
     text = (d / "arm.yaml").read_text()
-    for key, val in {"open_deg": "0.0", "closed_deg": "-60.0", "calibrated": "false"}.items():
+    # Likewise the tray-slot mode and placeholder poses, not the arm's taught ik setup.
+    for key, val in {"open_deg": "0.0", "closed_deg": "-60.0", "calibrated": "false", "mode": "slots"}.items():
         text = re.sub(rf"^(\s*{key}:\s*)\S+", rf"\g<1>{val}", text, flags=re.M)
     (d / "arm.yaml").write_text(text)
+    (d / "poses.yaml").write_text((d / "poses.yaml").read_text().replace("taught: true", "taught: false"))
     return d
 
 

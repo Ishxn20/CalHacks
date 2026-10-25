@@ -5,7 +5,7 @@ def test_pick_cfg_defaults(config_dir):
     cfg = load_arm_config(config_dir / "arm.yaml")
     p = cfg.pick
     assert p.mode == "slots"
-    assert abs(p.hover - 0.08) < 1e-9
+    assert abs(p.hover - 0.10) < 1e-9     # 10 cm: the visual centring starts there
     assert abs(p.descend_step - 0.003) < 1e-9
     assert p.contact_joints == ["joint2", "joint3"]
     assert p.max_declutter_moves == 6

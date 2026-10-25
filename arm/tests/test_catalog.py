@@ -99,3 +99,13 @@ def test_resolve_without_slot_keeps_orientation(tray):
 def test_category_request_in_ik_mode_asks_which(tray):
     with pytest.raises(ResolveError, match="which"):
         Catalog(tray, require_slot=False).resolve("scissors")
+
+
+
+def test_ik_mode_generic_scalpel_resolves_to_a_scalpel(tray):
+    """All scalpel blades are interchangeable (user decision): 'scalpel' needs no blade number; the planner
+    accepts any scalpel it sees. Other categories still ask which one."""
+    cat = Catalog(tray, require_slot=False)
+    assert cat.resolve("scalpel").instrument.id.startswith("scalpel_")
+    with pytest.raises(ResolveError, match="which forceps"):
+        cat.resolve("forceps")

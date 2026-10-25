@@ -50,11 +50,12 @@ def _contact_after(ik_app, n_moves):
     real = ik_app.driver.move_to
     calls = {"n": 0}
 
-    def move_to(q, speed=1.0, wait=True):
-        real(q, speed, wait)
+    def move_to(q, speed=1.0, wait=True, exact=False):
+        off = real(q, speed, wait, exact)
         calls["n"] += 1
         if calls["n"] == n_moves:
             ik_app.driver.bus.external_offset[1] = math.radians(3.0)
+        return off
 
     ik_app.driver.move_to = move_to
 
@@ -103,3 +104,131 @@ def test_grasp_keeps_tip_direction(ik_app):
         _, R = a.kin.fk(q)
         jaw = R @ a.kin.jaw_axis_local
         assert np.dot(jaw[:2], [np.cos(np.radians(yaw)), np.sin(np.radians(yaw))]) > 0.999
+
+
+def test_pick_at_descends_where_refine_aligned(ik_app):
+    """pick.reach rl: after the IK hover, a refine hook (the camera-guided policy) may correct the target;
+    the contact descent then goes straight down at the corrected point."""
+    calls = []
+    ik_app.assistant.refine = lambda x, y, yaw, th: calls.append((x, y, yaw, th)) or (310.0, 5.0, 10.0)
+    ik_app.assistant._pick_at(300, 0, 0, 4.0)
+    assert calls == [(300, 0, 0, 4.0)]
+    assert ik_app.assistant._picked_from == (310.0, 5.0, 10.0, 4.0)
+    p, _ = ik_app.assistant.kin.fk(ik_app.driver.q_command())
+    assert abs(p[0] * 1000 - 310) < 2 and abs(p[1] * 1000 - 5) < 2
+
+
+def test_descent_lands_where_ik_aimed_despite_sag(ik_app):
+    a, d = ik_app.assistant, ik_app.driver
+    d.bus.sag[1:3] = np.radians([4.0, -2.0])
+    z_floor = ik_app.cfg.pick.table_z + 0.004
+    d.move_to(a._solve(300, 0, ik_app.cfg.pick.table_z + ik_app.cfg.pick.hover, 0))
+    a._descend_until_contact(300, 0, 0, z_floor)
+    p, _ = a.kin.fk(d.q_measured())
+    assert abs(p[0] * 1000 - 300) < 2 and abs(p[1] * 1000) < 2 and abs(p[2] - z_floor) < 0.002
+
+
+def test_place_puts_down_at_the_planned_height_despite_sag(ik_app):
+    a, d = ik_app.assistant, ik_app.driver
+    d.bus.sag[1:3] = np.radians([4.0, -2.0])
+    seen = []
+    orig = d.gripper_open
+    d.gripper_open = lambda *aa, **kw: seen.append(a.kin.fk(d.q_measured())[0].copy()) or orig(*aa, **kw)
+    a._place_at(300, 0, 0, 4.0)
+    z_place = ik_app.cfg.pick.table_z + 0.002 + 0.005
+    assert seen and abs(seen[0][2] - z_place) < 0.002 and abs(seen[0][0] * 1000 - 300) < 2
+
+
+def test_move_line_goes_straight_in_x_only(ik_app):
+    """'Move X by 10': y, z and the gripper's orientation stay put the whole way (joint-space moves between IK
+    poses dipped and swung the gripper on the real arm), and it's one smooth motion, not a stop every 2 mm."""
+    import threading
+
+    a, d = ik_app.assistant, ik_app.driver
+    d.bus.sag[1:3] = np.radians([4.0, -2.0])
+    d.move_to(a._solve(320, 10, ik_app.cfg.pick.table_z + 0.10, 30), exact=True)
+    p0, R0 = a.kin.fk(d.q_measured())
+    seen, done = [], threading.Event()
+
+    def sample():                                       # where the gripper actually is during the move
+        while not done.is_set():
+            seen.append(a.kin.fk(d.q_measured())[0].copy())
+            done.wait(0.002)
+
+    calls = {"n": 0}
+    real = d.move_to
+
+    def count(*args, **kw):
+        calls["n"] += 1
+        return real(*args, **kw)
+
+    d.move_to = count
+    th = threading.Thread(target=sample)
+    th.start()
+    a.move_line(30, 0, 0)
+    done.set()
+    th.join()
+    d.move_to = real
+    pts = np.array(seen)
+    assert len(pts) > 20 and calls["n"] <= 2                   # one smooth path (+ the exact landing)
+    assert np.abs(pts[:, 1] - p0[1]).max() < 1e-3 and np.abs(pts[:, 2] - p0[2]).max() < 1e-3
+    p1, R1 = a.kin.fk(d.q_measured())
+    assert abs(p1[0] - p0[0] - 0.030) < 5e-4
+    assert np.degrees(np.arccos(np.clip((np.trace(R0.T @ R1) - 1) / 2, -1, 1))) < 1.0
+
+
+def test_move_line_turns_in_place(ik_app):
+    """Turning the jaws at the hover must not move the fingertips (rotation about the vertical through them)."""
+    a, d = ik_app.assistant, ik_app.driver
+    d.move_to(a._solve(320, 10, ik_app.cfg.pick.table_z + 0.10, 30), exact=True)
+    p0, R0 = a.kin.fk(d.q_measured())
+    a.move_line(0, 0, 0, dyaw_deg=20)
+    p1, R1 = a.kin.fk(d.q_measured())
+    assert np.linalg.norm(p1 - p0) < 1e-3
+    j0, j1 = R0 @ a.kin.jaw_axis_local, R1 @ a.kin.jaw_axis_local
+    turn = math.degrees(math.atan2(j1[1], j1[0]) - math.atan2(j0[1], j0[0]))
+    tilt0, tilt1 = (R0 @ a.kin.tool_axis_local)[2], (R1 @ a.kin.tool_axis_local)[2]
+    assert abs(turn - 20) < 1.0 and abs(tilt1 - tilt0) < 1e-3        # same tilt (straight down or the pick tilt)
+
+
+def test_descent_starts_where_the_staged_centring_finished(ik_app):
+    """refine may return the height it ended at (the 3 cm stage): the contact descent continues from there instead
+    of going back up to the hover; the lift afterwards is straight up."""
+    a, d, pk = ik_app.assistant, ik_app.driver, ik_app.cfg.pick
+    z3 = pk.table_z + 0.03
+
+    def refine(x, y, yaw, th):
+        d.move_to(a._solve(310, 5, z3, 10), exact=True)                    # centring left it here
+        return 310.0, 5.0, 10.0, z3
+
+    a.refine = refine
+    zs = []
+    real = d.move_to
+
+    def spy(q, speed=1.0, wait=True, exact=False):
+        off = real(q, speed, wait, exact)
+        zs.append(a.kin.fk(d.q_measured())[0].copy())
+        return off
+
+    d.move_to = spy
+    a._pick_at(300, 0, 0, 4.0)
+    d.move_to = real
+    pts = np.array(zs)
+    after = pts[int(np.argmin(np.abs(pts[:, 2] - z3))):]                  # from the 3 cm stage on
+    down = after[: int(np.argmin(after[:, 2])) + 1]
+    assert down[:, 2].max() < z3 + 0.002                                   # never climbed back to the hover
+    up = after[int(np.argmin(after[:, 2])):]
+    assert np.abs(up[:, :2] - up[0, :2]).max() < 1e-3                    # lifted straight up
+
+
+def test_tilted_pick_keeps_its_tilt_to_the_table(ik_app):
+    """pick.tilt_pose: hover and grab share the scan pose's tilt (the wrist camera looks straight down, so a vertical
+    descent barely moves the target in the image); where the tilt cannot reach both ends, straight down."""
+    a, k = ik_app.assistant, ik_app.assistant.kin
+    tz = (k.tilt_R @ k.tool_axis_local)[2]
+    for z in (0.10, 0.03, 0.003):
+        _, R = k.fk(a._solve(440, 0, ik_app.cfg.pick.table_z + z, 90))
+        assert abs((R @ k.tool_axis_local)[2] - tz) < 1e-3
+    assert a._tilt_for(440, 0, 90, 0.003, 0.10) and not a._tilt_for(200, 0, 90, 0.003, 0.10)
+    _, R = k.fk(a._solve(200, 0, ik_app.cfg.pick.table_z + 0.10, 90, tilt=False))   # where the tilt cannot reach
+    assert (R @ k.tool_axis_local)[2] < -0.999

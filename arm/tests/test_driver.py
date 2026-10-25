@@ -28,6 +28,15 @@ def test_rejects_targets_outside_joint_limits(app):
         app.driver.move_to(q)
 
 
+def test_limit_check_tolerates_encoder_noise_at_the_stop(app):
+    q = app.driver.q_command()
+    q[1] = math.radians(-0.1)  # real arm at rest on its zero stop
+    app.driver.check_limits(q)
+    q[1] = math.radians(-1.5)
+    with pytest.raises(ArmFault, match="joint2"):
+        app.driver.check_limits(q)
+
+
 def test_tracking_error_freezes_arm(app):
     d = app.driver
     time.sleep(0.55)  # past the post-enable grace window
@@ -80,3 +89,43 @@ def test_enable_holds_current_position(config_dir):
         assert np.allclose(bus.pos, start, atol=1e-6)
     finally:
         d.shutdown()
+
+
+def test_exact_move_cancels_gravity_sag(app):
+    """The real arm sat 4 deg low on joint 2 and 2 deg short on joint 3 (tip 3 cm below its IK target)."""
+    d = app.driver
+    d.bus.sag[1:3] = np.radians([4.0, -2.0])
+    q = d.q_command()
+    q[1] += math.radians(10)
+    d.move_to(q)                                                        # taught-pose replay: sags, as taught
+    assert abs(math.degrees(d.q_measured()[1] - q[1]) - 4.0) < 0.5
+    off = d.move_to(q, exact=True)
+    assert np.degrees(np.abs(d.q_measured() - q)).max() < 0.3
+    assert np.allclose(np.degrees(off[1:3]), [-4.0, 2.0], atol=0.3)
+
+
+def test_exact_move_does_not_dip_by_the_sag_first(app):
+    """After one sag correction, the next exact move must not first sag the full amount and climb back (on the real
+    arm: a ~3 cm drop toward the table on arriving at the hover)."""
+    import threading
+
+    d = app.driver
+    d.bus.sag[1] = math.radians(4.0)
+    q = d.q_command()
+    q[1] += math.radians(10)
+    d.move_to(q, exact=True)                          # learns the sag
+    q2 = q.copy()
+    q2[1] += math.radians(5)
+    seen, done = [], threading.Event()
+
+    def sample():
+        while not done.is_set():
+            seen.append(d.q_measured()[1])
+            done.wait(0.002)
+
+    th = threading.Thread(target=sample)
+    th.start()
+    d.move_to(q2, exact=True)
+    done.set()
+    th.join()
+    assert max(seen) < q2[1] + math.radians(1.0)      # never ran 4 deg past the target before correcting

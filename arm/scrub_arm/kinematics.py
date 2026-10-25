@@ -28,6 +28,16 @@ class Kinematics:
         fl = self.model.getFrameId("gripper_left")
         d = self._fk_full(qb, fl)[0] - self._fk_full(qa, fl)[0]
         self.jaw_axis_local = Rt.T @ d / np.linalg.norm(d)
+        self.tilt_R, self.tilt_yaw = None, 0.0     # set_pick_tilt: picks copy a taught pose's tilt
+
+    def set_pick_tilt(self, q: np.ndarray) -> None:
+        """Grasp poses copy this pose's tilt instead of pointing straight down, turned about the vertical to the
+        requested jaw yaw, all the way down to the grab. The scan pose tilts the gripper 45 deg so the wrist camera
+        looks straight down: a vertical descent then barely moves the target in the image (measured: within ~40 px
+        from 10 cm to 3 cm), and it reaches ~100 mm further than straight down (the real mat sits at x 380-640 mm)."""
+        _, R = self.fk(np.asarray(q, float))
+        jaw = R @ self.jaw_axis_local
+        self.tilt_R, self.tilt_yaw = R, float(np.arctan2(jaw[1], jaw[0]))
 
     # ── FK ────────────────────────────────────────────────────────────────
     def _pad(self, q: np.ndarray) -> np.ndarray:
@@ -49,8 +59,12 @@ class Kinematics:
         return self._fk_frame(np.asarray(q, dtype=float), self.fid)
 
     # ── IK ────────────────────────────────────────────────────────────────
-    def _target_rotation(self, yaw: float) -> np.ndarray:
-        """World rotation that maps tool_axis_local -> -z and jaw_axis_local -> (cos yaw, sin yaw, 0)."""
+    def _target_rotation(self, yaw: float, tilt: bool = True) -> np.ndarray:
+        """World rotation that maps tool_axis_local -> -z and jaw_axis_local -> (cos yaw, sin yaw, 0); with a pick
+        tilt, that pose's rotation turned about the vertical so its jaw axis lies along yaw."""
+        if tilt and self.tilt_R is not None:
+            c, s = np.cos(yaw - self.tilt_yaw), np.sin(yaw - self.tilt_yaw)
+            return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]) @ self.tilt_R
         t, j = self.tool_axis_local, self.jaw_axis_local
         j = j - np.dot(j, t) * t
         j /= np.linalg.norm(j)
@@ -83,9 +97,18 @@ class Kinematics:
             return None
         return q[:N_ARM].copy()
 
+    def ik_pose(self, p: np.ndarray, R: np.ndarray, q_seed: np.ndarray,
+                limits: tuple[np.ndarray, np.ndarray]) -> np.ndarray | None:
+        """Joints placing the tool at position p (m) with rotation R, solved from q_seed only (no restarts), so
+        consecutive small steps stay on one continuous solution (straight-line moves)."""
+        return self._solve(self.pin.SE3(np.asarray(R, float), np.asarray(p, float)), np.asarray(q_seed, float), limits)
+
     def ik_topdown(self, x: float, y: float, z: float, yaw: float, q_seed: np.ndarray,
-                   limits: tuple[np.ndarray, np.ndarray], allow_flip: bool = True) -> np.ndarray | None:
-        """Joint vector placing the tool at (x, y, z) m pointing straight down, jaws along `yaw`; None if unreachable.
+                   limits: tuple[np.ndarray, np.ndarray], allow_flip: bool = True,
+                   tilt: bool | None = None) -> np.ndarray | None:
+        """Joint vector placing the tool at (x, y, z) m pointing straight down (or with the pick tilt, see
+        set_pick_tilt), jaws along `yaw`; None if unreachable. tilt: None = the pick tilt where it reaches, else
+        straight down; True / False = only that.
 
         allow_flip: a two-finger pinch is symmetric, so yaw + pi grips equally well. Pass False when the
         instrument's tip must end up on a known side of the gripper (the requested instrument: it is presented
@@ -96,10 +119,14 @@ class Kinematics:
         base = np.arctan2(y, x)
         seeds = [q_seed] + [np.array([base, np.radians(60), np.radians(70), 0.0, np.radians(50), w])
                             for w in (0.0, np.pi / 2, -np.pi / 2, 0.9 * np.pi, -0.9 * np.pi)]
-        targets = [self.pin.SE3(self._target_rotation(yy), np.array([x, y, z], dtype=float))
-                   for yy in ((yaw, yaw + np.pi) if allow_flip else (yaw,))]
-        for group in (seeds[:1], seeds[1:]):       # restarts only if the direct solve fails both ways
-            sols = [q for t in targets for s in group if (q := self._solve(t, s, limits)) is not None]
-            if sols:
-                return min(sols, key=lambda q: np.linalg.norm(q - q_seed))
+        # The pick tilt first; straight down where the tilt can't reach (near the base: the tilted wrist needs room)
+        if self.tilt_R is None:
+            tilt = False
+        for tl in ((True, False) if tilt is None else (tilt,)):
+            targets = [self.pin.SE3(self._target_rotation(yy, tl), np.array([x, y, z], dtype=float))
+                       for yy in ((yaw, yaw + np.pi) if allow_flip else (yaw,))]
+            for group in (seeds[:1], seeds[1:]):       # restarts only if the direct solve fails both ways
+                sols = [q for t in targets for s in group if (q := self._solve(t, s, limits)) is not None]
+                if sols:
+                    return min(sols, key=lambda q: np.linalg.norm(q - q_seed))
         return None

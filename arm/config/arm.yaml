@@ -31,8 +31,8 @@ gripper:
   model: rs-00
   # Motor angles (deg) for fully open / fully closed with nothing in the jaws.
   # PLACEHOLDERS: measure with `teach` -> `gcal open` / `gcal closed`.
-  open_deg: 259.42
-  closed_deg: -0.20
+  open_deg: 179.81
+  closed_deg: -79.52
   calibrated: true
   move_kp: 20.0          # stiffness while opening / free moves
   move_kd: 1.0
@@ -74,10 +74,10 @@ verify:
   fail_open: true              # if the CV service is unreachable, proceed (demo resilience)
 
 pick:
-  mode: slots            # slots (taught tray poses) | ik (camera-located, inverse kinematics)
+  mode: ik               # slots (taught tray poses) | ik (camera-located, inverse kinematics)
   perception_url: http://127.0.0.1:8770
   table_z_mm: 0.0        # table height in the base frame, from touch calibration
-  hover_mm: 80.0         # height above table_z for the approach/retreat waypoint
+  hover_mm: 100.0        # height above table_z for the approach/retreat waypoint (10 cm: the visual centring starts here)
   descend_step_mm: 3.0   # contact-sensing descent step
   contact_deviation_deg: 1.5   # joint lag beyond baseline that counts as touching the pile
   contact_joints: [joint2, joint3]
@@ -88,6 +88,9 @@ pick:
   # cross-clamp doesn't touch its neighbour.
   staging_mm: [[250, -130], [250, -215], [170, -300], [250, 130], [250, 215], [170, 300]]
   staging_yaw_deg: 90.0
+  # Grasp with the scan pose's 45 deg tilt (wrist camera looking straight down) instead of pointing straight down:
+  # reaches ~100 mm further and the target stays at ~one pixel on the way down. Remove for straight-down grasps.
+  tilt_pose: scan
 
 server:
   host: 127.0.0.1

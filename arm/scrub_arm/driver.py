@@ -10,6 +10,7 @@ joints start and stop together, so paths are smooth and repeatable.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -47,6 +48,32 @@ class MinJerk:
         return self.q0 + s * dq, ds * dq, False
 
 
+@dataclass
+class Polyline:
+    """A smooth (min-jerk timed) pass through joint waypoints, e.g. a straight Cartesian line solved every 2 mm:
+    one motion, no stop at each waypoint."""
+    qs: np.ndarray            # (n, joints), starting at the current setpoint
+    t0: float
+    duration: float
+
+    def __post_init__(self) -> None:
+        seg = np.linalg.norm(np.diff(self.qs, axis=0), axis=1)
+        self._cum = np.r_[0.0, np.cumsum(seg)] / max(seg.sum(), 1e-12)
+        self.q1 = self.qs[-1].copy()
+
+    def sample(self, t: float) -> tuple[np.ndarray, np.ndarray, bool]:
+        tau = (t - self.t0) / self.duration
+        if tau >= 1.0:
+            return self.q1.copy(), np.zeros_like(self.q1), True
+        tau = max(tau, 0.0)
+        s = 10 * tau**3 - 15 * tau**4 + 6 * tau**5
+        ds = (30 * tau**2 - 60 * tau**3 + 30 * tau**4) / self.duration
+        i = int(np.clip(np.searchsorted(self._cum, s, side="right") - 1, 0, len(self.qs) - 2))
+        w = (s - self._cum[i]) / max(self._cum[i + 1] - self._cum[i], 1e-12)
+        dq = (self.qs[i + 1] - self.qs[i]) / max(self._cum[i + 1] - self._cum[i], 1e-12)
+        return self.qs[i] + w * (self.qs[i + 1] - self.qs[i]), ds * dq, False
+
+
 def min_jerk_duration(dq: np.ndarray, vmax: np.ndarray, min_s: float) -> float:
     # Peak velocity of a min-jerk profile is 1.875 * distance / duration.
     return max(float(np.max(1.875 * np.abs(dq) / vmax)), min_s)
@@ -69,6 +96,7 @@ class ArmDriver:
         self._enabled = False
         self._traj: MinJerk | None = None
         self._q_cmd = np.zeros(n)
+        self._sag_off = np.zeros(n)                # last gravity-sag setpoint offset (see move_to exact=True)
         self._qd_cmd = np.zeros(n)
         self._g_cmd = (cfg.gripper.open, cfg.gripper.move_kp, cfg.gripper.move_kd)
         self._pos = np.full(n + 1, np.nan)
@@ -265,7 +293,8 @@ class ArmDriver:
             raise ArmFault("motors are not enabled")
 
     def check_limits(self, q: np.ndarray) -> None:
-        eps = 1e-6
+        # Encoder noise: at rest on its zero stop joint2 reads -0.1 deg, which a strict check rejects.
+        eps = np.radians(1.0)
         bad = [
             f"{j.name}={np.degrees(v):.1f} (limits {np.degrees(j.lower):.0f}..{np.degrees(j.upper):.0f})"
             for j, v in zip(self.cfg.joints, q)
@@ -274,8 +303,51 @@ class ArmDriver:
         if bad:
             raise ArmFault("target outside joint limits: " + ", ".join(bad))
 
-    def move_to(self, q: np.ndarray, speed: float = 1.0, wait: bool = True) -> None:
+    def move_to(self, q: np.ndarray, speed: float = 1.0, wait: bool = True, exact: bool = False) -> np.ndarray:
+        """Move to joint setpoint q. exact=True: then nudge the setpoint until the encoders read q (cancels gravity
+        sag; for computed targets like IK poses, not taught poses, which replay their taught sag). Returns the
+        setpoint offset that took (zeros unless exact)."""
         q = np.asarray(q, dtype=float)
+        if not exact:
+            return self._move(q, speed, wait)
+        # Start from the last sag correction, not none: commanding q bare made the real arm sag ~3 cm (dropping
+        # toward the table at the hover) before the correction lifted it back. Before any correction, use the sag
+        # the arm shows where it is now (e.g. at the scan pose): similar, and far better than nothing.
+        if not self._sag_off.any():
+            now = self.q_command() - self.q_measured()
+            self._sag_off = np.clip(np.where(np.isnan(now), 0.0, now), -math.radians(10), math.radians(10))
+        self._move(q + self._sag_off, speed, wait)
+        return self._correct_sag(q, self._sag_off)
+
+    def move_through(self, qs, speed: float = 1.0, wait: bool = True) -> None:
+        """One smooth motion through joint waypoints qs (from the current setpoint), each checked against limits."""
+        qs = np.asarray(qs, dtype=float)
+        self._check_ready()
+        for q in qs:
+            self.check_limits(q)
+        m = self.cfg.motion
+        with self._lock:
+            path = np.vstack([self._q_cmd, qs])
+            vmax = self.cfg.max_vel * m.speed_scale * speed
+            T = min_jerk_duration(np.abs(np.diff(path, axis=0)).sum(axis=0), vmax, m.min_move_s)
+            self._traj = Polyline(qs=path, t0=time.perf_counter(), duration=T)
+        if wait:
+            self.wait_motion()
+
+    def _correct_sag(self, q: np.ndarray, off: np.ndarray, tol_deg: float = 0.3, max_deg: float = 10.0,
+                     rounds: int = 4) -> np.ndarray:
+        off = np.asarray(off, float).copy()
+        for _ in range(rounds):
+            err = q - self.q_measured()
+            err = np.where(np.isnan(err), 0.0, err)
+            if np.degrees(np.abs(err)).max() < tol_deg:
+                break
+            off = np.clip(off + err, -math.radians(max_deg), math.radians(max_deg))
+            self._move(q + off, speed=0.3, wait=True)
+        self._sag_off = off                      # sag changes slowly with pose: the next exact move starts here
+        return off
+
+    def _move(self, q: np.ndarray, speed: float, wait: bool) -> np.ndarray:
         self._check_ready()
         self.check_limits(q)
         m = self.cfg.motion
@@ -286,6 +358,7 @@ class ArmDriver:
             self._traj = MinJerk(q0=q0, q1=q.copy(), t0=time.perf_counter(), duration=T)
         if wait:
             self.wait_motion()
+        return np.zeros(len(q))
 
     def wait_motion(self) -> None:
         while True:

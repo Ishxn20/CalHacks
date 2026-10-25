@@ -15,3 +15,4 @@ sim/*.mp4
 sim/declutter_eval*.json
 sim/*.log
 perception/*.log
+hw_check/
