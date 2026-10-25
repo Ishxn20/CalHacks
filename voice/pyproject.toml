@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Speech to instrument code for the robotic scrub assistant"
 requires-python = ">=3.10"
 # scrub-arm is only needed for the shared config/tray.yaml vocabulary + Catalog; install it from ../arm.
-dependencies = ["scrub-arm", "faster-whisper", "sounddevice"]
+# Speech-to-text is Cartesia Ink (cloud); sounddevice records the mic.
+dependencies = ["scrub-arm", "cartesia>=4.2", "sounddevice", "numpy"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

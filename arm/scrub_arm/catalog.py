@@ -153,8 +153,11 @@ class Catalog:
             return self._phrases[s]
         # Longest known phrase contained in the request ("give me the potts scissors please").
         contained = [p for p in self._phrases if re.search(rf"(?<![\w#]){re.escape(p)}(?![\w])", s)]
-        if contained:
-            best = max(contained, key=len)
+        # A named instrument beats a category word, whatever their lengths: in "rosano forceps" the alias
+        # "rosano" must win over the longer "forceps", or the arm fetches whichever forceps is on the tray.
+        named = [p for p in contained if not self._phrases[p].startswith("category:")]
+        if named or contained:
+            best = max(named or contained, key=len)
             return self._phrases[best]
         # Fuzzy, but never across different numbers: "11 blade" must not become "10 blade".
         want = _digits(s)

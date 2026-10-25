@@ -99,3 +99,11 @@ def test_resolve_without_slot_keeps_orientation(tray):
 def test_category_request_in_ik_mode_asks_which(tray):
     with pytest.raises(ResolveError, match="which"):
         Catalog(tray, require_slot=False).resolve("scissors")
+
+
+def test_a_named_instrument_beats_a_longer_category_word(catalog):
+    # "rosano" (how speech-to-text hears Resano) is shorter than "forceps"; it must still win, so the request
+    # is refused (no Resano on the demo tray) rather than quietly becoming the DeBakey forceps.
+    with pytest.raises(ResolveError, match="Resano"):
+        catalog.resolve("Rosano Forceps.")
+    assert catalog.resolve("forceps").instrument.id == "forceps_debakey"     # a bare category still works

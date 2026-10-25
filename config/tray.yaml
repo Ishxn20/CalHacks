@@ -20,7 +20,7 @@ instruments:
   forceps_debakey:           {name: DeBakey forceps, category: forceps,
                               aliases: [debakey, de bakey, debakeys, pickups]}
   forceps_resano:            {name: Resano forceps, category: forceps,
-                              aliases: [resano, heavy forceps]}
+                              aliases: [resano, rosano, heavy forceps]}   # "rosano": how Cartesia Ink hears it
   forceps_fine_vascular:     {name: Fine vascular forceps, category: forceps,
                               aliases: [fine forceps, vascular forceps, fine pickups]}
   scalpel_10:                {name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
