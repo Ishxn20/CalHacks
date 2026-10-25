@@ -8,38 +8,38 @@
 # (from poses.yaml) the gripper passes through from a safe hover to the grasp.
 # Retreat runs the same list in reverse.
 
-# jaw_mm: [open, close] jaw gap (mm) for camera picks of our 8 printed parts. From the width under the jaws at the
-# grab point, measured on 400+ real wrist-camera views (perception/scrub_vision/red_parts.py, grip_w): scalpels
-# #10 12.9 / #20 15.2 / long #11 13.5, forceps 9.4, micro scissors 9.6 (on its side) - 10.7 (flat), needle holders
-# 21 (both shanks). open = width + 2 x 10 mm (aim error ~2 mm + yaw error + room), so the open jaws come down
-# without sweeping into the neighbours; close = width - 12 mm (>= 0): the soft squeeze then pushes with about the
-# same force on every tool (torque ~ grip_kp x the gap still left to the close target).
+# jaw_open_mm: jaw gap (mm) to come down and let go with, for camera picks of our 8 printed parts: the width under
+# the jaws at the grab point, measured on 400+ real wrist-camera views (perception/scrub_vision/red_parts.py, grip_w),
+# + 2 x 10 mm (aim error ~2 mm + yaw error + room), so the open jaws come down without sweeping into the neighbours:
+# scalpels #10 12.9 / #20 15.2 / long #11 13.5, forceps 9.4, micro scissors 9.6 (on its side) - 10.7 (flat), needle
+# holders 21 (both shanks). Closing: the jaws close until they stall on the tool, then squeeze gripper.squeeze_mm
+# further (arm.yaml).
 instruments:
   needle_holder_castroviejo: {name: Castroviejo needle holder, category: needle_holder, orientable: true,
                               aliases: [castroviejo, castro, fine needle holder]}
-  needle_holder_ryder:       {jaw_mm: [41, 9], name: Ryder needle holder, category: needle_holder, orientable: true,
+  needle_holder_ryder:       {jaw_open_mm: 41, name: Ryder needle holder, category: needle_holder, orientable: true,
                               aliases: [ryder, rider]}
   needle_holder_long:        {name: Long needle holder, category: needle_holder, orientable: true,
                               aliases: [long needle holder, long driver]}
-  needle_holder_short:       {jaw_mm: [41, 9], name: Short needle holder, category: needle_holder, orientable: true,
+  needle_holder_short:       {jaw_open_mm: 41, name: Short needle holder, category: needle_holder, orientable: true,
                               aliases: [short needle holder, short driver]}
   forceps_debakey:           {name: DeBakey forceps, category: forceps,
                               aliases: [debakey, de bakey, debakeys, pickups]}
   forceps_resano:            {name: Resano forceps, category: forceps,
                               aliases: [resano, heavy forceps]}
-  forceps_fine_vascular:     {jaw_mm: [30, 0], name: Fine vascular forceps, category: forceps,
+  forceps_fine_vascular:     {jaw_open_mm: 30, name: Fine vascular forceps, category: forceps,
                               aliases: [fine forceps, vascular forceps, fine pickups, tweezers, tweezer]}
-  scalpel_10:                {jaw_mm: [33, 1], name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
+  scalpel_10:                {jaw_open_mm: 33, name: "#10 scalpel", category: scalpel, aliases: [10 blade, number 10, "#10", ten blade]}
   scalpel_11:                {name: "#11 scalpel", category: scalpel, aliases: [11 blade, number 11, "#11", eleven blade]}
   scalpel_15:                {name: "#15 scalpel", category: scalpel, aliases: [15 blade, number 15, "#15", fifteen blade]}
-  scalpel_20:                {jaw_mm: [35, 3], name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
-  scalpel_11_long:           {jaw_mm: [34, 2], name: "Long #11 scalpel", category: scalpel,
+  scalpel_20:                {jaw_open_mm: 35, name: "#20 scalpel", category: scalpel, aliases: [20 blade, number 20, "#20", twenty blade]}
+  scalpel_11_long:           {jaw_open_mm: 34, name: "Long #11 scalpel", category: scalpel,
                               aliases: [long scalpel, long 11 blade, long eleven blade, long blade, "#3l", 3l handle]}
   scissors_potts:            {name: Potts scissors, category: scissors, orientable: true,
                               aliases: [potts, pots, pott scissors]}
-  scissors_micro_forward:    {jaw_mm: [31, 0], name: Forward micro scissors, category: scissors, orientable: true,
+  scissors_micro_forward:    {jaw_open_mm: 31, name: Forward micro scissors, category: scissors, orientable: true,
                               aliases: [micro scissors, micros, forward micro scissors, forward facing micro scissors, forward scissors]}
-  scissors_micro_back:       {jaw_mm: [31, 0], name: Back-facing micro scissors, category: scissors, orientable: true,
+  scissors_micro_back:       {jaw_open_mm: 31, name: Back-facing micro scissors, category: scissors, orientable: true,
                               aliases: [back micro scissors, back facing micro scissors, backward micro scissors, back scissors]}
   clamp_aortic_cross:        {name: Aortic cross-clamp, category: clamp,
                               aliases: [cross clamp, crossclamp, aortic clamp, cross-clamp]}

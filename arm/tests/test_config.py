@@ -21,5 +21,4 @@ def test_gripper_width_table_and_tool_jaws(config_dir):
         assert abs(math.degrees(g.angle_for(30) - g.angle_for(10)) - 20 / 0.33) < 8
     tray = load_tray_config(None)
     for iid in ("scalpel_10", "needle_holder_ryder", "forceps_fine_vascular", "scissors_micro_back"):
-        o, c = tray.instruments[iid].jaw_mm
-        assert 0 <= c < o <= 82
+        assert 20 <= tray.instruments[iid].jaw_open_mm <= 82

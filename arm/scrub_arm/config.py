@@ -51,6 +51,12 @@ class GripperCfg:
     settle_s: float
     holding_min_gap: float  # rad
     width_table: list[tuple[float, float]] = field(default_factory=list)   # (motor rad, jaw gap mm), rising
+    squeeze_mm: float = 0.0        # after the jaws stall on a tool, close this much further (pressure)
+    squeeze_kp: float = 0.0        # stiffness for that squeeze (0: grip_kp)
+
+    def width_at(self, rad: float) -> float:
+        rad_, mm = zip(*self.width_table)
+        return float(np.interp(rad, rad_, mm))
 
     def angle_for(self, width_mm: float) -> float:
         """Motor angle that opens the jaws to width_mm (measured table; without one, open)."""
@@ -105,6 +111,7 @@ class PickCfg:
     contact_deviation: float       # rad
     contact_joints: list[str]
     tilt_pose: str | None = None   # grasp with this taught pose's gripper tilt (Kinematics.set_pick_tilt)
+    tilt_tip_drop: float = 0.0     # m: with the pick tilt, the fingers' lowest corner sits this far below the tool point
 
 
 @dataclass
@@ -153,7 +160,7 @@ class Instrument:
     category: str
     orientable: bool
     aliases: list[str]
-    jaw_mm: tuple[float, float] | None = None   # (open, close) jaw gap for this tool: approach / squeeze target
+    jaw_open_mm: float | None = None   # jaw gap to come down / let go with for this tool (None: fully open)
 
 
 @dataclass
@@ -245,6 +252,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
         width_table=[(_rad(a), float(w)) for a, w in g.get("width_mm_at_deg", [])],
+        squeeze_mm=float(g.get("squeeze_mm", 0.0)), squeeze_kp=float(g.get("squeeze_kp", 0.0)),
     )
 
     m = d["motion"]
@@ -283,6 +291,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         contact_deviation=_rad(pk.get("contact_deviation_deg", 1.5)),
         contact_joints=[str(j) for j in pk.get("contact_joints", ["joint2", "joint3"])],
         tilt_pose=pk.get("tilt_pose") or None,
+        tilt_tip_drop=float(pk.get("tilt_tip_drop_mm", 0.0)) / 1000.0,
     )
 
     s = d.get("server", {}) or {}
@@ -331,7 +340,7 @@ def load_tray_config(path: Path | str | None = None) -> TrayConfig:
         iid: Instrument(
             id=iid, name=str(v.get("name", iid)), category=str(v.get("category", iid)),
             orientable=bool(v.get("orientable", False)), aliases=[str(a) for a in v.get("aliases", [])],
-            jaw_mm=tuple(float(x) for x in v["jaw_mm"]) if v.get("jaw_mm") else None,
+            jaw_open_mm=float(v["jaw_open_mm"]) if v.get("jaw_open_mm") else None,
         )
         for iid, v in d["instruments"].items()
     }

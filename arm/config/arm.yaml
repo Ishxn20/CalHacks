@@ -40,9 +40,11 @@ gripper:
   grip_kd: 0.5
   settle_s: 0.6          # time to let the jaws close before checking the grasp
   # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
-  holding_min_gap_deg: 4.0
+  holding_min_gap_deg: 2.5   # the tapered tips stall only ~5 deg short of closed on a 13.5 mm scalpel
   # Jaw gap between the fingertips (mm) at each motor angle (deg), measured 2026-10-24 with the wrist camera at the
   # scan pose (hand-eye projection of the fingers, fully closed = 0). ~0.33 mm/deg; flattens at the open stop.
+  squeeze_mm: 3.0        # after the jaws stall on a tool, close this much further so it's held under pressure (user)
+  squeeze_kp: 20.0       # firm enough that 3 mm (~9 deg) presses (~3 N m); grip_kp 6 for the soft first close
   width_mm_at_deg: [[-79.6, 0.0], [-53.7, 8.2], [-27.1, 16.8], [-1.3, 25.2], [24.6, 34.0], [50.6, 42.8],
                     [76.4, 51.5], [102.2, 60.5], [128.1, 69.0], [154.1, 78.0], [179.6, 82.0]]
 
@@ -88,6 +90,9 @@ pick:
   # Grasp with the scan pose's 45 deg tilt (wrist camera looking straight down) instead of pointing straight down:
   # reaches ~100 mm further and the target stays at ~one pixel on the way down. Remove for straight-down grasps.
   tilt_pose: scan
+  # Tilted, the fingers' lowest corner is ~9 mm below the tool point (stepping the open jaws onto bare table stopped
+  # the tool point at 9.2 mm, 2026-10-24); the descent then ends ~2 mm high, so 7 puts the fingertips ~1 mm up.
+  tilt_tip_drop_mm: 7.0
 
 server:
   host: 127.0.0.1

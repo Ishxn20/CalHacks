@@ -32,10 +32,13 @@ def test_pick_at_sets_picked_from(ik_app):
     assert ik_app.assistant._picked_from == (300, 0, 0, 4.0)
 
 
-def test_pick_at_miss_raises(ik_app):
-    ik_app.driver.bus.object_in_jaws = False
-    with pytest.raises(TaskFailed):
-        ik_app.assistant._pick_at(300, 0, 0, 4.0)
+def test_jaws_never_reopen_after_lifting(ik_app):
+    """User: the jaws only reopen when setting a part down or on the doctor's tug. Reading 'closed all the way'
+    is no reason: the flexing fingers held a lifted scalpel at the fully-closed angle, and opening dropped it."""
+    d = ik_app.driver
+    d.bus.object_in_jaws = False
+    ik_app.assistant._pick_at(300, 0, 0, 4.0)
+    assert d._g_cmd[0] <= d.cfg.gripper.closed + 1e-9          # still squeezing
 
 
 def test_unreachable_does_not_move(ik_app):
@@ -142,7 +145,9 @@ def test_place_puts_down_at_the_planned_height_despite_sag(ik_app):
     orig = d.gripper_open
     d.gripper_open = lambda *aa, **kw: seen.append(a.kin.fk(d.q_measured())[0].copy()) or orig(*aa, **kw)
     a._place_at(300, 0, 0, 4.0)
-    z_place = ik_app.cfg.pick.table_z + 0.002 + 0.005
+    pk = ik_app.cfg.pick
+    tilted = a._tilt_for(300, 0, 0, pk.table_z, pk.table_z + pk.hover)
+    z_place = pk.table_z + (pk.tilt_tip_drop if tilted else 0.0) + 0.002 + 0.005
     assert seen and abs(seen[0][2] - z_place) < 0.002 and abs(seen[0][0] * 1000 - 300) < 2
 
 

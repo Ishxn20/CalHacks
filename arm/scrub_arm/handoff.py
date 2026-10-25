@@ -254,7 +254,7 @@ class ScrubAssistant:
                 # base (yaw 48 was unreachable at (445, 18), yaw -132 fine). A flipped requested instrument is
                 # presented with the wrist turned 180 deg (_flipped), still handle-first.
                 self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"),
-                              jaw_mm=r.instrument.jaw_mm)
+                              jaw_open_mm=r.instrument.jaw_open_mm)
             except TaskFailed:
                 if attempt:
                     raise
@@ -423,16 +423,19 @@ class ScrubAssistant:
         return z
 
     def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
-                 allow_flip: bool = True, fid: str | None = None, jaw_mm: tuple[float, float] | None = None) -> None:
+                 allow_flip: bool = True, fid: str | None = None, jaw_open_mm: float | None = None) -> None:
         """hover -> open -> centre (refine) -> jaws to the tool's open width -> straight down to grasp height ->
-        squeeze toward its close width -> straight up. TaskFailed on a miss (caller decides on retry).
-        jaw_mm: (open, close) for this tool (tray.yaml); None: fully open / fully closed.
+        close until the jaws stall on it, squeeze a few mm more -> straight up. TaskFailed on a miss (caller decides).
+        jaw_open_mm: this tool's open width (tray.yaml); None: fully open.
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         plan_yaw = yaw_deg
         z_hover = pk.table_z + pk.hover
-        z_grasp = pk.table_z + thickness_mm / 2000.0              # jaws close on the instrument's mid-height
-        yaw_deg, tilt = self._pick_side(x_mm, y_mm, yaw_deg, z_grasp, z_hover, allow_flip)
+        yaw_deg, tilt = self._pick_side(x_mm, y_mm, yaw_deg, pk.table_z, z_hover, allow_flip)
+        # the fingers' lowest corner just above the table (mid-height for thinner parts). Tilted, that corner is
+        # ~9 mm below the tool point: aiming the tool point at mid-height drove the fingers into the table, which
+        # shoved the arm ~10 mm sideways and missed or rolled the part (real arm, 2026-10-24)
+        z_grasp = pk.table_z + (pk.tilt_tip_drop if tilt else 0.0) + min(thickness_mm / 2000.0, 0.001)
         q_hover = self._solve(x_mm, y_mm, z_hover, yaw_deg, False, tilt)
         self.phase = Phase.PICKING
         d.move_to(q_hover, exact=True)            # an IK target: cancel gravity sag (the RL alignment starts here)
@@ -443,16 +446,18 @@ class ScrubAssistant:
         # Ready: one smooth straight-down move to grasp height from wherever it was centred -- no adjusting, no
         # steps, no contact checks on the way (user); then close and go straight back up.
         slow = self.cfg.motion.approach_speed_scale
-        if jaw_mm:          # centred with the jaws fully open (the aim pixels were measured so); narrow them now
-            d.gripper_width(jaw_mm[0])      # so they come down without sweeping into the neighbours
+        if jaw_open_mm:     # centred with the jaws fully open (the aim pixels were measured so); narrow them now
+            d.gripper_width(jaw_open_mm)    # so they come down without sweeping into the neighbours
         z_now = self.kin.fk(d.q_measured())[0][2]
         self.move_line(0, 0, (z_grasp - z_now) * 1000, speed=slow, exact=False)
-        got_it = d.gripper_grasp(jaw_mm[1] if jaw_mm else None)
+        got_it = d.gripper_grasp()
         # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
         self.move_line(0, 0, (z_hover - z_grasp) * 1000, speed=slow)
         if not got_it:
-            d.gripper_open()
-            raise TaskFailed(f"missed the grasp at ({x_mm:.0f}, {y_mm:.0f}) mm")
+            # Never open here (user): the jaws only reopen when a part has been lowered to be set down, or on the
+            # doctor's tug at the hand-off. The tapered fingers flex round a part, so "closed all the way" doesn't
+            # mean empty: a lifted scalpel read -79.8 deg (fully closed) and the old miss check dropped it.
+            self._log(f"jaws read closed at ({x_mm:.0f}, {y_mm:.0f}) mm; holding on anyway")
         self._picked_from = (x_mm, y_mm, yaw_deg, thickness_mm)
         _, R = self.kin.fk(d.q_measured())
         jaw = R @ self.kin.jaw_axis_local
@@ -464,8 +469,8 @@ class ScrubAssistant:
         instrument back onto the pile) instead of going down to just above the table."""
         pk, d = self.cfg.pick, self.driver
         slow = self.cfg.motion.approach_speed_scale
-        z_place = pk.table_z + thickness_mm / 2000.0 + 0.005
-        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, z_place, pk.table_z + pk.hover)
+        tilt = self._tilt_for(x_mm, y_mm, yaw_deg, pk.table_z, pk.table_z + pk.hover)
+        z_place = pk.table_z + (pk.tilt_tip_drop if tilt else 0.0) + thickness_mm / 2000.0 + 0.005
         q_hover = self._solve(x_mm, y_mm, pk.table_z + pk.hover, yaw_deg, tilt=tilt)
         q_down = self._solve(x_mm, y_mm, z_place, yaw_deg, tilt=tilt)       # both solved before any motion
         self.phase = Phase.RETURNING
@@ -539,9 +544,9 @@ class ScrubAssistant:
 
     def _let_go(self, wait_s: float = 0.4) -> None:
         """Open to the held tool's open width (just enough to let go: no wide swing into a hand or the pile)."""
-        jaw = self.holding.instrument.jaw_mm if self.holding else None
+        jaw = self.holding.instrument.jaw_open_mm if self.holding else None
         if jaw:
-            self.driver.gripper_width(jaw[0], wait_s=wait_s)
+            self.driver.gripper_width(jaw, wait_s=wait_s)
         else:
             self.driver.gripper_open(wait_s=wait_s)
         self.holding = None

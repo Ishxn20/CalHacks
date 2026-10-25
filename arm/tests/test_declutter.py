@@ -111,12 +111,13 @@ def test_malformed_plan_fails_cleanly(make_app):
     assert job["status"] == "failed" and "perception" in job["error"]
 
 
-def test_missed_grasp_replans_once(make_app):
+def test_jaws_reading_closed_still_counts_as_holding(make_app):
+    """No reopen-and-replan after lifting (user): the jaws can read closed while holding a part."""
     app, fake = make_app([GRASP])
     app.driver.bus.object_in_jaws = False
     job = run(app)
-    assert job["status"] == "failed"
-    assert fake.calls == 2
+    assert job["status"] == "done", job
+    assert fake.calls == 1
 
 
 def test_client_rejects_missing_action():

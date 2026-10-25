@@ -428,12 +428,12 @@ class ArmDriver:
         self.set_gripper(self.cfg.gripper.angle_for(width_mm))
         self.sleep(wait_s)
 
-    def gripper_grasp(self, close_mm: float | None = None) -> bool:
-        """Squeeze softly toward close_mm (a tool's close target; None: fully closed). Returns True if the jaws
-        stopped on an object."""
+    def gripper_grasp(self) -> bool:
+        """Close softly until the jaws stall on the tool (that's its measured size), then squeeze gripper.squeeze_mm
+        further with squeeze_kp so it's held under pressure. Returns True if the jaws stopped on an object."""
         self._check_gripper_calibrated()
         g = self.cfg.gripper
-        target = g.closed if close_mm is None else g.angle_for(close_mm)
+        target = g.closed
         self.set_gripper(target, g.grip_kp, g.grip_kd)
         self.sleep(g.settle_s)
         # Read the motor directly: a stale cached value would look like "stopped short" = holding.
@@ -443,7 +443,15 @@ class ArmDriver:
         if np.isnan(pos):
             log.warning("no gripper feedback; assuming grasp succeeded")
             return True
-        return abs(pos - target) >= g.holding_min_gap
+        holding = abs(pos - target) >= g.holding_min_gap
+        if g.squeeze_mm and g.width_table:
+            # Press on from wherever the jaws stalled, even at "closed": the tapered fingers flex round a part, so a
+            # held scalpel can read fully closed. The angle <-> mm table is from the open jaws' bodies; only its slope
+            # is used here (the tips meet on a 13.5 mm scalpel at -75 deg, where the table reads ~2 mm).
+            dq = g.squeeze_mm * (g.angle_for(20.0) - g.angle_for(10.0)) / 10.0      # rad
+            self.set_gripper(max(g.closed - dq, pos - dq), g.squeeze_kp or g.grip_kp, g.grip_kd)
+            self.sleep(0.3)
+        return holding
 
 
 def _deg_list(a: np.ndarray) -> list[float | None]:
