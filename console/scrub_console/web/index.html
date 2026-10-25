@@ -6,214 +6,245 @@
 <title>Scrub console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
 <style>
+/* White, black and one red. Red means "needs your attention": the live mic, instruments out of the count, faults. */
 :root {
-  --paper: #eef2f2; --sheet: #ffffff; --ink: #12262b; --ink-soft: #4a6168; --line: #cbd6d8; --line-soft: #dde5e6;
-  --drape: #0e4e57; --drape-deep: #0a363d; --drape-wash: #dcebec;
-  --ok: #2b8a66; --warn: #b87800; --warn-wash: #f6ebcf; --alert: #c03a2b; --alert-wash: #f6dcd8;
-  --sans: "Familjen Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --paper: #f7f7f7; --sheet: #ffffff; --ink: #161616; --graphite: #5b5b5b; --mute: #8c8c8c; --rule: #e1e1e1; --wash: #f0f0f0;
+  --accent: #c8102e; --accent-deep: #a00d25; --accent-wash: #f9e3e6;
+  --red: #c8102e; --red-wash: #f9e3e6;
+  --font: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* legacy names the scripts and older rules use */
+  --ink-soft: var(--graphite); --line: var(--rule); --line-soft: #ebebeb;
+  --ok: var(--accent); --warn: #b87800; --alert: var(--red); --alert-wash: var(--red-wash); --sans: var(--font);
+  --series-1: #161616; --series-2: #161616; --series-3: #161616; --series-4: #c8102e; --series-5: #c8102e; --series-6: #c8102e;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { background: var(--paper); }
-body { margin: 0; font: 15px/1.45 var(--sans); color: var(--ink); background: var(--paper); }
+body { margin: 0; font: 400 15px/1.5 var(--font); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; cursor: pointer; }
-:focus-visible { outline: 3px solid var(--drape); outline-offset: 2px; }
-.shell { max-width: 1320px; margin: 0 auto; padding: 0 24px 56px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell { max-width: 1280px; margin: 0 auto; padding: 0 28px 72px; }
+h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
 
-/* header */
-.top { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: end; justify-content: space-between; padding: 22px 0 18px; }
-.brand h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-.armline { margin: 2px 0 0; color: var(--ink-soft); min-height: 1.45em; }
-.armline b { color: var(--ink); font-weight: 500; }
-.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
-.env { padding: 4px 12px; border-radius: 99px; font-weight: 600; border: 1.5px solid var(--drape); color: var(--drape); }
-.env.sim { border-color: var(--warn); color: var(--warn); background: var(--warn-wash); }
-.env.real { background: var(--drape); color: #fff; }
-.caps { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--ink-soft); }
-.caps li::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--line); }
-.caps li.on { color: var(--ink); } .caps li.on::before { background: var(--ok); }
-.caps li.partial::before { background: var(--warn); }
+/* sticky bar: the name, what the robot just said, and the mic. Stays in view while you scroll. */
+.top { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 36px;
+  align-items: center; padding: 16px 0; background: var(--paper); border-bottom: 2px solid var(--ink); }
+.top h1 { margin: 0; font-size: 22px; font-weight: 800; font-stretch: 125%; letter-spacing: -0.02em; white-space: nowrap; }
+.hdrmic { display: flex; align-items: center; gap: 8px; font-weight: 650; color: var(--accent); }
+.hdrmic .dot { animation: pulse 1.6s ease-in-out infinite; }
+/* the listening panel, right under the two feeds */
+.listening { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px 48px; align-items: center;
+  margin-top: 24px; padding: 28px 32px; background: var(--sheet); border: 1px solid var(--rule); border-left: 6px solid var(--accent); border-radius: 10px; }
+.listening .voice { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.listening .voice .note { margin: 0; }
+.listening .btn.big { padding: 16px 28px; font-size: 18px; }
+.listening .mic { font-size: 17px; }
+.talk { min-width: 0; }
+.talk p { margin: 0; }
+.talk .heard { color: var(--graphite); font-size: 15px; min-height: 1.5em; }
+.talk .reply { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em; }
+.talk .how { color: var(--mute); font-size: 13px; margin-top: 6px; min-height: 1.4em; }
+@media (max-width: 760px) { .listening { grid-template-columns: 1fr; padding: 20px; } }
+.title { margin: 0 0 14px; font-size: 20px; font-weight: 750; letter-spacing: -0.015em; }
 
-/* the voice bar: replaces every button */
-.listen { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; background: var(--sheet); border: 1.5px solid var(--drape); border-radius: 10px; padding: 14px 18px; }
-.mic { display: flex; align-items: center; gap: 10px; font-weight: 600; min-width: 260px; }
-.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--line); flex: none; }
-.dot.on { background: var(--ok); box-shadow: 0 0 0 4px #2b8a6626; }
-.dot.hearing { background: var(--drape); box-shadow: 0 0 0 6px var(--drape-wash); animation: pulse 0.9s ease-in-out infinite; }
-.dot.busy { background: var(--warn); }
-.dot.off { background: var(--alert); }
-@keyframes pulse { 50% { box-shadow: 0 0 0 10px var(--drape-wash); } }
-.cue { margin: 0; flex: 1; min-width: 260px; font: italic 400 20px/1.3 var(--serif); color: var(--ink-soft); }
-.cue b { font-style: normal; color: var(--ink); }
-.btn { border: 1.5px solid var(--drape); background: var(--sheet); color: var(--drape); border-radius: 8px; padding: 8px 16px; font-weight: 500; }
-.btn:hover { background: var(--drape-wash); }
-.btn.primary { background: var(--drape); color: #fff; } .btn.primary:hover { background: var(--drape-deep); }
-.btn.big { padding: 12px 22px; font-size: 17px; }
-.btn.quiet { border-color: var(--line); color: var(--ink-soft); }
+/* mic and buttons */
+.mic { display: flex; align-items: center; gap: 10px; font-weight: 600; white-space: nowrap; }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); flex: none; }
+.dot.on { background: var(--accent); border-color: var(--accent); }
+.dot.hearing { background: var(--accent); border-color: var(--accent); animation: pulse 0.9s ease-in-out infinite; }
+.dot.busy { background: var(--graphite); border-color: var(--graphite); }
+.dot.off { border-color: var(--red); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px var(--accent-wash); } }
+.btn { border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 8px 16px; font-weight: 600; }
+.btn:hover { background: var(--wash); }
+.btn.primary { background: var(--ink); color: var(--paper); } .btn.primary:hover { background: #2a2a2a; }
+.btn.big { padding: 12px 24px; font-size: 16px; }
+.btn.quiet { border-color: var(--rule); color: var(--graphite); }
 
-/* live views */
-.feeds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 22px; }
-.feed { background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+/* camera views */
+.cameras { margin-top: 28px; }
+.feeds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.feed { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
 .feed-head, .feed-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; }
 .feed-head { justify-content: space-between; }
-.feed-head h2 { margin: 0; font-size: 16px; }
-.feed-status { color: var(--ink-soft); font-size: 13px; }
-.feed-view { position: relative; aspect-ratio: 16 / 10; display: grid; place-items: center; background: #12262b; color: #dcebec; }
+.feed-head h2 { margin: 0; }
+.feed-status { color: var(--graphite); font-size: 13px; }
+.feed-view { position: relative; aspect-ratio: 16 / 10; display: grid; place-items: center; background: var(--ink); color: #cfcfcf; }
 .feed-view video, .feed-view img { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; }
 .feed-view .mirror { transform: scaleX(-1); }
 .feed-view p { max-width: 280px; padding: 16px; text-align: center; }
-.feed-actions select { flex: 1; min-width: 150px; max-width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); color: var(--ink); }
-.feed-note { margin: 0; padding: 0 16px 14px; color: var(--ink-soft); font-size: 13px; }
+.feed-actions select { flex: 1; min-width: 150px; max-width: 100%; font: inherit; padding: 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.feed-note { margin: 0; padding: 0 16px 14px; color: var(--graphite); font-size: 13px; }
 @media (max-width: 760px) { .feeds { grid-template-columns: 1fr; } }
 
 /* two-column main */
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 36px; margin-top: 26px; align-items: start; }
-@media (max-width: 1020px) { .main { grid-template-columns: 1fr; } }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0 48px; margin-top: 32px; align-items: start; }
+@media (max-width: 1020px) { .main { grid-template-columns: 1fr; gap: 36px; } }
 
-/* instrument flow board */
-.board { display: grid; grid-template-columns: 2.3fr 1fr 1fr 1.3fr; background: var(--sheet); border: 1.5px solid var(--ink); border-radius: 12px; overflow: hidden; }
+/* the instrument board: the one loud thing on the page */
+.board { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1.2fr; border-bottom: 1px solid var(--rule); }
 @media (max-width: 760px) { .board { grid-template-columns: 1fr 1fr; } }
-.zone { padding: 14px 16px 18px; border-left: 1px solid var(--line); min-height: 220px; }
-.zone:first-child { border-left: 0; }
-.zone header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-.zone h2 { margin: 0; font-size: 15px; font-weight: 600; }
-.zone .n { font: 400 44px/1 var(--serif); font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.02em; }
-.zone.arm { background: var(--drape-wash); } .zone.field { background: var(--warn-wash); }
-.zone .hint { margin: -6px 0 10px; color: var(--ink-soft); font-size: 13px; min-height: 1.3em; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
-.chip { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; font-weight: 500; max-width: 100%; }
-.chip svg { flex: none; width: 46px; height: 12px; color: var(--drape); }
-.chip span { overflow-wrap: anywhere; }
-.chip.held, .chip.in_field { border-color: var(--warn); } .chip.in_field svg, .chip.held svg { color: var(--warn); }
-.chip.used svg { color: var(--ink-soft); } .chip.used { color: var(--ink-soft); }
-.chip.ghost { border: 1.5px dashed var(--alert); background: var(--alert-wash); color: var(--alert); }
-.chip.ghost svg { color: var(--alert); }
-.empty { color: var(--ink-soft); font: italic 400 15px var(--serif); }
-.count-line { margin: 16px 0 0; padding: 12px 16px; border-left: 4px solid var(--line); background: var(--sheet); font: 400 19px/1.35 var(--serif); }
-.count-line.ok { border-color: var(--ok); } .count-line.bad { border-color: var(--alert); background: var(--alert-wash); }
-.count-line small { display: block; font: 13px var(--sans); color: var(--ink-soft); margin-top: 2px; }
+.zone { padding: 16px 18px 22px; border-left: 1px solid var(--rule); min-height: 230px; }
+.zone:first-child { border-left: 0; padding-left: 0; }
+.zone header { display: flex; flex-direction: column-reverse; gap: 2px; margin-bottom: 16px; }
+.zone h2 { margin: 0; color: var(--graphite); font-weight: 600; }
+.zone .n { font-size: 76px; line-height: 0.9; font-weight: 800; font-stretch: 62%; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.02em; }
+.zone .n.alert { color: var(--red); }
+.zone .hint { margin: -8px 0 10px; color: var(--graphite); font-size: 13px; min-height: 1.3em; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.chip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; font-weight: 550; max-width: 100%; }
+.chip svg { flex: none; width: 42px; height: 12px; color: var(--ink); }
+.chip span { overflow-wrap: break-word; hyphens: auto; }
+/* narrow columns: icon above the name, so names never break mid-word */
+.zone:not(.tray) .chip { flex-direction: column; align-items: flex-start; gap: 4px; }
+.zone .hint:empty { display: none; }
+.chip.held { border-color: var(--ink); }
+.chip.in_field { border-color: var(--red); color: var(--red); } .chip.in_field svg { color: var(--red); }
+.chip.used { color: var(--mute); } .chip.used svg { color: var(--mute); }
+.chip.ghost { border: 1.5px dashed var(--red); background: var(--red-wash); color: var(--red); }
+.chip.ghost svg { color: var(--red); }
+.empty { color: var(--mute); }
+.count-line { margin: 18px 0 0; padding: 12px 0 12px 16px; border-left: 3px solid var(--ink); font-size: 18px; font-weight: 500; }
+.count-line.bad { border-color: var(--red); color: var(--red); }
+.count-line small { display: block; font-size: 13px; font-weight: 400; color: var(--graphite); margin-top: 2px; }
 
-/* joint gauges: lag between where each joint is and where it was told to be, against the collision guard */
-.joints { margin-top: 22px; }
-.joints h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
-.joints .note { margin: 0 0 10px; }
+/* joint gauges */
+.joints { margin-top: 30px; }
+.joints h2 { margin: 0 0 4px; }
+.joints .note { margin: 0 0 12px; }
 .jrow { display: grid; grid-template-columns: 28px 1fr 64px 64px; gap: 12px; align-items: center; padding: 4px 0; font-variant-numeric: tabular-nums; }
-.jrow .lbl { font-weight: 600; color: var(--ink-soft); }
-.track { position: relative; height: 10px; background: var(--line-soft); border-radius: 99px; overflow: hidden; }
-.track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ok); border-radius: 99px; transition: width .3s; }
-.track i.warn { background: var(--warn); } .track i.bad { background: var(--alert); }
+.jrow .lbl { font-weight: 650; color: var(--graphite); }
+.track { position: relative; height: 6px; background: var(--wash); border-radius: 99px; overflow: hidden; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ink); border-radius: 99px; transition: width .3s; }
+.track i.warn { background: var(--graphite); } .track i.bad { background: var(--red); }
 .jrow .deg, .jrow .lag { text-align: right; }
-.jrow .lag { color: var(--ink-soft); }
+.jrow .lag { color: var(--graphite); }
 
 /* side column */
-.say-block { margin: 0 0 22px; }
-.say-block .heard { margin: 0; color: var(--ink-soft); min-height: 1.45em; }
-.say-block .reply { margin: 4px 0 0; font: 400 24px/1.25 var(--serif); }
-.say-block .how { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; }
-.side h2, .strip h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
-.phrases { margin: 0 0 22px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
-.phrases li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
-.phrases q { font: italic 400 16px var(--serif); quotes: "“" "”"; }
-.phrases span { color: var(--ink-soft); font-size: 13px; text-align: right; }
-.log { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
-.log li { display: grid; grid-template-columns: 10px 1fr; gap: 0 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
-.log li::before { content: ""; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--line); }
-.log li.ok::before { background: var(--ok); } .log li.warn::before { background: var(--warn); } .log li.bad::before { background: var(--alert); }
-.log li.you::before { background: var(--drape); }
-.log time { color: var(--ink-soft); font-size: 12px; display: block; }
+.side h2, .strip h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
+.side h2 + .log { margin-bottom: 0; }
+.phrases { margin: 0 0 30px; padding: 0; list-style: none; border-top: 1px solid var(--ink); }
+.phrases li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+.phrases q { font-weight: 550; quotes: "“" "”"; }
+.phrases span { color: var(--graphite); font-size: 13px; text-align: right; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; border-top: 1px solid var(--ink); }
+.log li { display: grid; grid-template-columns: 8px 1fr; gap: 0 12px; padding: 9px 0; border-bottom: 1px solid var(--rule); }
+.log li::before { content: ""; width: 6px; height: 6px; margin-top: 8px; border-radius: 50%; background: var(--rule); }
+.log li.ok::before, .log li.you::before { background: var(--ink); } .log li.warn::before { background: var(--mute); }
+.log li.bad { color: var(--red); } .log li.bad::before { background: var(--red); }
+.log time { color: var(--mute); font-size: 12px; display: block; }
 
 /* lower strip */
-.strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 36px; margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px; }
-@media (max-width: 1020px) { .strip { grid-template-columns: 1fr; gap: 32px; } }
+.strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 48px; margin-top: 56px; border-top: 2px solid var(--ink); padding-top: 20px; }
+@media (max-width: 1020px) { .strip { grid-template-columns: 1fr; gap: 36px; } }
 .strip p { margin: 0 0 10px; }
-.note { color: var(--ink-soft); font-size: 13px; }
-.say-this { margin: 10px 0 0; padding: 10px 12px; border-left: 4px solid var(--drape); background: var(--drape-wash); font: italic 400 17px/1.35 var(--serif); }
-.row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
-.row .k { flex: 1; } .row .v { font-weight: 500; text-align: right; }
-.good { color: var(--ok); } .bad { color: var(--alert); } .warnc { color: var(--warn); }
-.diff { margin: 10px 0; padding: 10px 12px; background: #f6f9f9; border: 1px solid var(--line); border-radius: 8px; overflow: auto; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; max-height: 220px; }
-.diff .add { background: #dff1e8; display: block; } .diff .del { background: #f6dcd8; display: block; } .diff .ctx { display: block; color: var(--ink-soft); }
-.steps { margin: 8px 0; padding-left: 18px; color: var(--ink-soft); font-size: 13px; max-height: 140px; overflow: auto; }
-.tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--warn-wash); color: var(--warn); margin-left: 6px; }
-.prose { font: 400 17px/1.5 var(--serif); white-space: pre-wrap; }
+.note { color: var(--graphite); font-size: 13px; }
+.say-this { margin: 10px 0 0; padding: 10px 14px; border-left: 3px solid var(--ink); background: var(--wash); font-weight: 550; }
+.row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.row .k { flex: 1; } .row .v { font-weight: 650; text-align: right; }
+.good { color: var(--ink); } .bad { color: var(--red); } .warnc { color: var(--graphite); }
+.diff { margin: 10px 0; padding: 10px 12px; background: var(--wash); border-radius: 6px; overflow: auto; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; max-height: 220px; }
+.diff .add { background: #e6e6e6; display: block; } .diff .del { background: var(--red-wash); color: var(--red); display: block; } .diff .ctx { display: block; color: var(--graphite); }
+.steps { margin: 8px 0; padding-left: 18px; color: var(--graphite); font-size: 13px; max-height: 140px; overflow: auto; }
+.tag { display: inline-block; padding: 1px 8px; border: 1px solid var(--graphite); border-radius: 99px; font-size: 12px; font-weight: 600; color: var(--graphite); margin-left: 6px; }
+.prose { font-size: 16px; line-height: 1.6; white-space: pre-wrap; max-width: 70ch; }
 
-/* training data: every handover becomes a face-blurred, Claude-labelled clip */
-.dataset { margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px; }
-.dataset h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
-.episodes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.episodes li { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
-.episodes .req { font: italic 400 17px/1.3 var(--serif); margin: 0 0 6px; }
+/* training data */
+.dataset { margin-top: 56px; border-top: 2px solid var(--ink); padding-top: 20px; }
+.dataset h2 { margin: 0 0 6px; }
+.episodes { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0 32px; }
+.episodes li { padding: 14px 0; border-top: 1px solid var(--rule); }
+.episodes .req { font-size: 17px; font-weight: 650; margin: 0 0 6px; }
 .episodes .cap { margin: 6px 0; }
-.episodes .meta { color: var(--ink-soft); font-size: 13px; }
-.episodes .meta.bad { color: var(--alert); } .episodes .meta.good { color: var(--ok); }
+.episodes .meta { color: var(--graphite); font-size: 13px; }
+.episodes .meta.bad { color: var(--red); } .episodes .meta.good { color: var(--ink); font-weight: 600; }
 
-/* arm readings: 20 Hz joint readings stored in Convex, charted one point per second (worst value kept) */
-.readings { margin-top: 40px; border-top: 1.5px solid var(--ink); padding-top: 18px;
-  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4; --series-6: #008300; }
-.readings h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+/* arm readings */
+.readings { margin-top: 56px; border-top: 2px solid var(--ink); padding-top: 20px; }
+.readings h2 { margin: 0 0 6px; }
 .rhead { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .rhead h2 { margin: 0; flex: 1; }
-.seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; background: var(--sheet); padding: 6px 12px; color: var(--ink-soft); }
-.seg button + button { border-left: 1px solid var(--line); }
-.seg button[aria-checked="true"], .kinds button[aria-pressed="true"] { background: var(--drape); color: #fff; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 12px 0; }
-.tile { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
-.tile .k { color: var(--ink-soft); font-size: 13px; }
-.tile .v { font: 400 30px/1.1 var(--serif); font-variant-numeric: tabular-nums lining-nums; }
-.tile .s { color: var(--ink-soft); font-size: 13px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 6px; padding: 0; list-style: none; color: var(--ink-soft); font-size: 13px; }
-.legend i, .tip i { display: inline-block; width: 14px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 6px; }
-.chart { position: relative; margin: 0 0 14px; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 4px; }
-.chart:focus-visible { outline-offset: 0; }
-.chart figcaption { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: var(--paper); padding: 6px 12px; color: var(--ink); }
+.seg button + button { border-left: 1px solid var(--ink); }
+.seg button[aria-checked="true"], .kinds button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0 32px; margin: 16px 0; }
+.tile { padding: 10px 0; border-top: 1px solid var(--rule); }
+.tile .k { color: var(--graphite); font-size: 13px; }
+.tile .v { font-size: 34px; line-height: 1.1; font-weight: 800; font-stretch: 62%; font-variant-numeric: tabular-nums lining-nums; }
+.tile .s { color: var(--graphite); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 6px; padding: 0; list-style: none; color: var(--graphite); font-size: 13px; }
+.legend i, .tip i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+.chart { position: relative; margin: 0 0 18px; border-top: 1px solid var(--rule); padding: 10px 0 4px; }
+.chart:focus-visible { outline-offset: 2px; }
+.chart figcaption { font-size: 13px; font-weight: 650; margin-bottom: 2px; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-.chart text { font: 11px var(--sans); fill: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.chart .grid { stroke: var(--line-soft); stroke-width: 1; }
-.chart .guard { stroke: var(--alert); stroke-width: 1; stroke-dasharray: 4 3; }
-.chart .band { fill: var(--line-soft); } .chart .faultband { fill: var(--alert-wash); }
+.chart text { font: 11px var(--font); fill: var(--graphite); font-variant-numeric: tabular-nums; }
+.chart .grid { stroke: #efefef; stroke-width: 1; }
+.chart .guard { stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 3; }
+.chart .band { fill: var(--wash); } .chart .faultband { fill: var(--red-wash); }
 .chart .hair { stroke: var(--ink); stroke-width: 1; }
-.chart path.s { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.tip { position: absolute; top: 28px; pointer-events: none; background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 2px 8px #12262b1f; white-space: nowrap; }
-.tip b { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
-.tip div { color: var(--ink-soft); }
+.chart path.s { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.tip { position: absolute; top: 28px; pointer-events: none; background: var(--paper); border: 1px solid var(--ink); border-radius: 6px; padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+.tip b { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--ink); }
+.tip div { color: var(--graphite); }
 .rtable { width: 100%; border-collapse: collapse; margin: 4px 0 22px; font-variant-numeric: tabular-nums; }
-.rtable th, .rtable td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); }
-.rtable th:first-child, .rtable td:first-child { text-align: left; }
-.rtable th { font-weight: 600; color: var(--ink-soft); font-size: 13px; }
+.rtable th, .rtable td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); }
+.rtable th:first-child, .rtable td:first-child { text-align: left; padding-left: 0; }
+.rtable th { font-weight: 600; color: var(--graphite); font-size: 13px; border-bottom-color: var(--ink); }
 .kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
-.kinds button { border: 1px solid var(--line); background: var(--sheet); border-radius: 99px; padding: 3px 12px; font-size: 13px; }
+.kinds button { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 3px 12px; font-size: 13px; }
 
-/* presenter-only rehearsal tools (simulation / --demo): not part of the OR workflow */
-.rehearse { margin-top: 40px; border: 1.5px dashed var(--warn); border-radius: 10px; padding: 10px 16px; background: var(--sheet); }
-.rehearse summary { cursor: pointer; font-weight: 600; color: var(--warn); }
-.rehearse .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+@media (max-width: 600px) { .shell { padding: 0 16px 56px; } .zone .n { font-size: 56px; } }
+/* red is the accent: the cross by the name, tabs, buttons, the words you can say. Red is kept for alarms. */
+.top { border-bottom-color: var(--rule); }
+.top h1::before { content: ""; display: inline-block; width: 18px; height: 18px; margin-right: 10px; vertical-align: -2px;
+  background: linear-gradient(var(--accent), var(--accent)) center / 100% 6px no-repeat, linear-gradient(var(--accent), var(--accent)) center / 6px 100% no-repeat; }
+.strip, .dataset, .readings { border-top-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; } .btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn { background: var(--sheet); border-color: var(--accent); color: var(--accent); } .btn:hover { background: var(--accent-wash); }
+.btn.quiet { border-color: var(--rule); color: var(--graphite); }
+.phrases, .log { border-top-color: var(--ink); }
+.phrases q { color: var(--accent); }
+.say-this { border-left-color: var(--accent); background: var(--accent-wash); }
+.count-line { border-left-color: var(--accent); }
+.seg { border-color: var(--accent); } .seg button { color: var(--accent); background: var(--sheet); } .seg button + button { border-left-color: var(--accent); }
+.seg button[aria-checked="true"], .kinds button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.log li.you::before { background: var(--accent); }
+.track i { background: var(--accent); } .track i.warn { background: var(--warn); } .track i.bad { background: var(--red); }
+.rtable th { border-bottom-color: var(--ink); }
+/* tabs */
+.tabs { grid-column: 1 / -1; display: flex; gap: 4px 28px; flex-wrap: wrap; margin: 6px 0 -16px; }
+.tabs button { position: relative; border: 0; background: none; padding: 10px 0 12px; font-size: 15px; font-weight: 600; color: var(--graphite); }
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+.tabdot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--red); vertical-align: 2px; }
+
+.panel > .cameras { margin-top: 24px; }
+.panel > .main { margin-top: 32px; }
+.panel > .readings { margin-top: 56px; border-top: 1px solid var(--rule); padding-top: 28px; }
+.rtable tbody th, .rtable tr + tr th { border-bottom-color: var(--rule); color: var(--ink); font-size: 15px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="shell">
   <header class="top">
-    <div class="brand">
-      <h1>Scrub console</h1>
-      <p class="armline" id="armline" aria-live="polite">Connecting to the arm…</p>
-    </div>
-    <div class="meta">
-      <span class="env" id="env">Checking…</span>
-      <ul class="caps" id="caps" aria-label="Connected services"></ul>
-    </div>
+    <h1>Scrub console</h1>
+    <span></span>
+    <div class="hdrmic" id="hdrmic" hidden><span class="dot on"></span>Listening</div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" id="t-live" aria-controls="tab-live" aria-selected="true">Live</button>
+      <button role="tab" id="t-data" aria-controls="tab-data" aria-selected="false" tabindex="-1">Robot data</button>
+    </nav>
   </header>
 
-  <section class="listen" aria-label="Voice">
-    <button class="btn primary big" id="start">Start listening</button>
-    <div class="mic" id="mic" hidden aria-live="polite"><span class="dot" id="micdot"></span><span id="micstate"></span></div>
-    <p class="cue">Say <b>“Scrub”</b>, then what you need: “Scrub, Castroviejo, backhand.”</p>
-  </section>
 
-  <section class="feeds" aria-label="Live camera views">
+  <div class="panel" id="tab-live" role="tabpanel" aria-labelledby="t-live">
+  <section class="cameras" aria-label="Live camera views">
+    <div class="feeds">
     <div class="feed" aria-label="Doctor camera">
       <div class="feed-head"><h2>Doctor view</h2><span class="feed-status" id="doctor-status">Camera off</span></div>
       <div class="feed-view"><video id="doctor-video" autoplay playsinline muted class="mirror" hidden></video><p id="doctor-empty">Choose the camera facing the surgeon.</p></div>
@@ -226,8 +257,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
       <div class="feed-actions"><label for="robot-device">Camera</label><select id="robot-device"><option value="">Choose wrist camera</option></select><button class="btn" id="robot-connect">Connect preview</button></div>
       <p class="feed-note" id="robot-note">Browser preview only. Select the second camera; no video is recorded.</p>
     </div>
+    </div>
   </section>
 
+  <section class="listening" aria-label="Voice">
+    <div class="voice">
+      <button class="btn primary big" id="start">Start listening</button>
+      <div class="mic" id="mic" hidden aria-live="polite"><span class="dot" id="micdot"></span><span id="micstate"></span></div>
+      <p class="note">Say “Scrub”, then what you need. “Stop” works any time.</p>
+    </div>
+    <div class="talk" aria-live="polite">
+      <p class="heard" id="heard"></p>
+      <p class="reply" id="reply">“Scrub, Castroviejo, backhand.”</p>
+      <p class="how" id="how"></p>
+    </div>
+  </section>
+  </div>
+
+  <div class="panel" id="tab-data" role="tabpanel" aria-labelledby="t-data" hidden>
   <div class="main">
     <section aria-label="Instruments">
       <div class="board" id="board">
@@ -245,11 +292,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </section>
 
     <aside class="side">
-      <div class="say-block" aria-live="polite">
-        <p class="heard" id="heard"></p>
-        <p class="reply" id="reply">Tap “Start listening”, then talk.</p>
-        <p class="how" id="how"></p>
-      </div>
       <h2>What you can say</h2>
       <ul class="phrases">
         <li><q>Scrub, Potts scissors</q><span>hand it over</span></li>
@@ -266,31 +308,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </aside>
   </div>
 
-  <div class="strip">
-    <section aria-label="Safety record">
-      <h2>Safety record</h2>
-      <div id="audit"></div>
-      <p class="note" id="auditnote"></p>
-    </section>
-    <section aria-label="Fault triage">
-      <h2>Fault triage</h2>
-      <div id="triage"></div>
-    </section>
-    <section aria-label="After the case">
-      <h2>After the case</h2>
-      <div id="after"><p class="say-this">“Scrub, write the case report” or “Scrub, what's next?”</p></div>
-    </section>
-  </div>
-
-  <section class="dataset" aria-label="Training data">
-    <h2>Training data</h2>
-    <p class="note" id="datasetnote"></p>
-    <ol class="episodes" id="episodes"></ol>
-  </section>
 
   <section class="readings" aria-label="Arm readings">
     <div class="rhead">
-      <h2>Arm readings</h2>
+      <h2 class="title">Arm readings</h2>
       <div class="seg" role="radiogroup" aria-label="Time window" id="rwin">
         <button role="radio" aria-checked="true" data-min="10">10 min</button><button role="radio" aria-checked="false" data-min="30">30 min</button><button role="radio" aria-checked="false" data-min="60">60 min</button>
       </div>
@@ -308,16 +329,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <ol class="log" id="rlog"></ol>
   </section>
 
-  <details class="rehearse" id="rehearse" hidden>
-    <summary>Presenter controls (rehearsal only, not part of the OR workflow)</summary>
-    <div class="acts">
-      <button class="btn quiet" id="simremove" hidden>Someone takes an instrument off the table</button>
-      <button class="btn quiet" id="simrestore" hidden>Put it back</button>
-      <button class="btn quiet" id="fault">Simulate a fault</button>
-      <button class="btn quiet" id="tamper">Tamper with a copy of the log</button>
-    </div>
-    <p class="note" id="tamperout"></p>
-  </details>
+  </div>
 </div>
 
 <script src="/camera.js"></script>
@@ -439,6 +451,7 @@ function renderBoard() {
     box.replaceChildren(...els);
     if (!els.length) { const e = document.createElement("span"); e.className = "empty"; e.textContent = z === "tray" ? "Nothing left." : "None."; box.append(e); }
     $("n-" + z).textContent = zones[z].length;
+    $("n-" + z).classList.toggle("alert", z === "in_field" && zones[z].length > 0);
   }
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
     for (const [uid, el] of chipEls) {
@@ -451,21 +464,8 @@ function renderBoard() {
 }
 
 function renderHeader() {
-  const a = S.arm, phase = a.phase || "unknown";
-  $("armline").innerHTML = S.online === false ? "<b>Arm not reachable.</b> Start the arm server, then this page reconnects."
-    : a.fault || (a.arm && a.arm.fault) ? `<b>Arm stopped:</b> ${esc(a.arm.fault || "fault")}` : `Arm is <b>${esc(phase)}</b>${a.holding ? ", holding " + esc(a.holding) : ""}.`;
+  const a = S.arm;
   $("armhint").textContent = a.holding || "";
-  const env = $("env"); env.textContent = S.sim ? "Simulated arm" : "Real arm"; env.className = "env " + (S.sim ? "sim" : "real");
-  const c = S.caps, items = [
-    ["claude", c.claude ? "on" : "off", "Claude"], ["voice", c.voice ? "on" : "off", "Cartesia"],
-    ["convex", c.convex ? (S.convexLive ? "on" : "partial") : "off", "Convex"], ["bitdeer", c.bitdeer ? "on" : "off", "Bitdeer"],
-    ["agents", c.agents ? "on" : "off", "Fetch.ai agents"],
-    ["droid", c.droid === "sdk" ? "on" : c.droid === "rehearsal" ? "partial" : "off", c.droid === "rehearsal" ? "Droid (rehearsal)" : "Droid"],
-  ];
-  $("caps").innerHTML = items.map(([, st, label]) => `<li class="${st}">${label}</li>`).join("");
-  $("rehearse").hidden = !(S.sim || c.demo);
-  $("simremove").hidden = $("simrestore").hidden = !S.sim;
-  $("tamper").hidden = $("fault").hidden = !c.demo;
 }
 
 function renderCount() {
@@ -476,55 +476,32 @@ function renderCount() {
   el.innerHTML = esc(c.say) + `<small>${c.source === "simulated" ? "Simulated count: the console assumes the table matches its records except what was removed here." : c.source === "camera" ? "Counted from the camera." : "No camera count: checked against the console's own records."}</small>`;
 }
 
-function renderAudit() {
-  const rows = [["Arm command log", S.audit.arm], ["Console log", S.audit.console]];
-  $("audit").innerHTML = rows.map(([k, a]) => !a ? `<div class="row"><span class="k">${k}</span><span class="v">not checked yet</span></div>`
-    : `<div class="row"><span class="k">${k}</span><span class="v ${a.ok ? "good" : a.ok === false ? "bad" : ""}">${a.ok ? "intact" : a.ok === false ? "TAMPERED" : "unknown"}${a.entries != null ? ", " + a.entries + " entries" : ""}</span></div>`).join("");
-  const anchored = Object.entries(S.anchors).map(([k, a]) => `${k} ${a.seq} entries`).join(", ");
-  const alerts = S.alerts.map((a) => `<p class="bad">Convex noticed: ${esc(a.detail)}</p>`).join("");
-  $("auditnote").innerHTML = alerts + esc(S.caps.convex ? (S.convexLive ? `Chain heads are published to Convex${anchored ? " (" + anchored + ")" : ""}, so deleting the end of a log is noticed.` : "Convex is configured but this page is not connected to it yet.") : "Convex is off, so heads are not published anywhere else: deleting the end of a log would not be noticed.");
-}
 
-function renderTriage() {
-  const p = S.triage[0];
-  if (!p) { $("triage").innerHTML = '<p class="empty">No faults. If the arm freezes, Droid reads what happened and proposes a fix here, and you approve or reject it out loud.</p>'; return; }
-  const tone = { pending: "warnc", approved: "good", rejected: "", invalid: "bad", error: "bad", stale: "bad" }[p.status] || "";
-  const diff = (p.diff || "").split("\n").map((l) => `<span class="${l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : "ctx"}">${esc(l)}</span>`).join("");
-  $("triage").innerHTML = `<p><b>${esc(p.fault)}</b></p>
-    <p>${statusWord(p.status)}${p.simulated ? '<span class="tag">rehearsal, no agent ran</span>' : ""}</p>
-    ${p.summary ? `<p class="prose">${esc(p.summary)}</p>` : ""}
-    ${p.steps && p.steps.length ? `<ol class="steps">${p.steps.filter((s) => s.type !== "result").slice(-8).map((s) => `<li>${s.type === "tool" ? "Ran " + esc(s.name) : esc((s.text || "").slice(0, 140))}</li>`).join("")}</ol>` : ""}
-    ${p.diff ? `<div class="diff">${diff}</div>` : ""}
-    ${p.errors && p.errors.length ? `<p class="bad">Refused: ${p.errors.map(esc).join("; ")}</p>` : ""}
-    ${p.status === "pending" ? '<p class="say-this">Say “Scrub, approve” or “Scrub, reject”.</p>' : ""}
-    ${p.needs_restart ? '<p class="note">Applied to arm.yaml. Restart the arm server for it to take effect.</p>' : ""}`;
-  function statusWord(s) { return `<span class="${tone}">${{ running: "Droid is working…", pending: "Waiting for your decision", approved: "Approved", rejected: "Rejected", no_change: "Droid found no change worth making", invalid: "Proposal refused by the safety check", unavailable: "Droid isn't set up", error: "Triage failed", stale: "Out of date" }[s] || s}</span>`; }
-}
 
-function renderAfter(e) {
-  const d = e.data;
-  if (e.kind === "report") $("after").innerHTML = `<p class="prose">${esc(d.text)}</p><p class="note">Written by ${esc(d.generated_by)}.</p>`;
-  else if (e.kind === "prediction") $("after").innerHTML = `<p class="prose">Next, probably the ${esc(d.name)}. ${esc(d.reason || "")}</p><p class="note">Suggested by ${esc(d.generated_by || "")}.</p><p class="say-this">Say “stage it” to get it ready.</p>`;
-}
 
-function renderDataset() {
-  const rec = S.caps.recording, st = S.dstats;
-  $("datasetnote").textContent = !rec ? "Recording is off. Start the console with --record to turn every handover into a face-blurred, Claude-labelled training clip."
-    : !S.convexLive ? "Recording is on; clips appear here once this page is connected to Convex."
-    : `${rec === "simulated" ? "Simulated arm: placeholder frames, so Claude will flag them and they won't be accepted. " : ""}`
-      + (st ? `${st.accepted} accepted of ${st.total} recorded (${st.minutes.toFixed(1)} min of training video), ${st.needsReview} waiting for a person. Faces are blurred on the robot before anything is stored.` : "");
-  const word = { pending: "Waiting for Claude…", labeling: "Claude is labelling…", failed: "Labelling failed (retries every 10 min)", skipped: "Not labelled (no consent or no footage)" };
-  $("episodes").innerHTML = (S.episodes || []).map((e) => {
-    const flags = [...e.privacyFlags.map((f) => "privacy: " + f), ...e.qualityFlags, ...(e.agreesWithRobot === false ? ["disagrees with the robot"] : [])];
-    return `<li><p class="req">“${esc(e.request || e.kind)}”</p>
-      <p class="meta">${esc(cap(e.kind))} ${esc(e.outcome)} · ${e.frameCount} frames · ${e.facesBlurred} faces blurred${e.simulated ? " · simulated" : ""}</p>
-      ${e.caption ? `<p class="cap">${esc(e.caption)}</p>` : `<p class="meta">${esc(word[e.labelStatus] || e.labelStatus)}${e.labelError ? ": " + esc(e.labelError) : ""}</p>`}
-      ${flags.length ? `<p class="meta bad">${flags.map(esc).join(", ")}</p>` : ""}
-      <p class="meta ${e.review === "accepted" ? "good" : ""}">${e.review === "accepted" ? "In the training set" : e.labelStatus === "done" ? "Held for a person" : ""}</p></li>`;
-  }).join("");
-}
 
-function render() { renderHeader(); renderBoard(); renderCount(); renderAudit(); renderTriage(); renderLog(); renderDataset(); }
+/* ── tabs ─────────────────────────────────────────────────────────────── */
+const TABS = ["live", "data"];
+function showTab(name, focus = false) {
+  if (!TABS.includes(name)) name = "live";
+  for (const n of TABS) {
+    const on = n === name, tab = $("t-" + n);
+    tab.setAttribute("aria-selected", on); tab.tabIndex = on ? 0 : -1;
+    $("tab-" + n).hidden = !on;
+  }
+  if (focus) $("t-" + name).focus();
+  if (location.hash.slice(1) !== name) history.replaceState(null, "", "#" + name);
+}
+TABS.forEach((n, i) => {
+  $("t-" + n).onclick = () => showTab(n);
+  $("t-" + n).onkeydown = (e) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (step) { e.preventDefault(); showTab(TABS[(i + step + TABS.length) % TABS.length], true); }
+  };
+});
+showTab(location.hash.slice(1));
+
+function render() { renderHeader(); renderBoard(); renderCount(); renderLog(); }
 
 /* ── joint gauges (polled from the console's cached arm status, ~2 Hz) ── */
 async function pollJoints() {
@@ -610,7 +587,6 @@ function onEvent(e) {
   else if (e.kind === "audit") S.audit[d.source] = { ok: d.ok, entries: d.seq, head: d.head };
   else if (e.kind === "proposal") { S.triage = [d, ...S.triage.filter((p) => p.id !== d.id)]; }
   else if (e.kind === "announce") { showReply({ say: d.text }); speak(d.text); }
-  else if (e.kind === "report" || e.kind === "prediction") renderAfter(e);
   else if (e.kind === "arm" || e.kind === "arm_online" || e.kind === "arm_offline") { refresh(); return; }
   render();
 }
@@ -648,7 +624,10 @@ function handle(r) {
   if (!r || r.ignored) { setMic("on", listeningLabel()); return; }
   showReply(r); speak(r.say); setMic("on", listeningLabel());
 }
-function setMic(state, text) { $("micdot").className = "dot " + state; $("micstate").textContent = text; }
+function setMic(state, text) {
+  $("micdot").className = "dot " + state; $("micstate").textContent = text;
+  $("hdrmic").hidden = !["on", "hearing", "busy"].includes(state);
+}
 const listeningLabel = () => S.caps.voice ? "Listening for “Scrub” (Cartesia)" : "Listening for “Scrub” (browser speech)";
 
 /* ── listening, engine 1: Cartesia Ink. The mic runs continuously; a simple voice-activity detector cuts each
@@ -728,23 +707,10 @@ $("start").onclick = async () => {
   showReply({ say: "Listening. Say “Scrub”, then what you need." });
 };
 
-/* ── presenter-only rehearsal tools ──────────────────────────────────── */
-$("simremove").onclick = async () => {
-  const candidates = S.items.filter((i) => i.status === "tray");
-  if (!candidates.length) return;
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
-  await api("/api/sim/remove", { instrument: pick.instrument }); $("tamperout").textContent = `${pick.name} was taken off the table. Say “Scrub, count”.`;
-};
-$("simrestore").onclick = async () => { await api("/api/sim/restore", {}); S.ghosts = []; render(); };
-$("fault").onclick = () => api("/api/triage/trigger", {}).catch((e) => { $("tamperout").textContent = e.message; });
-$("tamper").onclick = async () => {
-  try { const r = await api("/api/demo/tamper", {}); $("tamperout").textContent = r.detected ? `A copy of the log was edited on line ${r.edited_line}. Verification caught it: ${r.error}. The real log is still ${r.original_intact ? "intact" : "NOT intact"}.` : "Tampering was not detected."; }
-  catch (e) { $("tamperout").textContent = e.message; }
-};
-
 /* ── arm readings: stored in Convex at 20 Hz, charted one point per second (each point keeps the worst value) ── */
 const R = { min: 10, pts: [], kinds: new Set(["fault", "job", "arm_event"]), logs: [], unsubLogs: null, guard: 25 };
-const JOINTS = [1, 2, 3, 4, 5, 6].map((i) => ({ name: "J" + i, color: `var(--series-${i})` }));
+const DASH = ["", "6 3", "1.5 3", "", "6 3", "1.5 3"];      // 3 black + 3 grey lines, told apart by dash
+const JOINTS = [1, 2, 3, 4, 5, 6].map((i) => ({ name: "J" + i, color: `var(--series-${i})`, dash: DASH[i - 1] }));
 const LOG_KINDS = ["fault", "job", "command", "arm_event", "arm", "utterance", "announce", "arm_offline", "error"];
 const fmtT = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const fmt = (x, d = 1) => (x == null ? "–" : x.toFixed(d));
@@ -786,7 +752,7 @@ function lineChart(el, title, unit, series, opts = {}) {
       d += `${prev == null || p.t - prev > 2.5 ? "M" : "L"}${x(p.t).toFixed(1)},${y(v).toFixed(1)}`;   // a gap breaks the line
       prev = p.t;
     }
-    svg += `<path class="s" d="${d}" style="stroke:${s.color}"/>`;
+    svg += `<path class="s" d="${d}" style="stroke:${s.color}${s.dash ? ";stroke-dasharray:" + s.dash : ""}"/>`;
   }
   el.innerHTML = `<figcaption>${esc(title)}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}, last ${R.min} minutes. Values are in the table below.">${svg}<line class="hair" y1="${T}" y2="${T + PH}" hidden/><rect x="${L}" y="${T}" width="${PW}" height="${PH}" fill="transparent"/></svg><div class="tip" hidden></div>`;
   const hair = el.querySelector(".hair"), tip = el.querySelector(".tip"), svgEl = el.querySelector("svg");
@@ -794,7 +760,7 @@ function lineChart(el, title, unit, series, opts = {}) {
     el._i = i = Math.max(0, Math.min(pts.length - 1, i));
     const p = pts[i], px = x(p.t) + sec / 2;
     hair.setAttribute("x1", px); hair.setAttribute("x2", px); hair.hidden = false;
-    tip.innerHTML = `<div>${fmtT(p.t)} · ${esc(p.phase)}${p.fault ? " · fault" : ""}</div>` + series.map((s) => `<div><i style="background:${s.color}"></i><b>${fmt(s.get(p), 2)}${unit}</b> ${esc(s.name)}</div>`).join("");
+    tip.innerHTML = `<div>${fmtT(p.t)} · ${esc(p.phase)}${p.fault ? " · fault" : ""}</div>` + series.map((s) => `<div><i style="border-top-color:${s.color}${s.dash ? ";border-top-style:dashed" : ""}"></i><b>${fmt(s.get(p), 2)}${unit}</b> ${esc(s.name)}</div>`).join("");
     tip.hidden = false;
     const left = (px / W) * svgEl.clientWidth + 12;
     tip.style.left = Math.min(left, el.clientWidth - tip.offsetWidth - 8) + "px";
@@ -828,10 +794,10 @@ function renderReadings() {
     ["Faults", String(faults), faults ? "see the red bands and the fault log" : "none in this window"],
     ["Moving", `${moving}%`, `of the last ${R.min} minutes with readings`],
   ].map(([k, v, sub]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${esc(sub)}</div></div>`).join("");
-  $("rlegend").innerHTML = pts.length ? JOINTS.map((j) => `<li><i style="background:${j.color}"></i>${j.name}</li>`).join("") : "";
+  $("rlegend").innerHTML = pts.length ? JOINTS.map((j) => `<li><i style="border-top-color:${j.color}${j.dash ? ";border-top-style:dashed" : ""}"></i>${j.name}</li>`).join("") : "";
   lineChart($("c-lag"), "Lag from setpoint (°, worst per second)", "°", JOINTS.map((j, i) => ({ ...j, get: (p) => p.lag[i] })), { zero: true, guard: R.guard });
   lineChart($("c-tau"), "Torque (N·m, largest |value| per second)", " N·m", JOINTS.map((j, i) => ({ ...j, get: (p) => p.tau[i] })), { zero: true });
-  lineChart($("c-grip"), "Gripper angle (°)", "°", [{ name: "Gripper", color: "var(--drape)", get: (p) => p.gripper }]);
+  lineChart($("c-grip"), "Gripper angle (°)", "°", [{ name: "Gripper", color: "var(--ink)", get: (p) => p.gripper }]);
   const last = pts[pts.length - 1];
   $("rtable").innerHTML = !pts.length ? "" : `<caption class="note" style="text-align:left">Per joint over the last ${R.min} minutes</caption><thead><tr><th scope="col">Joint</th><th scope="col">Angle now</th><th scope="col">Worst lag</th><th scope="col">Peak |torque|</th></tr></thead><tbody>`
     + JOINTS.map((j, i) => {
@@ -896,10 +862,6 @@ async function connectConvex(url) {
     const client = new window.convex.ConvexClient(url), fail = () => { S.convexLive = false; };
     client.onUpdate("instruments:list", {}, (d) => { S.convexLive = true; S.items = d.items; S.counts = d.counts; render(); }, fail);
     client.onUpdate("events:recent", {}, (rows) => { S.convexLive = true; S.events = rows; renderLog(); }, fail);
-    client.onUpdate("audit:latest", {}, (a) => { S.anchors = a; renderAudit(); }, fail);
-    client.onUpdate("audit:alerts", {}, (a) => { S.alerts = a; renderAudit(); }, fail);
-    client.onUpdate("episodes:list", {}, (rows) => { S.episodes = rows; renderDataset(); }, fail);
-    client.onUpdate("episodes:stats", {}, (st) => { S.dstats = st; renderDataset(); }, fail);
     S.client = client; $("rcsv").disabled = false;
     loadReadings(); watchLogs();
     client.onUpdate("metrics:latest", {}, onLatestReadings, fail);
