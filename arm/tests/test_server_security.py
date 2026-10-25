@@ -97,20 +97,20 @@ def test_dns_rebinding_host_header_is_refused_on_loopback(make_server):
 
 def test_requests_are_audited_with_their_fields_and_status(make_server):
     base, audit = make_server(token=TOKEN)
-    assert call(base, "/resolve", {"instrument": "resano", "orientation": "backhand"}, headers=auth())[0] == 200
+    assert call(base, "/resolve", {"instrument": "potts", "orientation": "backhand"}, headers=auth())[0] == 200
     assert call(base, "/handoff", {"instrument": "hammer"}, headers=auth())[0] == 400
     entries = [json.loads(l) for l in audit.path.read_text().splitlines()]
     resolve, bad = entries
     assert resolve["data"]["path"] == "/resolve" and resolve["data"]["status"] == 200
-    assert resolve["data"]["instrument"] == "resano" and resolve["data"]["orientation"] == "backhand"
+    assert resolve["data"]["instrument"] == "potts" and resolve["data"]["orientation"] == "backhand"
     assert bad["data"]["status"] == 400
     assert TOKEN not in audit.path.read_text()
 
 
 def test_audit_endpoint_reports_a_tampered_log(make_server):
     base, audit = make_server(token=TOKEN)
-    call(base, "/resolve", {"instrument": "resano"}, headers=auth())
+    call(base, "/resolve", {"instrument": "potts"}, headers=auth())
     code, body, _ = call(base, "/audit", headers=auth())
     assert code == 200 and body["ok"] and body["entries"] == 1
-    audit.path.write_text(audit.path.read_text().replace("resano", "potts"))
+    audit.path.write_text(audit.path.read_text().replace("potts", "ryder"))
     assert call(base, "/audit", headers=auth())[1]["ok"] is False
