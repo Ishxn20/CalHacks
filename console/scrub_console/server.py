@@ -7,6 +7,7 @@
     POST /api/audio  (WAV body)   hands-free speech, transcribed by Cartesia, acted on only after the wake word
     POST /api/heard {text}        hands-free speech already transcribed in the browser (no Cartesia key), same gate
     POST /api/utterance {text}    a request with no wake word needed (CLI, tests, the Fetch.ai agent)
+    POST /api/understand {text}   dry run: the intent and reply a request would get, without acting on it
     GET  /api/tts?text=...        the reply as speech (Cartesia)
     POST /api/count               count check               POST /api/used {instrument}
     POST /api/report              end-of-case report        POST /api/predict   next-instrument suggestion
@@ -145,6 +146,9 @@ def make_handler(console: Console):
                     return self._json(200, bridge.handle_heard(str(a.get("text", ""))[:500], via="speech"))
                 if path == "/api/utterance":
                     return self._json(200, bridge.handle_text(str(a.get("text", ""))[:500]))
+                if path == "/api/understand":       # dry run: what a request would do, nothing moves (ASI:One agent)
+                    i = bridge.understand(str(a.get("text", ""))[:500], bridge.context())
+                    return self._json(200, {"intent": i.kind, "say": i.say, "source": i.source, "sim": bridge.sim})
                 if path == "/api/count":
                     return self._json(200, bridge.count_check())
                 if path == "/api/used":

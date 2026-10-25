@@ -4,6 +4,7 @@
     serve [--sim] [--demo] [--rehearse-droid] [--agents] [--record CAMERA|sim]
                                                  the dashboard at http://127.0.0.1:8780 (arm server must be running)
     export --site-url URL --key KEY --out DIR    accepted episodes as a LeRobot-style training set
+    asi                                          the ASI:One chat agent (Agentverse mailbox), talking to the console
     say "needle holder, 6-0 prolene, backhand"   one request through the same path the dashboard uses
     check                                        which integrations are configured, and is the arm reachable
 """
@@ -79,6 +80,12 @@ def cmd_export(args) -> None:
     print(f"exported {n} episodes to {args.out}")
 
 
+def cmd_asi(args) -> None:
+    from .asi_agent import run
+
+    run(args.console_url, Settings.from_env().audit_dir, args.port)
+
+
 def cmd_say(args) -> None:
     c = build_console(Settings.from_env(), sim=args.sim)
     print(json.dumps(c.bridge.handle_text(" ".join(args.text), via="cli"), indent=2))
@@ -119,6 +126,10 @@ def main(argv=None) -> None:
     x.add_argument("--key", default=os.environ.get("EXPORT_KEY"))
     x.add_argument("--out", default="datasets/scrub_v1")
     x.set_defaults(fn=cmd_export)
+    a = sub.add_parser("asi", help="the ASI:One chat agent on Agentverse (needs AGENTVERSE_API_KEY and a running console)")
+    a.add_argument("--console-url", default="http://127.0.0.1:8780")
+    a.add_argument("--port", type=int, default=8001)
+    a.set_defaults(fn=cmd_asi)
     r = sub.add_parser("demo", help="simulated arm + console + dashboard in one process (no hardware)")
     r.add_argument("--port", type=int, default=8780)
     r.add_argument("--fast", action="store_true", help="speed the simulated arm up")
