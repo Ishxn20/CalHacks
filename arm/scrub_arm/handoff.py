@@ -253,7 +253,8 @@ class ScrubAssistant:
                 # Either way round: the pinch is symmetric, and a tilted gripper can only lean away from the
                 # base (yaw 48 was unreachable at (445, 18), yaw -132 fine). A flipped requested instrument is
                 # presented with the wrist turned 180 deg (_flipped), still handle-first.
-                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"))
+                self._pick_at(t["x_mm"], t["y_mm"], t["yaw_deg"], t["thickness_mm"], fid=t.get("id"),
+                              jaw_mm=r.instrument.jaw_mm)
             except TaskFailed:
                 if attempt:
                     raise
@@ -422,9 +423,10 @@ class ScrubAssistant:
         return z
 
     def _pick_at(self, x_mm: float, y_mm: float, yaw_deg: float, thickness_mm: float,
-                 allow_flip: bool = True, fid: str | None = None) -> None:
-        """hover -> open -> centre (refine) -> straight down to grasp height -> grasp -> straight up. TaskFailed on
-        a miss (caller decides on retry).
+                 allow_flip: bool = True, fid: str | None = None, jaw_mm: tuple[float, float] | None = None) -> None:
+        """hover -> open -> centre (refine) -> jaws to the tool's open width -> straight down to grasp height ->
+        squeeze toward its close width -> straight up. TaskFailed on a miss (caller decides on retry).
+        jaw_mm: (open, close) for this tool (tray.yaml); None: fully open / fully closed.
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         plan_yaw = yaw_deg
@@ -441,9 +443,11 @@ class ScrubAssistant:
         # Ready: one smooth straight-down move to grasp height from wherever it was centred -- no adjusting, no
         # steps, no contact checks on the way (user); then close and go straight back up.
         slow = self.cfg.motion.approach_speed_scale
+        if jaw_mm:          # centred with the jaws fully open (the aim pixels were measured so); narrow them now
+            d.gripper_width(jaw_mm[0])      # so they come down without sweeping into the neighbours
         z_now = self.kin.fk(d.q_measured())[0][2]
         self.move_line(0, 0, (z_grasp - z_now) * 1000, speed=slow, exact=False)
-        got_it = d.gripper_grasp()
+        got_it = d.gripper_grasp(jaw_mm[1] if jaw_mm else None)
         # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
         self.move_line(0, 0, (z_hover - z_grasp) * 1000, speed=slow)
         if not got_it:
@@ -473,8 +477,7 @@ class ScrubAssistant:
                 pass              # something right under the hover point: let go from there, gently held above
         else:
             d.move_to(q_down + off, speed=slow)
-        d.gripper_open()
-        self.holding = None
+        self._let_go()
         d.move_to(q_hover, speed=slow)
 
     def _oriented(self, pose: str, orientation: str | None, flipped: bool = False) -> np.ndarray:
@@ -534,10 +537,18 @@ class ScrubAssistant:
         self._log("present timed out; still holding")
         return "timeout"
 
+    def _let_go(self, wait_s: float = 0.4) -> None:
+        """Open to the held tool's open width (just enough to let go: no wide swing into a hand or the pile)."""
+        jaw = self.holding.instrument.jaw_mm if self.holding else None
+        if jaw:
+            self.driver.gripper_width(jaw[0], wait_s=wait_s)
+        else:
+            self.driver.gripper_open(wait_s=wait_s)
+        self.holding = None
+
     def _release_and_retreat(self) -> None:
         self.phase = Phase.RELEASING
-        self.driver.gripper_open(wait_s=self.cfg.handoff.release_wait_s)
-        self.holding = None
+        self._let_go(self.cfg.handoff.release_wait_s)
         self.phase = Phase.MOVING
         self.driver.move_pose("home")
         self.phase = Phase.IDLE

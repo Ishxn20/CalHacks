@@ -50,6 +50,14 @@ class GripperCfg:
     grip_kd: float
     settle_s: float
     holding_min_gap: float  # rad
+    width_table: list[tuple[float, float]] = field(default_factory=list)   # (motor rad, jaw gap mm), rising
+
+    def angle_for(self, width_mm: float) -> float:
+        """Motor angle that opens the jaws to width_mm (measured table; without one, open)."""
+        if not self.width_table:
+            return self.open
+        rad, mm = zip(*self.width_table)
+        return float(np.interp(width_mm, mm, rad))
 
 
 @dataclass
@@ -145,6 +153,7 @@ class Instrument:
     category: str
     orientable: bool
     aliases: list[str]
+    jaw_mm: tuple[float, float] | None = None   # (open, close) jaw gap for this tool: approach / squeeze target
 
 
 @dataclass
@@ -235,6 +244,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         move_kp=float(g["move_kp"]), move_kd=float(g["move_kd"]),
         grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
+        width_table=[(_rad(a), float(w)) for a, w in g.get("width_mm_at_deg", [])],
     )
 
     m = d["motion"]
@@ -321,6 +331,7 @@ def load_tray_config(path: Path | str | None = None) -> TrayConfig:
         iid: Instrument(
             id=iid, name=str(v.get("name", iid)), category=str(v.get("category", iid)),
             orientable=bool(v.get("orientable", False)), aliases=[str(a) for a in v.get("aliases", [])],
+            jaw_mm=tuple(float(x) for x in v["jaw_mm"]) if v.get("jaw_mm") else None,
         )
         for iid, v in d["instruments"].items()
     }

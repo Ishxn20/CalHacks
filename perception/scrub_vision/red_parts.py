@@ -153,8 +153,10 @@ def features(comp: np.ndarray) -> dict:
     # oriented bounding box centre (canvas px) and long axis
     mid_u, mid_t = (u.max() + u.min()) / 2, (t.max() + t.min()) / 2
     centre = (mu + mid_u * ax + mid_t * np.array([-ax[1], ax[0]])) / MM_PX
+    jaw = np.abs(u - mid_u) < 6.0                                       # under the ~12 mm wide jaws
+    grip_w = float(t[jaw].max() - t[jaw].min()) if jaw.any() else medw  # what the jaws must span there
     return {"length": L, "area": area, "holes": holes, "medw": medw, "tipw": tip, "fill": fill.tolist(),
-            "vec": [L, area / L, medw, tip, tip / medw], "centre_rc": (centre[1], centre[0]), "axis_cr": ax}
+            "vec": [L, area / L, medw, tip, tip / medw], "grip_w": grip_w, "centre_rc": (centre[1], centre[0]), "axis_cr": ax}
 
 
 def classify(model: dict, f: dict) -> list[tuple[float, str]]:

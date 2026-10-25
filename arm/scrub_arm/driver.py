@@ -422,11 +422,19 @@ class ArmDriver:
         self.set_gripper(self.cfg.gripper.open)
         self.sleep(wait_s)
 
-    def gripper_grasp(self) -> bool:
-        """Squeeze softly toward fully closed. Returns True if the jaws stopped on an object."""
+    def gripper_width(self, width_mm: float, wait_s: float = 0.4) -> None:
+        """Open (or close) the jaws to this gap, mm (arm.yaml gripper.width_mm_at_deg)."""
+        self._check_gripper_calibrated()
+        self.set_gripper(self.cfg.gripper.angle_for(width_mm))
+        self.sleep(wait_s)
+
+    def gripper_grasp(self, close_mm: float | None = None) -> bool:
+        """Squeeze softly toward close_mm (a tool's close target; None: fully closed). Returns True if the jaws
+        stopped on an object."""
         self._check_gripper_calibrated()
         g = self.cfg.gripper
-        self.set_gripper(g.closed, g.grip_kp, g.grip_kd)
+        target = g.closed if close_mm is None else g.angle_for(close_mm)
+        self.set_gripper(target, g.grip_kp, g.grip_kd)
         self.sleep(g.settle_s)
         # Read the motor directly: a stale cached value would look like "stopped short" = holding.
         pos = float(self.read_fresh()[-1])
@@ -435,7 +443,7 @@ class ArmDriver:
         if np.isnan(pos):
             log.warning("no gripper feedback; assuming grasp succeeded")
             return True
-        return abs(pos - g.closed) >= g.holding_min_gap
+        return abs(pos - target) >= g.holding_min_gap
 
 
 def _deg_list(a: np.ndarray) -> list[float | None]:
