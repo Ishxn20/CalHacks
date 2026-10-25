@@ -8,6 +8,7 @@ Outputs (photos + joint angles) go to `hw_check/real/` (gitignored).
 
 | script | what it does |
 |---|---|
+| `pick.py [TOOL ...]` | type a tool ("10 blade", "tweezers", "ryder"...): pick it, check with the camera it's off the table, retry up to 3x; then hand off (release on tug) or put back. With names on the command line: pick each, put back |
 | `snap_scan.py OUTDIR` | go to the scan pose, save 3 frames + joints, park |
 | `draw_targets.py STEM OUT.jpg` | draw each detected part's outline, grab point and jaw line on a saved frame |
 | `pick_test.py PART [PART ...]` | scan, pick each named part with its jaw width, photograph every stage (target drawn), put it back |
