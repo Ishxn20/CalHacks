@@ -9,17 +9,23 @@ class FakeCartesia:
     def __init__(self, voices=("v1",)):
         self.tts_calls, self.stt_calls, self._voices = [], [], voices
         self.stt = SimpleNamespace(transcribe=self._transcribe)
-        self.tts = SimpleNamespace(bytes=self._bytes)
-        self.voices = SimpleNamespace(list=lambda limit=None: [SimpleNamespace(id=v, name="n") for v in self._voices])
+        self.tts = SimpleNamespace(generate=self._generate)
+        self.voices = SimpleNamespace(list=self._list)
+
+    def _list(self, limit=None):
+        """Like the SDK: an auto-paginating iterator. Walking past the first page would mean paging the whole catalogue."""
+        for v in self._voices:
+            yield SimpleNamespace(id=v, name="n")
+        if self._voices:
+            raise AssertionError("paged past the first voice")
 
     def _transcribe(self, **kw):
         self.stt_calls.append(kw)
         return SimpleNamespace(text="  castroviejo backhand  ")
 
-    def _bytes(self, **kw):
+    def _generate(self, **kw):
         self.tts_calls.append(kw)
-        yield b"RIFF"
-        yield b"data"
+        return SimpleNamespace(read=lambda: b"RIFFdata")
 
 
 def test_transcribe_sends_a_wav_to_ink_and_trims_the_text():
@@ -72,5 +78,5 @@ def test_real_sdk_accepts_the_arguments_we_send():
     from cartesia import Cartesia
 
     c = Cartesia(api_key="x")
-    assert {"model_id", "transcript", "voice", "output_format"} <= set(inspect.signature(c.tts.bytes).parameters)
+    assert {"model_id", "transcript", "voice", "output_format"} <= set(inspect.signature(c.tts.generate).parameters)
     assert {"file", "model", "language"} <= set(inspect.signature(c.stt.transcribe).parameters)

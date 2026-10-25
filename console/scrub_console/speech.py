@@ -49,11 +49,12 @@ class CartesiaSpeech:
 
     def _voice(self) -> str:
         if not self.voice_id:
-            voices = list(self.client.voices.list(limit=1))
-            if not voices:
+            # first item only: list() would auto-paginate through the whole voice catalogue (minutes)
+            voice = next(iter(self.client.voices.list(limit=1)), None)
+            if voice is None:
                 raise SpeechUnavailable("no Cartesia voices available: set CARTESIA_VOICE_ID")
-            self.voice_id = voices[0].id
-            log.info("using Cartesia voice %s (%s)", voices[0].id, getattr(voices[0], "name", "?"))
+            self.voice_id = voice.id
+            log.info("using Cartesia voice %s (%s); set CARTESIA_VOICE_ID to choose", voice.id, getattr(voice, "name", "?"))
         return self.voice_id
 
     def synthesize(self, text: str) -> bytes:
@@ -62,8 +63,8 @@ class CartesiaSpeech:
         if text in self._cache:
             self._cache.move_to_end(text)
             return self._cache[text]
-        audio = b"".join(self.client.tts.bytes(model_id=self.tts_model, transcript=text,
-                                               voice={"id": self._voice()}, output_format=WAV_24K))
+        audio = self.client.tts.generate(model_id=self.tts_model, transcript=text,
+                                         voice={"id": self._voice()}, output_format=WAV_24K).read()
         self._cache[text] = audio
         while len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)
