@@ -19,3 +19,11 @@ sim/declutter_eval*.json
 sim/*.log
 perception/*.log
 hw_check/
+sim/policy/checkpoints/*/replay_buffer.pkl
+
+# secrets, runtime logs, node
+.env
+.env.*
+!.env.example
+logs/
+node_modules/
