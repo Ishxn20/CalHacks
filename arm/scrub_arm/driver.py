@@ -431,15 +431,14 @@ class ArmDriver:
         self.set_gripper(self.cfg.gripper.angle_for(width_mm))
         self.sleep(wait_s)
 
-    def gripper_grasp(self, width_mm: float | None = None) -> bool:
-        """Close to gripper.squeeze_mm narrower than the part's width at the grab point (user: a few mm past it, so it's
-        pressed), with squeeze_kp; never past fully closed (set_gripper clamps). Without a width: to fully closed.
-        Returns True if the jaws stopped on an object (unreliable near closed: the tapered fingers flex round a part;
-        the caller never reopens on False)."""
+    def gripper_grasp(self) -> bool:
+        """Close softly until the jaws stall on the object (its width, as the jaws feel it), then tighten
+        gripper.squeeze_deg past that stall with squeeze_kp (user: a few degrees past the object, not past the
+        calibrated close). Never past closed: set_gripper clamps. Returns True if the jaws stopped on an object
+        (unreliable near closed: the tapered fingers flex round a part; the caller never reopens on False)."""
         self._check_gripper_calibrated()
         g = self.cfg.gripper
-        target = g.closed if width_mm is None or not g.width_table else g.angle_for(max(0.0, width_mm - g.squeeze_mm))
-        self.set_gripper(target, g.squeeze_kp or g.grip_kp, g.grip_kd)
+        self.set_gripper(g.closed, g.grip_kp, g.grip_kd)
         self.sleep(g.settle_s)
         # Read the motor directly: a stale cached value would look like "stopped short" = holding.
         pos = float(self.read_fresh()[-1])
@@ -448,7 +447,11 @@ class ArmDriver:
         if np.isnan(pos):
             log.warning("no gripper feedback; assuming grasp succeeded")
             return True
-        return pos - g.closed >= g.holding_min_gap
+        if g.squeeze_deg:
+            self.set_gripper(pos + np.sign(g.closed - g.open) * math.radians(g.squeeze_deg), g.squeeze_kp or g.grip_kp,
+                             g.grip_kd)
+            self.sleep(0.3)
+        return abs(pos - g.closed) >= g.holding_min_gap
 
 
 def _deg_list(a: np.ndarray) -> list[float | None]:

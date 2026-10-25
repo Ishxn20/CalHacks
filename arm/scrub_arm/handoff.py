@@ -428,7 +428,7 @@ class ScrubAssistant:
         """hover -> open -> centre (refine) -> jaws to the tool's open width -> straight down to grasp height ->
         close until the jaws stall on it, squeeze a few mm more -> straight up. TaskFailed on a miss (caller decides).
         jaw_open_mm: this tool's open width (tray.yaml); None: fully open. width_mm: the part's width across the jaws at
-        the grab point (vision); the jaws close to a few mm less than that, never past fully closed.
+        the grab point (vision; logged only: the grasp tightens a few degrees past where the jaws stall on it).
         allow_flip=False keeps the instrument's tip on a fixed side of the gripper (see Kinematics.ik_topdown)."""
         pk, d = self.cfg.pick, self.driver
         plan_yaw = yaw_deg
@@ -452,7 +452,9 @@ class ScrubAssistant:
             d.gripper_width(jaw_open_mm)    # so they come down without sweeping into the neighbours
         z_now = self.kin.fk(d.q_measured())[0][2]
         self.move_line(0, 0, (z_grasp - z_now) * 1000, speed=slow, exact=False)
-        got_it = d.gripper_grasp(width_mm)
+        got_it = d.gripper_grasp()
+        if width_mm is not None:
+            self._log(f"jaws stalled at {math.degrees(d.gripper_measured()):.1f} deg on a {width_mm:.1f} mm grab point")
         # straight up (a joint-space move back to the hover pose can swing the gripper through the pile)
         self.move_line(0, 0, (z_hover - z_grasp) * 1000, speed=slow)
         if not got_it:

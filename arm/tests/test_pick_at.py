@@ -261,7 +261,11 @@ def test_gripper_is_never_commanded_past_closed(ik_app):
     for cmd in (g.closed - 0.3, g.closed + 0.3 * np.sign(g.closed - g.open), g.open + 1.0):
         d.set_gripper(cmd)
         assert lo - 1e-9 <= d._g_cmd[0] <= hi + 1e-9
-    d.gripper_grasp(10.0)                       # closes to width - squeeze_mm, never past closed
+    d.bus.object_in_jaws = True
+    d.gripper_grasp()                           # tightens squeeze_deg past where the jaws stalled, never past closed
+    stall = float(d.read_fresh()[-1])
     assert lo - 1e-9 <= d._g_cmd[0] <= hi + 1e-9
-    if g.width_table:
-        assert abs(d._g_cmd[0] - g.angle_for(10.0 - g.squeeze_mm)) < 1e-6 or d._g_cmd[0] in (lo, hi)
+    assert abs(abs(d._g_cmd[0] - stall) - np.radians(g.squeeze_deg)) < np.radians(1.5) or d._g_cmd[0] in (lo, hi)
+    d.bus.object_in_jaws = False
+    d.gripper_grasp()                           # empty jaws: stops at closed, not beyond
+    assert lo - 1e-9 <= d._g_cmd[0] <= hi + 1e-9

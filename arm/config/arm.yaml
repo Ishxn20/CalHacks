@@ -41,9 +41,9 @@ gripper:
   settle_s: 0.6          # time to let the jaws close before checking the grasp
   # If the jaws stop at least this far (deg) short of `closed_deg`, something is in them.
   holding_min_gap_deg: 2.5   # the tapered tips stall only ~5 deg short of closed on a 13.5 mm scalpel
-  squeeze_mm: 3.0        # grasp: close to this much narrower than the part's width at the grab point (user), never
-                         # past closed_deg (a hard limit: commanding past it broke the gripper)
-  squeeze_kp: 20.0       # stiffness for that close (a soft kp 6 close stalled short of a thin needle-holder neck)
+  squeeze_deg: 4.0       # grasp: after the jaws stall on the object, tighten this many degrees further (user: a few
+                         # degrees past the object, never past closed_deg, a hard limit: going past it broke the gripper)
+  squeeze_kp: 20.0       # stiffness for that tightening
   # Jaw gap between the fingertips (mm) at each motor angle (deg): re-measured 2026-10-24 after the user recalibrated
   # closed_deg to where the tips really meet (-109.5): wrist-camera hand-eye projection of the fingers, ~0.33 mm/deg
   # (the camera can't resolve the last ~10 mm, so that step is the same slope).

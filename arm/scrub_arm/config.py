@@ -51,7 +51,7 @@ class GripperCfg:
     settle_s: float
     holding_min_gap: float  # rad
     width_table: list[tuple[float, float]] = field(default_factory=list)   # (motor rad, jaw gap mm), rising
-    squeeze_mm: float = 0.0        # after the jaws stall on a tool, close this much further (pressure)
+    squeeze_deg: float = 0.0       # after the jaws stall on the object, close this many degrees further (pressure)
     squeeze_kp: float = 0.0        # stiffness for that squeeze (0: grip_kp)
 
     def width_at(self, rad: float) -> float:
@@ -252,7 +252,7 @@ def load_arm_config(path: Path | str | None = None) -> ArmConfig:
         grip_kp=float(g["grip_kp"]), grip_kd=float(g["grip_kd"]),
         settle_s=float(g["settle_s"]), holding_min_gap=_rad(g["holding_min_gap_deg"]),
         width_table=[(_rad(a), float(w)) for a, w in g.get("width_mm_at_deg", [])],
-        squeeze_mm=float(g.get("squeeze_mm", 0.0)), squeeze_kp=float(g.get("squeeze_kp", 0.0)),
+        squeeze_deg=float(g.get("squeeze_deg", 0.0)), squeeze_kp=float(g.get("squeeze_kp", 0.0)),
     )
 
     m = d["motion"]
